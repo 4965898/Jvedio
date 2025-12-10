@@ -1,1 +1,0 @@
-﻿ffmpeg -i "F:\电影\钢铁侠\钢铁侠1.mkv" -filter:v fps=1/7200 "D:\test\screenshot\output_%02d.jpg"
