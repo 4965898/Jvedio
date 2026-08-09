@@ -456,10 +456,14 @@ namespace Jvedio.Entity
             video.TagStamp = new ObservableCollection<TagStamp>();
             if (video == null || string.IsNullOrEmpty(video.TagIDs))
                 return;
-            List<long> list = video.TagIDs.Split(',').Select(arg => long.Parse(arg)).ToList();
-            if (list != null && list.Count > 0) {
-                foreach (var item in Jvedio.Entity.CommonSQL.TagStamp.TagStamps.Where(arg => list.Contains(arg.TagID)).ToList())
-                    video.TagStamp.Add(item);
+            Dictionary<long, TagStamp> dict = Jvedio.Entity.CommonSQL.TagStamp.TagStampDict;
+            if (dict == null || dict.Count == 0)
+                return;
+            foreach (string s in video.TagIDs.Split(',')) {
+                if (string.IsNullOrEmpty(s))
+                    continue;
+                if (long.TryParse(s, out long tagID) && dict.TryGetValue(tagID, out TagStamp stamp))
+                    video.TagStamp.Add(stamp);
             }
         }
 

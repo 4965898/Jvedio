@@ -9,6 +9,11 @@ namespace Jvedio.Core.WindowConfig
 
         public const int DEFAULT_SYNC_CONCURRENCY = 2;
 
+        /// <summary>
+        /// 刮削等操作使影片新增图片后，累计多少条触发一次后台静默重建图片索引；0 表示关闭
+        /// </summary>
+        public const int DEFAULT_AUTO_REBUILD_IMAGE_INDEX_COUNT = 10;
+
         private Settings() : base($"WindowConfig.Settings")
         {
             PicPathMode = 1; // 相对路径
@@ -36,7 +41,8 @@ namespace Jvedio.Core.WindowConfig
 
             DelInfoAfterDelFile = true;
 
-            SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
+SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
+            AutoRebuildImageIndexCount = DEFAULT_AUTO_REBUILD_IMAGE_INDEX_COUNT;
         }
 
         public static List<int> BackUpPeriods = new List<int> { 1, 3, 7, 15, 30 };
@@ -102,6 +108,11 @@ namespace Jvedio.Core.WindowConfig
         public string NFOSavePath { get; set; }
 
         public long SyncConcurrency { get; set; }
+
+        /// <summary>
+        /// 自动重建图片存在性索引的累计阈值（条数），0 表示关闭
+        /// </summary>
+        public long AutoRebuildImageIndexCount { get; set; }
 
 
 

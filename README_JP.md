@@ -19,8 +19,8 @@
 [![.NET CORE](https://img.shields.io/badge/.NET%20Framework-4.7.2-d.svg)](#)
 [![Platform](https://img.shields.io/badge/Platform-Win-brightgreen.svg)](#)
 [![LICENSE](https://img.shields.io/badge/license-GPL%203.0-blue)](#)
-[![Star](https://img.shields.io/github/stars/hitchao/Jvedio?label=Star%20this%20repo)](https://github.com/hitchao/Jvedio)
-[![Fork](https://img.shields.io/github/forks/hitchao/Jvedio?label=Fork%20this%20repo)](https://github.com/hitchao/Jvedio/fork)
+[![Star](https://img.shields.io/github/stars/4965898/Jvedio?label=Star%20this%20repo)](https://github.com/4965898/Jvedio)
+[![Fork](https://img.shields.io/github/forks/4965898/Jvedio?label=Fork%20this%20repo)](https://github.com/4965898/Jvedio/fork)
 
 
 
@@ -30,7 +30,7 @@
 ウィンドウデスクトップ上の`FFmpeg`、スムーズで美しいアプリケーションソフトウェアに基づいてビデオ写真をキャプチャします
 
 
-公式ウェブサイト：[Jvedio](https://hitchao.github.io/JvedioWebPage/) | ダウンロードリンク：[最新バージョン](https://github.com/hitchao/Jvedio/releases)
+公式ウェブサイト：[Jvedio](https://hitchao.github.io/JvedioWebPage/) | ダウンロードリンク：[最新バージョン](https://github.com/4965898/Jvedio/releases)
 
 
 
@@ -67,6 +67,20 @@
 | Chrome(360スピードブラウザ)プラグイン| [Jvedio-Chrome-Extensions](https://github.com/hitchao/Jvedio-Chrome-Extensions)|
 | Jvedioアップグレードサーバーソース| [jvedioupdate](https://github.com/hitchao/jvedioupdate)|
 | Gifコン​​トロールが変更されました| [WpfAnimatedGif](https://github.com/hitchao/WpfAnimatedGif)|
+
+
+# 自改バージョン履歴
+
+> 元リポジトリ（hitchao/Jvedio）はアーカイブ済みです。5.4.0.1 から [4965898/Jvedio](https://github.com/4965898/Jvedio) がメンテナンスを引き継いでいます：
+
+| バージョン | 公開日 | 主な内容 |
+|---|---|---|
+| 5.4.0.1 | 2025-12-04 | 画像の一括削除機能；画像によるフィルタ機能 |
+| 5.4.0.2 | 2025-12-10 | ポスタ・サムネイルフィルタの最適化 |
+| 5.4.0.3 | 2025-12-30 | メンテナンス更新 |
+| 5.4.0.4 | 2026-02-21 | 失敗した同期情報のワンクリック再起動機能；追加フィルタ機能 |
+| 5.4.0.5 | 2026-05-02 | 俳優情報の有無によるフィルタ；その他の最適化 |
+| 5.4.0.6 | 2026-08-10 | ページめくりレンダリング最適化（高速ページめくり時のクラッシュと遅延を修正）；画像存在インデックスの自動再構築；起動スキャンのバックグラウンド化；JavBus スクレイピング修正 |
 
 
 # ソフトウェア特性

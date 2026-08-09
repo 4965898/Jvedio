@@ -930,53 +930,82 @@
                             Margin="3"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Bottom">
-                            <Path RenderTransformOrigin="0.5,0.5">
-                                <Path.RenderTransform>
-                                    <RotateTransform CenterX="0" CenterY="0" />
-                                </Path.RenderTransform>
-                                <Path.Style>
-                                    <Style TargetType="Path">
+                            <Grid Width="14" Height="14">
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
                                         <Setter Property="Visibility" Value="Hidden" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Running, Source={x:Static local:App.ScanManager}}" Value="True">
-                                                <DataTrigger.EnterActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation
-                                                                RepeatBehavior="Forever"
-                                                                Storyboard.TargetProperty="RenderTransform.Angle"
-                                                                From="0"
-                                                                To="360"
-                                                                Duration="0:0:1" />
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </DataTrigger.EnterActions>
-                                                <DataTrigger.ExitActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation
-                                                                Storyboard.TargetProperty="RenderTransform.Angle"
-                                                                To="0"
-                                                                Duration="0:0:0" />
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </DataTrigger.ExitActions>
                                                 <Setter Property="Visibility" Value="Visible" />
-                                                <Setter Property="Fill" Value="{DynamicResource Common.HighLight.Deep.Background}" />
-                                                <Setter Property="Data" Value="M171.292444 548.977778a337.464889 337.464889 0 0 1 210.488889-367.445334c111.616-43.52 231.992889-22.698667 317.212445 39.480889L626.460444 338.488889l325.233778-1.251556L835.470222 0l-59.562666 96.426667C650.353778 15.075556 479.175111-11.491556 329.272889 46.933333 121.628444 127.886222 2.048 337.351111 25.6 549.034667h145.635556zM852.764444 465.009778a337.464889 337.464889 0 0 1-210.488888 367.502222c-102.627556 39.992889-215.836444 24.917333-302.819556-29.013333l65.536-106.211556-349.752889-20.48L203.093333 1024l62.065778-100.465778c125.553778 81.351111 279.608889 102.001778 429.511111 43.52 207.644444-80.952889 327.224889-290.304 303.616-502.044444h-145.635555z" />
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding Running, Source={x:Static local:App.ScanManager}}" Value="False">
                                                 <Setter Property="Visibility" Value="Visible" />
-                                                <Setter Property="Fill" Value="{DynamicResource Common.Status.Complete.Background}" />
-                                                <Setter Property="Data" Value="M947.605 139.803c-15.766-15.763-39.836-14.107-57.1 0-133.71 109.263-541.798 419.618-541.798 419.618s-165.018-71.128-216.268-94.163c-20.338-9.14-41.328-15.766-57.101 0-15.763 15.763-15.763 41.326 0 57.087 0 0 242.992 244.252 244.157 245.415 8.052 8.052 18.652 11.867 29.212 11.693 10.554 0.175 21.154-3.64 29.211-11.693 1.159-1.163 427.18-428.238 569.686-570.87 15.759-15.772 15.768-41.324 0.001-57.087z m0 0" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Running, Source={x:Static local:App.ScanManager}}" Value="null">
-                                                <Setter Property="Visibility" Value="Hidden" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </Path.Style>
-                            </Path>
+                                </Grid.Style>
+                                <!-- 扫描/索引进行中：旋转的小圆圈 -->
+                                <Path RenderTransformOrigin="0.5,0.5">
+                                    <Path.RenderTransform>
+                                        <RotateTransform CenterX="0" CenterY="0" />
+                                    </Path.RenderTransform>
+                                    <Path.Style>
+                                        <Style TargetType="Path">
+                                            <Setter Property="Visibility" Value="Hidden" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Running, Source={x:Static local:App.ScanManager}}" Value="True">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation
+                                                                    RepeatBehavior="Forever"
+                                                                    Storyboard.TargetProperty="RenderTransform.Angle"
+                                                                    From="0"
+                                                                    To="360"
+                                                                    Duration="0:0:1" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation
+                                                                    Storyboard.TargetProperty="RenderTransform.Angle"
+                                                                    To="0"
+                                                                    Duration="0:0:0" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.ExitActions>
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Setter Property="Fill" Value="{DynamicResource Common.HighLight.Deep.Background}" />
+                                                    <Setter Property="Data" Value="M171.292444 548.977778a337.464889 337.464889 0 0 1 210.488889-367.445334c111.616-43.52 231.992889-22.698667 317.212445 39.480889L626.460444 338.488889l325.233778-1.251556L835.470222 0l-59.562666 96.426667C650.353778 15.075556 479.175111-11.491556 329.272889 46.933333 121.628444 127.886222 2.048 337.351111 25.6 549.034667h145.635556zM852.764444 465.009778a337.464889 337.464889 0 0 1-210.488888 367.502222c-102.627556 39.992889-215.836444 24.917333-302.819556-29.013333l65.536-106.211556-349.752889-20.48L203.093333 1024l62.065778-100.465778c125.553778 81.351111 279.608889 102.001778 429.511111 43.52 207.644444-80.952889 327.224889-290.304 303.616-502.044444h-145.635555z" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Path.Style>
+                                </Path>
+                                <!-- 扫描/索引完成：绿色小圆圈中间白色对勾 -->
+                                <Grid>
+                                    <Grid.Style>
+                                        <Style TargetType="Grid">
+                                            <Setter Property="Visibility" Value="Hidden" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Running, Source={x:Static local:App.ScanManager}}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Grid.Style>
+                                    <Ellipse
+                                        Fill="{DynamicResource Common.Status.Complete.Background}"
+                                        Stretch="Uniform" />
+                                    <Path
+                                        Margin="2.4"
+                                        Data="M23.9 13.2l-6.3 6.3-3.7-3.7-1.9 1.9 5.6 5.6 8.2-8.2z"
+                                        Fill="White"
+                                        Stretch="Uniform" />
+                                </Grid>
+                            </Grid>
                         </Viewbox>
                     </Grid>
                     <Grid>

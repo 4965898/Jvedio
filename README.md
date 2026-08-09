@@ -21,8 +21,8 @@
 [![.NET CORE](https://img.shields.io/badge/.NET%20Framework-4.7.2-d.svg)](#)
 [![Platform](https://img.shields.io/badge/Platform-Win-brightgreen.svg)](#)
 [![LICENSE](https://img.shields.io/badge/license-GPL%203.0-blue)](#)
-[![Star](https://img.shields.io/github/stars/hitchao/Jvedio?label=Star%20this%20repo)](https://github.com/hitchao/Jvedio)
-[![Fork](https://img.shields.io/github/forks/hitchao/Jvedio?label=Fork%20this%20repo)](https://github.com/hitchao/Jvedio/fork)
+[![Star](https://img.shields.io/github/stars/4965898/Jvedio?label=Star%20this%20repo)](https://github.com/4965898/Jvedio)
+[![Fork](https://img.shields.io/github/forks/4965898/Jvedio?label=Fork%20this%20repo)](https://github.com/4965898/Jvedio/fork)
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`Jvedio` 是本地视频管理软件，支持扫描本地视频并导入软件，建立视频库，
 提取出视频的 **唯一识别码**，自动分类视频，
@@ -30,7 +30,7 @@
 基于 `FFmpeg` 截取视频图片，Window 桌面端流畅美观的应用软件
 
 
-官方网址：[Jvedio](https://hitchao.github.io/JvedioWebPage/) | 下载地址：[最新版本](https://github.com/hitchao/Jvedio/releases)
+官方网址：[Jvedio](https://hitchao.github.io/JvedioWebPage/) | 下载地址：[最新版本](https://github.com/4965898/Jvedio/releases)
 
 ---
 
@@ -64,6 +64,19 @@
 |Chrome（360极速浏览器） 插件|[Jvedio-Chrome-Extensions](https://github.com/hitchao/Jvedio-Chrome-Extensions)|
 |Jvedio 升级的服务器源|[jvedioupdate](https://github.com/hitchao/jvedioupdate)|
 |Gif 控件修改于|[WpfAnimatedGif](https://github.com/hitchao/WpfAnimatedGif)|
+
+# 自改版本记录
+
+> 原仓库（hitchao/Jvedio）已归档，自 5.4.0.1 起由 [4965898/Jvedio](https://github.com/4965898/Jvedio) 接手维护，以下为自改版本变更记录：
+
+| 版本 | 发布日期 | 主要内容 |
+|---|---|---|
+| 5.4.0.1 | 2025-12-04 | 增加批量删图功能；增加按图片筛选功能 |
+| 5.4.0.2 | 2025-12-10 | 优化海报图、缩略图筛选功能 |
+| 5.4.0.3 | 2025-12-30 | 维护性更新 |
+| 5.4.0.4 | 2026-02-21 | 增加失败同步信息一键重启功能；增加额外筛选功能 |
+| 5.4.0.5 | 2026-05-02 | 增加按演员信息有无筛选；其他优化 |
+| 5.4.0.6 | 2026-08-10 | 翻页渲染优化（修复快速翻页闪退、越翻越慢）；图片存在性索引自动重建；启动扫描后台化；JavBus 刮削修复 |
 
 # 版本计划
 

@@ -420,6 +420,7 @@
     </Compile>
     <Compile Include="Utils\Extern\JvedioLib.cs" />
     <Compile Include="Core\Tasks\DownloadManager.cs" />
+    <Compile Include="Core\Tasks\ImageIndexManager.cs" />
     <Compile Include="Mapper\Common\AssociationMapper.cs" />
     <Compile Include="Mapper\Common\ActorMapper.cs" />
     <Compile Include="Mapper\Common\AIFaceMapper.cs" />

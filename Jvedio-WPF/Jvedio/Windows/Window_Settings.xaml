@@ -1862,6 +1862,21 @@
                                     Style="{StaticResource NormalStaticProgressBar}"
                                     Visibility="{Binding IndexCreating, Converter={StaticResource BoolToVisibilityConverter}}" />
 
+                                <StackPanel Margin="10,5" Orientation="Horizontal">
+                                    <TextBlock
+                                        MinWidth="170"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="{DynamicResource AutoRebuildImageIndex}"
+                                        TextAlignment="Left" />
+                                    <super:SearchBox
+                                        MinWidth="80"
+                                        Background="{DynamicResource Window.Title.Background}"
+                                        ShowClearButton="False"
+                                        Text="{Binding AutoRebuildImageIndexCount, Mode=TwoWay}"
+                                        TextAlignment="Center" />
+                                </StackPanel>
+
                             </StackPanel>
                         </Grid>
                         <Grid>

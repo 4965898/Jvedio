@@ -380,12 +380,24 @@ namespace Jvedio.Entity
 
         static MetaData()
         {
-            DefaultSmallImage =
-                new BitmapImage(new Uri("pack://application:,,,/Resources/Picture/NoPrinting_S.png", UriKind.RelativeOrAbsolute));
-            DefaultBigImage =
-                new BitmapImage(new Uri("pack://application:,,,/Resources/Picture/NoPrinting_B.png", UriKind.RelativeOrAbsolute));
-            DefaultActorImage =
-                new BitmapImage(new Uri("pack://application:,,,/Resources/Picture/NoPrinting_A.png", UriKind.RelativeOrAbsolute));
+            DefaultSmallImage = CreateDefaultImage("pack://application:,,,/Resources/Picture/NoPrinting_S.png");
+            DefaultBigImage = CreateDefaultImage("pack://application:,,,/Resources/Picture/NoPrinting_B.png");
+            DefaultActorImage = CreateDefaultImage("pack://application:,,,/Resources/Picture/NoPrinting_A.png");
+        }
+
+        /// <summary>
+        /// 创建并 Freeze 默认图片，使其可以在后台线程解码后跨线程安全使用
+        /// </summary>
+        private static BitmapImage CreateDefaultImage(string uri)
+        {
+            BitmapImage image = new BitmapImage();
+            image.BeginInit();
+            image.UriSource = new Uri(uri, UriKind.RelativeOrAbsolute);
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.EndInit();
+            if (image.CanFreeze)
+                image.Freeze();
+            return image;
         }
 
         public override bool Equals(object obj)

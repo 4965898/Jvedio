@@ -315,11 +315,20 @@ namespace Jvedio.ViewModel
             }
         }
 
-        private int _SyncConcurrency = (int)ConfigManager.Settings.SyncConcurrency;
+private int _SyncConcurrency = (int)ConfigManager.Settings.SyncConcurrency;
         public int SyncConcurrency {
             get { return _SyncConcurrency; }
             set {
                 _SyncConcurrency = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        private int _AutoRebuildImageIndexCount = (int)ConfigManager.Settings.AutoRebuildImageIndexCount;
+        public int AutoRebuildImageIndexCount {
+            get { return _AutoRebuildImageIndexCount; }
+            set {
+                _AutoRebuildImageIndexCount = value;
                 RaisePropertyChanged();
             }
         }

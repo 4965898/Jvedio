@@ -928,6 +928,9 @@ namespace Jvedio
             ConfigManager.Settings.AutoBackup = vieModel.AutoBackup;
             ConfigManager.Settings.AutoBackupPeriodIndex = vieModel.AutoBackupPeriodIndex;
             ConfigManager.Settings.SyncConcurrency = vieModel.SyncConcurrency;
+            if (vieModel.AutoRebuildImageIndexCount < 0)
+                vieModel.AutoRebuildImageIndexCount = 0;
+            ConfigManager.Settings.AutoRebuildImageIndexCount = vieModel.AutoRebuildImageIndexCount;
 
             // 代理
             ConfigManager.ProxyConfig.Server = vieModel.ProxyServer;

@@ -305,6 +305,9 @@ namespace Jvedio.ViewModel
                 }
             }
 
+            // 关联数据已变更，使邻接表缓存失效
+            associationMapper.InvalidateCache();
+
             return toDelete;
         }
     }

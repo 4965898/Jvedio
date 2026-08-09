@@ -816,6 +816,18 @@ namespace Jvedio
             }
         }
 
+        /// <summary>
+        /// 启动时后台静默扫描完成后调用：刷新统计、按需加载新影片并截图
+        /// </summary>
+        public void OnBackgroundScanComplete(List<Video> insertVideos)
+        {
+            vieModel.Statistic();
+            if (ConfigManager.ScanConfig.LoadDataAfterScan)
+                LoadAll();
+            if (ConfigManager.FFmpegConfig.ScreenShotAfterImport)
+                ScreenShotAfterImport(insertVideos);
+        }
+
         private void OnDragFileOver(object sender, DragEventArgs e)
         {
             e.Effects = DragDropEffects.Link;

@@ -1,4 +1,4 @@
-using Jvedio.Core.CustomEventArgs;
+﻿using Jvedio.Core.CustomEventArgs;
 using Jvedio.Core.Enums;
 using Jvedio.Entity;
 using Jvedio.Entity.CommonSQL;
@@ -22,7 +22,7 @@ namespace Jvedio.Core.UserControls.ViewModels
     {
         private const int SEARCH_CANDIDATE_MAX_COUNT = 10;
 
-        #region "事件"
+        #region "浜嬩欢"
 
         //public Action<bool> onScroll;
         public Action<long> onPageChange;
@@ -35,20 +35,41 @@ namespace Jvedio.Core.UserControls.ViewModels
 
         public event EventHandler RenderSqlChanged;
 
-        private delegate void LoadVideoDelegate(Video video, int idx);
+        #endregion
 
+        #region "娓叉煋涓茶鍖?
 
-        private delegate void LoadViewAssoVideoDelegate(Video video, int idx);
+        /// <summary>
+        /// 鎵归噺鏇存柊 UI 鐨勬潯鏁?
+        /// </summary>
+        private const int UI_UPDATE_BATCH_SIZE = 12;
 
-        private void LoadViewAssoVideo(Video video, int idx) => ViewAssociationDatas.Add(video);
+        /// <summary>
+        /// 娓叉煋鐗堟湰鍙凤紝姣忔缈婚〉鑷锛屾棫娓叉煋寰幆妫€娴嬪埌鐗堟湰涓嶄竴鑷寸珛鍗抽€€鍑?
+        /// </summary>
+        private int _RenderVersion = 0;
 
-        private delegate void AsyncLoadItemDelegate<T>(ObservableCollection<T> list, T item);
+        /// <summary>
+        /// 褰撳墠娓叉煋浠诲姟锛屾柊鐨勭炕椤佃姹傚繀椤荤瓑寰呭畠鐪熸缁撴潫
+        /// </summary>
+        private Task _RenderTask = null;
 
-        private void AsyncLoadItem<T>(ObservableCollection<T> list, T item) => list.Add(item);
+        private class QueryResult
+        {
+            public long Total { get; set; }
+
+            public List<Video> Videos { get; set; }
+
+            public QueryResult(long total, List<Video> videos)
+            {
+                Total = total;
+                Videos = videos;
+            }
+        }
 
         #endregion
 
-        #region "静态属性"
+        #region "闈欐€佸睘鎬?
 
         public static List<string> SortDict { get; set; } = new List<string>()
 {
@@ -94,27 +115,27 @@ namespace Jvedio.Core.UserControls.ViewModels
 
         #endregion
 
-        #region "属性"
+        #region "灞炴€?
         public Queue<int> PageQueue { get; set; } = new Queue<int>();
 
 
         /// <summary>
-        /// 过滤器传进的
+        /// 杩囨护鍣ㄤ紶杩涚殑
         /// </summary>
         public SelectWrapper<Video> FilterWrapper { get; set; }
 
         /// <summary>
-        /// 过滤器传进的 SQL
+        /// 杩囨护鍣ㄤ紶杩涚殑 SQL
         /// </summary>
         public string FilterSQL { get; set; }
 
         /// <summary>
-        /// 侧边栏点击进入的
+        /// 渚ц竟鏍忕偣鍑昏繘鍏ョ殑
         /// </summary>
         public SelectWrapper<Video> ExtraWrapper { get; set; }
 
         /// <summary>
-        /// 搜索
+        /// 鎼滅储
         /// </summary>
         public SelectWrapper<Video> SearchWrapper { get; set; }
 
@@ -447,7 +468,7 @@ namespace Jvedio.Core.UserControls.ViewModels
             }
         }
 
-        // 影片关联
+        // 褰辩墖鍏宠仈
         private ObservableCollection<Video> _AssociationDatas;
 
         public ObservableCollection<Video> AssociationDatas {
@@ -462,7 +483,7 @@ namespace Jvedio.Core.UserControls.ViewModels
         #endregion
 
 
-        #region "筛选"
+        #region "绛涢€?
 
 
 
@@ -505,39 +526,18 @@ namespace Jvedio.Core.UserControls.ViewModels
         public void Refresh() => Select();
 
 
-        private void LoadVideo(Video video, int idx)
-        {
-            if (RenderVideoCT.IsCancellationRequested)
-                return;
-            if (CurrentVideoList.Count < PageSize) {
-                if (idx < CurrentVideoList.Count) {
-                    LoadVideo(idx, video);
-                } else {
-                    CurrentVideoList.Add(video);
-                }
-            } else {
-                if (idx < CurrentVideoList.Count) {
-                    LoadVideo(idx, video);
-                }
-            }
-        }
-
-        private void LoadVideo(int idx, Video video)
-        {
-            if (CurrentVideoList[idx].DataID == video.DataID) {
-                // 不知为啥，如果 2 个对象相等，则不会触发 notify
-                Video temp = CurrentVideoList[idx];
-                RefreshData(ref temp, video);
-            } else {
-                CurrentVideoList[idx] = video;
-            }
-        }
-
         public void RefreshVideoRenderToken()
         {
+            CancellationTokenSource old = RenderVideoCTS;
             RenderVideoCTS = new CancellationTokenSource();
             RenderVideoCTS.Token.Register(() => { Logger.Warn("cancel load video page task"); });
             RenderVideoCT = RenderVideoCTS.Token;
+            try {
+                old?.Cancel();
+                old?.Dispose();
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
         }
 
 
@@ -589,17 +589,27 @@ namespace Jvedio.Core.UserControls.ViewModels
         {
             Logger.Info("0.Select");
 
-            // 判断当前获取的队列
+            // 鍒ゆ柇褰撳墠鑾峰彇鐨勯槦鍒?
             while (PageQueue.Count > 1) {
                 int page = PageQueue.Dequeue();
                 Logger.Info($"skip page: {page}");
             }
 
-            // 当前有视频在渲染的时候，打断渲染，等待结束
-            while (Rendering) {
-                RenderVideoCTS?.Cancel();
-                await Task.Delay(100);
+            // 姣忔缈婚〉鐗堟湰鍙疯嚜澧烇紝璁╂鍦ㄨ繍琛岀殑鏃ф覆鏌撳敖蹇€€鍑?
+            int version = Interlocked.Increment(ref _RenderVersion);
+
+            // 鍗曢锛氱瓑寰呬笂涓€娆℃覆鏌撲换鍔＄湡姝ｇ粨鏉燂紝閬垮厤骞跺彂娓叉煋瀵艰嚧闂€€
+            Task prevTask = _RenderTask;
+            if (prevTask != null && !prevTask.IsCompleted) {
+                try {
+                    await prevTask;
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                }
             }
+            // 绛夊緟鏈熼棿宸茬粡鏈夋洿鏂扮殑璇锋眰杩涙潵浜嗭紝鏀惧純鏈鏌ヨ
+            if (version != _RenderVersion)
+                return;
 
             SelectWrapper<Video> wrapper = Video.InitWrapper();
 
@@ -629,7 +639,7 @@ namespace Jvedio.Core.UserControls.ViewModels
                     sql += FilterSQL;
             }
 
-            // todo 如果搜索框选中了标签，搜索出来的结果不一致
+            // todo 濡傛灉鎼滅储妗嗛€変腑浜嗘爣绛撅紝鎼滅储鍑烘潵鐨勭粨鏋滀笉涓€鑷?
             SearchField searchType = (SearchField)SearchSelectedIndex;
             if (Searching) {
                 if (searchType == SearchField.ActorName)
@@ -646,16 +656,38 @@ namespace Jvedio.Core.UserControls.ViewModels
             }
 
             string count_sql = "select count(DISTINCT metadata.DataID) " + sql + wrapper.ToWhere(false);
-            TotalCount = metaDataMapper.SelectCount(count_sql);
+            string select_sql = wrapper.ToSelect(false) + sql + wrapper.ToWhere(false) + wrapper.ToOrder() + wrapper.ToLimit();
+
+            // 鏁版嵁搴撴煡璇㈢Щ鍒板悗鍙扮嚎绋嬶紝閬垮厤闃诲 UI
+            QueryResult result = null;
+            try {
+                result = await Task.Run(() => {
+                    long total = metaDataMapper.SelectCount(count_sql);
+                    List<Dictionary<string, object>> list = metaDataMapper.Select(select_sql);
+                    List<Video> videos = list == null
+                        ? new List<Video>()
+                        : metaDataMapper.ToEntity<Video>(list, typeof(Video).GetProperties(), false);
+                    return new QueryResult(total, videos);
+                });
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                return;
+            }
+            // 鏌ヨ鏈熼棿鍙堟湁鏂拌姹傦紝涓㈠純鏈缁撴灉
+            if (version != _RenderVersion)
+                return;
+
+            TotalCount = result.Total;
+            VideoList = result.Videos;
+            CurrentCount = VideoList.Count;
 
             WrapperEventArg<Video> arg = new WrapperEventArg<Video>();
             arg.Wrapper = wrapper;
             arg.SQL = sql;
             RenderSqlChanged?.Invoke(null, arg);
 
-            sql = wrapper.ToSelect(false) + sql + wrapper.ToWhere(false) + wrapper.ToOrder() + wrapper.ToLimit();
             onPageChange?.Invoke(TotalCount);
-            RenderCurrentVideo(sql);
+            _RenderTask = RenderAsync(version);
         }
 
         public void SetSortOrder<T>(IWrapper<T> wrapper, bool random = false)
@@ -687,20 +719,7 @@ namespace Jvedio.Core.UserControls.ViewModels
 
 
 
-        public void RenderCurrentVideo(string sql)
-        {
-            List<Dictionary<string, object>> list = metaDataMapper.Select(sql);
-            List<Video> videos = metaDataMapper.ToEntity<Video>(list, typeof(Video).GetProperties(), false);
-
-            VideoList = new List<Video>();
-            if (videos == null)
-                videos = new List<Video>();
-            VideoList.AddRange(videos);
-            CurrentCount = VideoList.Count;
-            Render();
-        }
-
-        public async void Render()
+        public Task RenderAsync(int version)
         {
             Logger.Info("1.Render");
             if (CurrentVideoList == null) {
@@ -713,41 +732,99 @@ namespace Jvedio.Core.UserControls.ViewModels
 
             PageChangedStarted?.Invoke();
 
+            // 鍙栨秷骞舵浛鎹㈡棫鐨勫彇娑堜护鐗?
             RefreshVideoRenderToken();
             Rendering = true;
             RenderProgress = 0;
-            for (int i = 0; i < VideoList.Count; i++) {
+
+            List<Video> videos = VideoList;
+            CancellationToken token = RenderVideoCT;
+            return Task.Run(async () => {
                 try {
-                    RenderVideoCT.ThrowIfCancellationRequested();
-                } catch (OperationCanceledException) {
-                    RenderVideoCTS?.Dispose();
-                    break;
+                    int from = 0;
+                    for (int i = 0; i < videos.Count; i++) {
+                        if (version != _RenderVersion || token.IsCancellationRequested)
+                            break;
+                        Video video = videos[i];
+                        if (video == null)
+                            continue;
+                        // 浠ヤ笅鑰楁椂鎿嶄綔锛堝浘鐗囪В鐮併€佹暟鎹簱鏌ヨ锛夊叏閮ㄥ湪鍚庡彴绾跨▼鎵ц
+                        Video.SetImage(ref video, ShowImageMode);
+                        Video.SetTagStamps(ref video); // 璁剧疆鏍囩鎴?
+                        Video.SetTitleAndDate(ref video); // 璁剧疆鏍囬鍜屽彂琛屾棩鏈?
+                        Video.SetAsso(ref video);
+                        RenderProgress = (int)(100 * (i + 1) / (float)videos.Count);
+                        if (i % UI_UPDATE_BATCH_SIZE == UI_UPDATE_BATCH_SIZE - 1) {
+                            if (version != _RenderVersion || token.IsCancellationRequested)
+                                break;
+                            int to = i;
+                            await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background,
+                                new Action(() => ApplyRenderBatch(videos, from, to)));
+                            from = i + 1;
+                        }
+                    }
+
+                    // 鏀跺熬锛氭覆鏌撴湡闂村張鏈夋柊璇锋眰鍒欐斁寮冿紝閬垮厤鏃х粨鏋滆鐩栨柊椤甸潰
+                    if (version == _RenderVersion && !token.IsCancellationRequested) {
+                        int from2 = from;
+                        await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background,
+                            new Action(() => {
+                                if (videos.Count > 0)
+                                    ApplyRenderBatch(videos, from2, videos.Count - 1);
+                                // 娓呴櫎澶氫綑鐨勯」锛堝惈缁撴灉涓虹┖鏃舵竻绌烘暣椤碉級
+                                for (int j = CurrentVideoList.Count - 1; j >= videos.Count; j--)
+                                    CurrentVideoList.RemoveAt(j);
+                            }));
+                    }
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                } finally {
+                    try {
+                        System.Windows.Application app = App.Current;
+                        if (app != null && app.Dispatcher != null) {
+                            await app.Dispatcher.BeginInvoke(DispatcherPriority.Background,
+                                new Action(() => {
+                                    try {
+                                        if (RenderVideoCT.IsCancellationRequested)
+                                            RefreshVideoRenderToken();
+                                    } finally {
+                                        Rendering = false;
+                                        PageChangedCompleted?.Invoke(this, null);
+                                    }
+                                }));
+                        }
+                    } catch (Exception ex) {
+                        Logger.Error(ex);
+                    }
                 }
-                Video video = VideoList[i];
-                if (video == null)
-                    continue;
-                Video.SetImage(ref video, ShowImageMode);
-                Video.SetTagStamps(ref video); // 设置标签戳
-                Video.SetTitleAndDate(ref video); // 设置标题和发行日期
-                Video.SetAsso(ref video);
-
-                await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new LoadVideoDelegate(LoadVideo), video, i);
-                RenderProgress = (int)(100 * (i + 1) / (float)VideoList.Count);
-            }
-
-            // 清除
-            for (int i = CurrentVideoList.Count - 1; i > VideoList.Count - 1; i--) {
-                CurrentVideoList.RemoveAt(i);
-            }
-
-            if (RenderVideoCT.IsCancellationRequested)
-                RefreshVideoRenderToken();
-            Rendering = false;
-            PageChangedCompleted?.Invoke(this, null);
+            });
         }
 
         /// <summary>
-        /// 搜索
+        /// 鍦?UI 绾跨▼鎵归噺鏇存柊闆嗗悎锛堟浛鎹?鏂板锛夛紝閬垮厤閫愭潯 BeginInvoke
+        /// </summary>
+        private void ApplyRenderBatch(List<Video> videos, int from, int to)
+        {
+            if (videos == null || CurrentVideoList == null)
+                return;
+            for (int i = from; i <= to && i < videos.Count; i++) {
+                Video video = videos[i];
+                if (video == null)
+                    continue;
+                if (i < CurrentVideoList.Count) {
+                    Video temp = CurrentVideoList[i];
+                    if (temp == null || temp.DataID != video.DataID)
+                        CurrentVideoList[i] = video;
+                    else
+                        RefreshData(ref temp, video);
+                } else {
+                    CurrentVideoList.Add(video);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 鎼滅储
         /// </summary>
         /// <returns></returns>
         public async Task<List<string>> GetSearchCandidate()
@@ -760,7 +837,7 @@ namespace Jvedio.Core.UserControls.ViewModels
                 if (string.IsNullOrEmpty(SearchText))
                     return result;
                 SelectWrapper<Video> wrapper = new SelectWrapper<Video>();
-                SetSortOrder(wrapper); // 按照当前排序
+                SetSortOrder(wrapper); // 鎸夌収褰撳墠鎺掑簭
                 wrapper.Eq("metadata.DBId", ConfigManager.Main.CurrentDBId).Eq("metadata.DataType", 0);
                 SelectWrapper<Video> selectWrapper = GetSearchWrapper(searchType);
                 if (selectWrapper != null)
@@ -793,7 +870,7 @@ namespace Jvedio.Core.UserControls.ViewModels
                             + $" LIMIT 0,{SEARCH_CANDIDATE_MAX_COUNT}";
 
                 if (searchType == SearchField.Genre) {
-                    // 类别特殊处理
+                    // 绫诲埆鐗规畩澶勭悊
                     string genre_sql = $"SELECT {field} FROM metadata_video " +
                             "JOIN metadata " +
                             "on metadata.DataID=metadata_video.DataID ";

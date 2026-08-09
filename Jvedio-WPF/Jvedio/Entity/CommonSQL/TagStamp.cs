@@ -31,10 +31,24 @@ namespace Jvedio.Entity.CommonSQL
 
 
 
+        private static List<TagStamp> _TagStamps;
+
         /// <summary>
         /// 标签戳，全局缓存，避免每次都查询
         /// </summary>
-        public static List<TagStamp> TagStamps { get; set; }
+        public static List<TagStamp> TagStamps {
+            get { return _TagStamps; }
+            set {
+                _TagStamps = value;
+                TagStampDict = value == null ? new Dictionary<long, TagStamp>()
+                    : value.ToDictionary(arg => arg.TagID);
+            }
+        }
+
+        /// <summary>
+        /// TagID -> TagStamp 的字典，用于 O(1) 查找，随 TagStamps 一起重建
+        /// </summary>
+        public static Dictionary<long, TagStamp> TagStampDict { get; set; }
 
         public static void Init()
         {

@@ -48,6 +48,9 @@ namespace Jvedio
             ScanManager = ScanManager.CreateInstance();
             DownloadManager = DownloadManager.CreateInstance();
 
+            // 触发类型初始化：订阅刮削/截图事件，累计阈值后后台静默重建图片索引
+            ImageIndexManager.Init();
+
 
             Window_ErrorMsg.OnFeedBack += () => {
                 FileHelper.TryOpenUrl(UrlManager.FeedBackUrl);

@@ -21,8 +21,8 @@
 [![.NET CORE](https://img.shields.io/badge/.NET%20Framework-4.7.2-d.svg)](#)
 [![Platform](https://img.shields.io/badge/Platform-Win-brightgreen.svg)](#)
 [![LICENSE](https://img.shields.io/badge/license-GPL%203.0-blue)](#)
-[![Star](https://img.shields.io/github/stars/hitchao/Jvedio?label=Star%20this%20repo)](https://github.com/hitchao/Jvedio)
-[![Fork](https://img.shields.io/github/forks/hitchao/Jvedio?label=Fork%20this%20repo)](https://github.com/hitchao/Jvedio/fork)
+[![Star](https://img.shields.io/github/stars/4965898/Jvedio?label=Star%20this%20repo)](https://github.com/4965898/Jvedio)
+[![Fork](https://img.shields.io/github/forks/4965898/Jvedio?label=Fork%20this%20repo)](https://github.com/4965898/Jvedio/fork)
 
 
 
@@ -32,7 +32,7 @@ Add tags to manage videos, use artificial intelligence to identify actors, suppo
 Capture video pictures based on `FFmpeg`, smooth and beautiful application software on Window desktop
 
 
-WebSite：[Jvedio](https://hitchao.github.io/JvedioWebPage/) | Download：[Latest Version](https://github.com/hitchao/Jvedio/releases)
+WebSite：[Jvedio](https://hitchao.github.io/JvedioWebPage/) | Download：[Latest Version](https://github.com/4965898/Jvedio/releases)
 
 ---
 
@@ -68,6 +68,20 @@ Users : [User Guide](https://github.com/hitchao/Jvedio/wiki/02_Beginning)
 |Chrome (360 speed browser) plug-in|[Jvedio-Chrome-Extensions](https://github.com/hitchao/Jvedio-Chrome-Extensions)|
 |Jvedio upgraded server source|[jvedioupdate](https://github.com/hitchao/jvedioupdate)|
 |Gif control modified in|[WpfAnimatedGif](https://github.com/hitchao/WpfAnimatedGif)|
+
+
+# Version History (Fork)
+
+> The original repository (hitchao/Jvedio) has been archived. Since 5.4.0.1 it is maintained by [4965898/Jvedio](https://github.com/4965898/Jvedio):
+
+| Version | Date | Highlights |
+|---|---|---|
+| 5.4.0.1 | 2025-12-04 | Batch delete images; filter by images |
+| 5.4.0.2 | 2025-12-10 | Optimize poster / thumbnail filtering |
+| 5.4.0.3 | 2025-12-30 | Maintenance update |
+| 5.4.0.4 | 2026-02-21 | One-click restart of failed sync tasks; extra filters |
+| 5.4.0.5 | 2026-05-02 | Filter by actor-info presence; other optimizations |
+| 5.4.0.6 | 2026-08-10 | Pagination rendering optimization (fix crash on fast page-flip and slowdown); auto rebuild of image-existence index; background startup scan; JavBus scraping fixes |
 
 
 # Software Characteristics

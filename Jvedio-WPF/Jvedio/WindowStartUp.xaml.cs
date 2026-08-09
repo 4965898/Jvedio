@@ -59,6 +59,10 @@ namespace Jvedio
 
         private ScanTask ScanTask { get; set; }
 
+        private Main MainWindow { get; set; }
+
+        private bool BackgroundScanPending { get; set; }
+
         private bool EnteringDataBase { get; set; }
 
         private bool CancelScanTask { get; set; }
@@ -542,7 +546,7 @@ namespace Jvedio
             vieModel.ReadFromDataBase();
         }
 
-        public async void LoadDataBase()
+        public void LoadDataBase()
         {
             if (vieModel.CurrentDatabases == null || vieModel.CurrentDatabases.Count <= 0) {
                 ConfigManager.Settings.OpenDataBaseDefault = false;
@@ -587,33 +591,23 @@ namespace Jvedio
                 appDatabaseMapper.IncreaseFieldById("ViewCount", id);
                 ConfigManager.Main.CurrentDBId = id;
 
-                // 是否需要扫描
+                // 是否需要扫描（后台静默执行，不再阻塞进入主界面）
                 if (main == null &&
                     Main.CurrentDataType == DataType.Video &&
                     ConfigManager.ScanConfig.ScanOnStartUp) {
                     // 未打开过 main 的时候才会扫描
                     if (!string.IsNullOrEmpty(database.ScanPath)) {
-                        tabControl.SelectedIndex = 0;
                         List<string> toScan = JsonUtils.TryDeserializeObject<List<string>>(database.ScanPath);
                         try {
+                            BackgroundScanPending = false;
                             ScanTask = new ScanTask(toScan, null, ScanTask.VIDEO_EXTENSIONS_LIST);
-                            ScanTask.onScanning += (s, ev) => {
-                                Dispatcher.Invoke(() => {
-                                    vieModel.LoadingText = (ev as MessageCallBackEventArgs).Message;
-                                });
-                            };
+                            ScanTask.onCompleted += ScanCompleteInBackground;
+                            // 注册进扫描任务管理器，右下角扫描按钮同步显示状态
+                            App.ScanManager.AddTask(ScanTask);
                             ScanTask.Start();
-                            while (ScanTask.Running) {
-                                await Task.Delay(100);
-                                if (CancelScanTask)
-                                    break;
-                            }
                         } catch (Exception ex) {
                             Logger.Error(ex);
-                            MsgBox.Show(ex.Message);
                         }
-                    } else {
-                        tabControl.SelectedIndex = 1;
                     }
                 }
             }
@@ -625,6 +619,7 @@ namespace Jvedio
             if (main == null) {
                 main = new Main();
                 Application.Current.MainWindow = main;
+                MainWindow = main; // 供后台扫描完成回调使用
             } else {
                 main.InitDataBases();
                 main.SetComboboxID();
@@ -632,12 +627,39 @@ namespace Jvedio
             }
 
             main.Show();
-            if (ScanTask != null)
-                App.ScanManager.CurrentTasks.Add(ScanTask);
+
+            // 扫描极快完成（主窗口尚未就绪）时，在此补一次刷新
+            if (BackgroundScanPending && ScanTask != null && ScanTask.Success) {
+                BackgroundScanPending = false;
+                main.OnBackgroundScanComplete(ScanTask.ScanResult?.InsertVideos);
+            }
 
             // 设置当前状态为：进入库
             EnteringDataBase = true;
             this.Close();
+        }
+
+        /// <summary>
+        /// 启动时后台静默扫描完成回调：刷新主界面统计与数据（不弹窗打扰）
+        /// </summary>
+        private void ScanCompleteInBackground(object sender, EventArgs ev)
+        {
+            ScanTask scanTask = sender as ScanTask;
+            if (scanTask == null || !scanTask.Success)
+                return;
+            try {
+                Dispatcher.Invoke(() => {
+                    Main main = MainWindow;
+                    if (main == null || !main.IsLoaded) {
+                        // 主窗口还未就绪，由 LoadDataBase 在 Show 之后补刷新
+                        BackgroundScanPending = true;
+                    } else {
+                        main.OnBackgroundScanComplete(scanTask.ScanResult?.InsertVideos);
+                    }
+                });
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
         }
 
         private void SetImage(object sender, RoutedEventArgs e)
