@@ -1,7 +1,8 @@
-﻿using Jvedio.Core.DataBase;
+﻿﻿﻿﻿﻿﻿using Jvedio.Core.DataBase;
 using Jvedio.Core.DataBase.Tables;
 using Jvedio.Mapper;
 using System;
+using System.Collections.Generic;
 using static Jvedio.App;
 
 namespace Jvedio
@@ -82,6 +83,22 @@ namespace Jvedio
                 } catch (Exception ex) {
                     Logger.Error(ex);
                 }
+            }
+
+            // 修复 common_picture_exist 表的唯一约束
+            try {
+                string checkSql = "SELECT sql FROM sqlite_master WHERE type='table' AND name='common_picture_exist'";
+                List<Dictionary<string, object>> result = metaDataMapper.Select(checkSql);
+                string tableDef = "";
+                if (result != null && result.Count > 0 && result[0].ContainsKey("sql"))
+                    tableDef = result[0]["sql"]?.ToString() ?? "";
+                if (tableDef.Contains("ImageType,Exist)") && !tableDef.Contains("ImageType)")) {
+                    foreach (string sql in Sqlite.SQL.PictureExistMigration) {
+                        metaDataMapper.ExecuteNonQuery(sql);
+                    }
+                }
+            } catch (Exception ex) {
+                Logger.Error(ex);
             }
 
             Loaded = true;

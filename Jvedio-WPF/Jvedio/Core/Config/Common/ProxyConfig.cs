@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.Config.Base;
+using Jvedio.Core.Config.Base;
 using SuperUtils.NetWork;
 using System;
 using System.Net;
@@ -33,7 +33,7 @@ namespace Jvedio.Core.Config
 
     public class ProxyConfig : AbstractConfig
     {
-        public const int DEFAULT_TIMEOUT = 10;
+        public const int DEFAULT_TIMEOUT = 8;
 
         public const ProxyModeEnum DEFAULT_PROXY_MODE = ProxyModeEnum.System;
         public const ProxyTypeEnum DEFAULT_PROXY_TYPE = ProxyTypeEnum.SOCKS;

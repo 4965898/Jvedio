@@ -1,4 +1,4 @@
-﻿using Google.Protobuf.WellKnownTypes;
+using Google.Protobuf.WellKnownTypes;
 using Jvedio.Core.CustomEventArgs;
 using Jvedio.Core.Enums;
 using Jvedio.Core.FFmpeg;
@@ -200,12 +200,12 @@ namespace Jvedio.Core.UserControls
             GotoTop(null, null);
         }
 
-        private void PageChangedCompleted(object sender, EventArgs ev)
+        private async void PageChangedCompleted(object sender, EventArgs ev)
         {
             if (vieModel.EditMode)
                 SetSelected();
             if (ConfigManager.Settings.AutoGenScreenShot)
-                AutoGenScreenShot(vieModel.CurrentVideoList);
+                await AutoGenScreenShotAsync(vieModel.CurrentVideoList);
             if (tableData.Visibility == Visibility.Visible && tableData.Items.Count > 0)
                 tableData.ScrollIntoView(tableData.Items[0]);
         }
@@ -215,9 +215,18 @@ namespace Jvedio.Core.UserControls
             Dispatcher.Invoke(() => {
                 lock (RefreshLock) {
                     vieModel.RefreshData(task.DataID);
-                    // 更新图片存在
-                    if (task.Success)
-                        UpdateImageIndex(task.DataID, true, true);
+                    if (task.Success) {
+                        Video v = videoMapper.SelectVideoByID(task.DataID);
+                        bool small = v != null && File.Exists(v.GetSmallImage());
+                        bool big = v != null && File.Exists(v.GetBigImage());
+                        bool hasScreen = false;
+                        if (v != null) {
+                            string screenDir = v.GetScreenShot();
+                            if (!string.IsNullOrEmpty(screenDir) && Directory.Exists(screenDir))
+                                hasScreen = Directory.EnumerateFiles(screenDir, "*.*", System.IO.SearchOption.TopDirectoryOnly).Any();
+                        }
+                        UpdateImageIndex(task.DataID, small || hasScreen, big || hasScreen);
+                    }
                 }
             });
         }
@@ -227,6 +236,18 @@ namespace Jvedio.Core.UserControls
             Dispatcher.Invoke(() => {
                 if (ok) {
                     LoadImageAfterScreenShort(dataID);
+                    try {
+                        Video v = videoMapper.SelectVideoByID(dataID);
+                        if (v != null && v.DataID > 0) {
+                            bool small = File.Exists(v.GetSmallImage());
+                            bool big = File.Exists(v.GetBigImage());
+                            bool hasScreen = false;
+                            string screenDir = v.GetScreenShot();
+                            if (!string.IsNullOrEmpty(screenDir) && Directory.Exists(screenDir))
+                                hasScreen = Directory.EnumerateFiles(screenDir, "*.*", System.IO.SearchOption.TopDirectoryOnly).Any();
+                            UpdateImageIndex(dataID, small || hasScreen, big || hasScreen);
+                        }
+                    } catch { }
                 }
             });
         }
@@ -237,24 +258,28 @@ namespace Jvedio.Core.UserControls
             ResizingTimer.Stop();
         }
 
-        private void AutoGenScreenShot(ObservableCollection<Video> data)
+        private async Task AutoGenScreenShotAsync(ObservableCollection<Video> data)
         {
-            for (int i = 0; i < data.Count; i++) {
-                if (data[i].BigImage == MetaData.DefaultBigImage ||
-                    data[i].BigImage == MetaData.DefaultSmallImage) {
-                    // 检查有无截图
-                    Video video = data[i];
-                    string path = video.GetScreenShot();
-                    if (Directory.Exists(path)) {
-                        string[] array = FileHelper.TryScanDIr(path, "*.*", System.IO.SearchOption.TopDirectoryOnly);
-                        if (array.Length > 0) {
-                            Video.SetImage(ref video, array[array.Length / 2]);
-                            data[i].BigImage = null;
-                            data[i].BigImage = video.ViewImage;
+            await Task.Run(async () => {
+                for (int i = 0; i < data.Count; i++) {
+                    var item = data[i];
+                    if (item.BigImage == MetaData.DefaultBigImage || item.BigImage == MetaData.DefaultSmallImage) {
+                        string path = item.GetScreenShot();
+                        if (Directory.Exists(path)) {
+                            string[] array = FileHelper.TryScanDIr(path, "*.*", System.IO.SearchOption.TopDirectoryOnly);
+                            if (array.Length > 0) {
+                                string target = array[array.Length / 2];
+                                await App.Current.Dispatcher.BeginInvoke(new Action(() => {
+                                    Video video = item;
+                                    Video.SetImage(ref video, target);
+                                    item.BigImage = null;
+                                    item.BigImage = video.ViewImage;
+                                }));
+                            }
                         }
                     }
                 }
-            }
+            });
         }
 
         public void SetViewMode(object sender, RoutedEventArgs e)
@@ -751,12 +776,11 @@ namespace Jvedio.Core.UserControls
         {
             long pathType = ConfigManager.Settings.PicPathMode;
             List<string> list = new List<string>();
-            // 小图
             list.Add($"({dataID},{pathType},0,{(smallImageExists ? 1 : 0)})");
-            // 大图
             list.Add($"({dataID},{pathType},1,{(bigImageExists ? 1 : 0)})");
-            string insertSql = $"begin;insert or replace into common_picture_exist(DataID,PathType,ImageType,Exist) values {string.Join(",", list)};commit;";
-            MapperManager.videoMapper.ExecuteNonQuery(insertSql);
+            string deleteSql = $"delete from common_picture_exist where DataID={dataID} and PathType={pathType};";
+            string insertSql = $"insert into common_picture_exist(DataID,PathType,ImageType,Exist) values {string.Join(",", list)};";
+            MapperManager.videoMapper.ExecuteNonQuery($"begin;{deleteSql}{insertSql}commit;");
         }
 
         public void ReMoveZero(object sender, RoutedEventArgs e)
@@ -1241,7 +1265,7 @@ namespace Jvedio.Core.UserControls
                                 vieModel.CurrentVideoList[i].BigImage = null;
                                 vieModel.CurrentVideoList[i].BigImage = currentVideo.ViewImage;
                                 // 更新索引
-                                UpdateImageIndex(currentVideo.DataID, false, true);
+                                UpdateImageIndex(currentVideo.DataID, true, true);
                             }
                         }
                     }
@@ -1866,6 +1890,84 @@ namespace Jvedio.Core.UserControls
             if (video == null)
                 return;
             RaiseEvent(new VideoItemEventArgs(video.DataID, OnItemClickEvent, sender));
+        }
+
+        private void DeletePosterOnly(object sender, RoutedEventArgs e)
+        {
+            HandleMenuSelected(sender, 1);
+            ObservableCollection<Video> videos = GetVideosByMenu(sender as MenuItem, 1);
+            if (videos == null)
+                return;
+            for (int i = 0; i < vieModel.SelectedVideo.Count; i++) {
+                Video v = vieModel.SelectedVideo[i];
+                string big = v.GetBigImage();
+                if (File.Exists(big)) {
+                    try { File.Delete(big); } catch { }
+                    ImageCache.Remove(big);
+                }
+                v.BigImage = MetaData.DefaultBigImage;
+                bool smallExists = File.Exists(v.GetSmallImage());
+                bool bigExists = File.Exists(v.GetBigImage());
+                bool hasScreen = false;
+                string screenDir = v.GetScreenShot();
+                if (!string.IsNullOrEmpty(screenDir) && Directory.Exists(screenDir))
+                    hasScreen = Directory.EnumerateFiles(screenDir, "*.*", System.IO.SearchOption.TopDirectoryOnly).Any();
+                UpdateImageIndex(v.DataID, smallExists || hasScreen, bigExists || hasScreen);
+            }
+        }
+
+        private void DeleteThumbnailOnly(object sender, RoutedEventArgs e)
+        {
+            HandleMenuSelected(sender, 1);
+            ObservableCollection<Video> videos = GetVideosByMenu(sender as MenuItem, 1);
+            if (videos == null)
+                return;
+            for (int i = 0; i < vieModel.SelectedVideo.Count; i++) {
+                Video v = vieModel.SelectedVideo[i];
+                string small = v.GetSmallImage();
+                if (File.Exists(small)) {
+                    try { File.Delete(small); } catch { }
+                    ImageCache.Remove(small);
+                }
+                v.SmallImage = MetaData.DefaultSmallImage;
+                bool smallExists = File.Exists(v.GetSmallImage());
+                bool bigExists = File.Exists(v.GetBigImage());
+                bool hasScreen = false;
+                string screenDir = v.GetScreenShot();
+                if (!string.IsNullOrEmpty(screenDir) && Directory.Exists(screenDir))
+                    hasScreen = Directory.EnumerateFiles(screenDir, "*.*", System.IO.SearchOption.TopDirectoryOnly).Any();
+                UpdateImageIndex(v.DataID, smallExists || hasScreen, bigExists || hasScreen);
+            }
+        }
+
+        private void DeletePosterAndThumbnail(object sender, RoutedEventArgs e)
+        {
+            HandleMenuSelected(sender, 1);
+            ObservableCollection<Video> videos = GetVideosByMenu(sender as MenuItem, 1);
+            if (videos == null)
+                return;
+            for (int i = 0; i < vieModel.SelectedVideo.Count; i++) {
+                Video v = vieModel.SelectedVideo[i];
+                string small = v.GetSmallImage();
+                string big = v.GetBigImage();
+                if (File.Exists(small)) {
+                    try { File.Delete(small); } catch { }
+                    ImageCache.Remove(small);
+                }
+                if (File.Exists(big)) {
+                    try { File.Delete(big); } catch { }
+                    ImageCache.Remove(big);
+                }
+                v.SmallImage = MetaData.DefaultSmallImage;
+                v.BigImage = MetaData.DefaultBigImage;
+                bool smallExists = File.Exists(v.GetSmallImage());
+                bool bigExists = File.Exists(v.GetBigImage());
+                bool hasScreen = false;
+                string screenDir = v.GetScreenShot();
+                if (!string.IsNullOrEmpty(screenDir) && Directory.Exists(screenDir))
+                    hasScreen = Directory.EnumerateFiles(screenDir, "*.*", System.IO.SearchOption.TopDirectoryOnly).Any();
+                UpdateImageIndex(v.DataID, smallExists || hasScreen, bigExists || hasScreen);
+            }
         }
 
     }

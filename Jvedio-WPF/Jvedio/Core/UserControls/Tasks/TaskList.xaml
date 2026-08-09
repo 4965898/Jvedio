@@ -1,4 +1,4 @@
-﻿<UserControl
+<UserControl
     x:Class="Jvedio.Core.UserControls.Tasks.TaskList"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -117,6 +117,12 @@
                 Content="{DynamicResource CancelALl}"
                 Style="{StaticResource ButtonDanger}"
                 Visibility="{Binding onCancelAll, ElementName=taskList, Converter={StaticResource NullToVisibilityConverter}}" />
+
+            <Button
+                Click="RestartAll"
+                Content="重启所有"
+                Style="{StaticResource ButtonWarning}"
+                Visibility="{Binding onRestartAll, ElementName=taskList, Converter={StaticResource NullToVisibilityConverter}}" />
 
             <Grid Width="500" Visibility="{Binding ShowProgress, Mode=OneWay, ElementName=taskList, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>

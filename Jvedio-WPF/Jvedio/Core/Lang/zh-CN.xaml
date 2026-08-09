@@ -28,4 +28,17 @@
     <sys:String x:Key="CrawlerServerHint">左侧是支持的信息刮削器，右侧需要自行填入刮削器对应的网址，Jvedio 不提供任何网站地址！</sys:String>
     <sys:String x:Key="AllPicture">所有图片</sys:String>
     <sys:String x:Key="RecentView">最近浏览</sys:String>
+    <sys:String x:Key="Actors">演员</sys:String>
+    <sys:String x:Key="HasPoster">有海报图</sys:String>
+    <sys:String x:Key="NoPoster">无海报图</sys:String>
+    <sys:String x:Key="HasThumbnail">有缩略图</sys:String>
+    <sys:String x:Key="NoThumbnail">无缩略图</sys:String>
+    <sys:String x:Key="ActorInfo">演员信息</sys:String>
+    <sys:String x:Key="HasActor">有演员</sys:String>
+    <sys:String x:Key="NoActor">无演员</sys:String>
+    <sys:String x:Key="Thumbnail">缩略图</sys:String>
+    <sys:String x:Key="Poster">海报图</sys:String>
+    <sys:String x:Key="Menu_DeletePosterOnly">仅删除海报图</sys:String>
+    <sys:String x:Key="Menu_DeleteThumbnailOnly">仅删除缩略图</sys:String>
+    <sys:String x:Key="Menu_DeletePosterAndThumbnail">同时删除海报图+缩略图</sys:String>
 </ResourceDictionary>

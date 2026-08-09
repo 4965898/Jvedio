@@ -1,4 +1,4 @@
-﻿<UserControl
+<UserControl
     x:Class="Jvedio.Core.UserControls.VideoList"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -105,6 +105,10 @@
                     Visibility="Collapsed" />
                 <MenuItem Click="RenameFile" Header="{DynamicResource Menu_RenameFile}" />
                 <MenuItem Click="ReMoveZero" Header="{DynamicResource Menu_RemoveZero}" />
+                <Separator />
+                <MenuItem Click="DeletePosterOnly" Header="{DynamicResource Menu_DeletePosterOnly}" />
+                <MenuItem Click="DeleteThumbnailOnly" Header="{DynamicResource Menu_DeleteThumbnailOnly}" />
+                <MenuItem Click="DeletePosterAndThumbnail" Header="{DynamicResource Menu_DeletePosterAndThumbnail}" />
 
             </MenuItem>
 
@@ -371,20 +375,21 @@
                     MenuOnLeftClick="True"
                     Style="{StaticResource SortHoverPath}"
                     ToolTip="{DynamicResource Sorting}">
-                    <super:HoverPath.ContextMenu>
-                        <ContextMenu HorizontalOffset="-50">
-                            <MenuItem Header="{DynamicResource ID}" IsCheckable="True" />
-                            <MenuItem Header="{DynamicResource Favorites}" IsCheckable="True" />
-                            <MenuItem Header="{DynamicResource FileSize}" IsCheckable="True" />
-                            <MenuItem Header="{DynamicResource ImportDate}" IsCheckable="True" />
-                            <MenuItem Header="{DynamicResource CreatedDate}" IsCheckable="True" />
-                            <MenuItem Header="{DynamicResource Title}" IsCheckable="True" />
-                            <MenuItem Header="{DynamicResource ViewNumber}" IsCheckable="True" />
-                            <MenuItem Header="{DynamicResource ReleaseDate}" IsCheckable="True" />
-                            <MenuItem Header="{DynamicResource Rating}" IsCheckable="True" />
-                            <MenuItem Header="{DynamicResource Duration}" IsCheckable="True" />
-                        </ContextMenu>
-                    </super:HoverPath.ContextMenu>
+            <super:HoverPath.ContextMenu>
+              <ContextMenu HorizontalOffset="-50">
+                <MenuItem Header="{DynamicResource ID}" IsCheckable="True" />
+                <MenuItem Header="{DynamicResource Favorites}" IsCheckable="True" />
+                <MenuItem Header="{DynamicResource FileSize}" IsCheckable="True" />
+                <MenuItem Header="{DynamicResource ImportDate}" IsCheckable="True" />
+                <MenuItem Header="{DynamicResource CreatedDate}" IsCheckable="True" />
+                <MenuItem Header="{DynamicResource Title}" IsCheckable="True" />
+                <MenuItem Header="{DynamicResource ViewNumber}" IsCheckable="True" />
+                <MenuItem Header="{DynamicResource ReleaseDate}" IsCheckable="True" />
+                <MenuItem Header="{DynamicResource Rating}" IsCheckable="True" />
+                <MenuItem Header="{DynamicResource Duration}" IsCheckable="True" />
+                <MenuItem Header="{DynamicResource Actors}" IsCheckable="True" />
+              </ContextMenu>
+            </super:HoverPath.ContextMenu>
                 </super:HoverPath>
 
 

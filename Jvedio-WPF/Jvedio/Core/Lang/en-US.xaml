@@ -25,5 +25,16 @@
     <sys:String x:Key="PleaseSetExistsIndex">Please establish a playback index in [Options-Library]!</sys:String>
     <sys:String x:Key="CrawlAllWarning">The climbing of the whole library may cause your IP to be blocked, please use it with caution, try to synchronize the resources only required</sys:String>
     <sys:String x:Key="CrawlerServerHint">On the left is the supported information scraper. You need to fill in the URL corresponding to the scratch on the right. JVEDIO does not provide any website address!</sys:String>
+    
+    <sys:String x:Key="HasThumbnail">Has thumbnail</sys:String>
+    <sys:String x:Key="NoThumbnail">No thumbnail</sys:String>
+    <sys:String x:Key="ActorInfo">Actor Info</sys:String>
+    <sys:String x:Key="HasActor">Has actor</sys:String>
+    <sys:String x:Key="NoActor">No actor</sys:String>
+    <sys:String x:Key="Thumbnail">Thumbnail</sys:String>
+    <sys:String x:Key="Poster">Poster</sys:String>
+    <sys:String x:Key="Menu_DeletePosterOnly">Delete Poster Only</sys:String>
+    <sys:String x:Key="Menu_DeleteThumbnailOnly">Delete Thumbnail Only</sys:String>
+    <sys:String x:Key="Menu_DeletePosterAndThumbnail">Delete Poster + Thumbnail</sys:String>
 
 </ResourceDictionary>

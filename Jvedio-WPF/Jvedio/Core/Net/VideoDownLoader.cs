@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.Crawler;
+using Jvedio.Core.Crawler;
 using Jvedio.Core.Enums;
 using Jvedio.Core.Exceptions;
 using Jvedio.Core.Plugins.Crawler;
@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -173,9 +174,35 @@ namespace Jvedio.Core.Net
         public async Task<byte[]> DownloadImage(string url, RequestHeader header, Action<string> onError = null)
         {
             try {
-                HttpResult httpResult = await HttpHelper.AsyncDownLoadFile(url, header);
-                return httpResult.FileByte;
+                HttpClientHandler handler = new HttpClientHandler();
+                handler.AllowAutoRedirect = true;
+                handler.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+
+                if (header != null && header.WebProxy != null) {
+                    handler.Proxy = header.WebProxy;
+                    handler.UseProxy = true;
+                }
+
+                using (var client = new System.Net.Http.HttpClient(handler, disposeHandler: true)) {
+                    int timeoutMs = 8000;
+                    if (header != null && header.TimeOut > 0)
+                        timeoutMs = (int)header.TimeOut;
+                    client.Timeout = TimeSpan.FromMilliseconds(timeoutMs);
+
+                    if (header != null && header.Headers != null) {
+                        foreach (var kv in header.Headers) {
+                            try { client.DefaultRequestHeaders.TryAddWithoutValidation(kv.Key, kv.Value); } catch { }
+                        }
+                    }
+
+                    client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+                    return await client.GetByteArrayAsync(url);
+                }
             } catch (WebException ex) {
+                onError?.Invoke(ex.Message);
+            } catch (Exception ex) {
                 onError?.Invoke(ex.Message);
             }
 

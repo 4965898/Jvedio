@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.DataBase;
+using Jvedio.Core.DataBase;
 using Jvedio.Core.Enums;
 using Jvedio.Entity;
 using Jvedio.Mapper;

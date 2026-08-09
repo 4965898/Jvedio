@@ -1,4 +1,4 @@
-﻿using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Highlighting;
 using Jvedio.Core.FFmpeg;
 using Jvedio.Entity;
@@ -83,6 +83,16 @@ namespace Jvedio.Core.UserControls.Tasks
 
             set {
                 _onRestart = value;
+                RaisePropertyChanged();
+            }
+        }
+        private Action _onRestartAll;
+
+        public Action onRestartAll {
+            get { return _onRestartAll; }
+
+            set {
+                _onRestartAll = value;
                 RaisePropertyChanged();
             }
         }
@@ -227,6 +237,11 @@ namespace Jvedio.Core.UserControls.Tasks
         {
             if (sender is FrameworkElement ele && ele.Uid is string id)
                 onRestart?.Invoke(id);
+        }
+
+        private void RestartAll(object sender, RoutedEventArgs e)
+        {
+            onRestartAll?.Invoke();
         }
 
         private void textBox_GotFocus(object sender, System.Windows.RoutedEventArgs e)

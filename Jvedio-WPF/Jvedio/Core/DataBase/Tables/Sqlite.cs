@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace Jvedio.Core.DataBase.Tables
 {
@@ -13,6 +13,27 @@ namespace Jvedio.Core.DataBase.Tables
                 "ALTER TABLE common_search_history ADD COLUMN TypeMode INT DEFAULT 0;",
                 "INSERT or ignore into common_tagstamp (TagID,Foreground,Background,TagName) " +
                     "VALUES (10000,'255,255,255,255','255,165,0,255','新加入');",
+            };
+
+            public static List<string> PictureExistMigration { get; set; } = new List<string>()
+            {
+                "BEGIN;",
+                "CREATE TABLE IF NOT EXISTS temp_picture_exist (" +
+                    "id INTEGER PRIMARY KEY autoincrement, " +
+                    "DataID INTEGER, " +
+                    "PathType INT DEFAULT 0, " +
+                    "ImageType INT DEFAULT 0, " +
+                    "Exist INT DEFAULT 0, " +
+                    "CreateDate VARCHAR(30) DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%S', 'NOW', 'localtime')), " +
+                    "UpdateDate VARCHAR(30) DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%S', 'NOW', 'localtime')), " +
+                    "unique(DataID,PathType,ImageType));",
+                "INSERT OR IGNORE INTO temp_picture_exist (DataID,PathType,ImageType,Exist,CreateDate,UpdateDate) " +
+                    "SELECT DataID,PathType,ImageType,MAX(Exist),CreateDate,UpdateDate " +
+                    "FROM common_picture_exist GROUP BY DataID,PathType,ImageType;",
+                "DROP TABLE IF EXISTS common_picture_exist;",
+                "ALTER TABLE temp_picture_exist RENAME TO common_picture_exist;",
+                "CREATE INDEX IF NOT EXISTS common_picture_exist_idx_DataID_PathType_ImageType ON common_picture_exist (DataID,PathType,ImageType);",
+                "COMMIT;",
             };
         }
 
@@ -191,7 +212,7 @@ namespace Jvedio.Core.DataBase.Tables
                         "Exist INT DEFAULT 0, " +
                         "CreateDate VARCHAR(30) DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%S', 'NOW', 'localtime')), " +
                         "UpdateDate VARCHAR(30) DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%S', 'NOW', 'localtime')), " +
-                        "unique(DataID,PathType,ImageType,Exist) " +
+                        "unique(DataID,PathType,ImageType) " +
                     "); " +
                     "CREATE INDEX common_picture_exist_idx_DataID_PathType_ImageType ON common_picture_exist (DataID,PathType,ImageType); " +
                     "COMMIT;");

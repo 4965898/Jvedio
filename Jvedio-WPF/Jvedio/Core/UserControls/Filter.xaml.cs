@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.CustomEventArgs;
+using Jvedio.Core.CustomEventArgs;
 using Jvedio.Entity;
 using Jvedio.Entity.CommonSQL;
 using Jvedio.Mapper;
@@ -407,13 +407,14 @@ namespace Jvedio.Core.UserControls
 
         private void Refresh(object sender, RoutedEventArgs e)
         {
+            ResetToDefault();
             CommonLoad = LoadState.None;
             GenreLoad = LoadState.None;
             SeriesLoad = LoadState.None;
             DirectorLoad = LoadState.None;
             StudioLoad = LoadState.None;
-
             LoadAll();
+            ApplyFilter();
         }
 
         private void PathCheckButton_Click(object sender, RoutedEventArgs e)
@@ -623,13 +624,108 @@ namespace Jvedio.Core.UserControls
             }
             ApplyFilter();
         }
-        private void SetPictureType(object sender, RoutedEventArgs e)
+        
+
+        private RadioButton _lastCheckedPosterRadio = null;
+        private RadioButton _lastCheckedThumbRadio = null;
+        private RadioButton _lastCheckedActorRadio = null;
+
+        private void SetPosterExist(object sender, RoutedEventArgs e)
         {
             if (!ConfigManager.Settings.PictureIndexCreated) {
                 MessageNotify.Error(LangManager.GetValueByKey("PleaseSetImageIndex"));
                 return;
             }
-            SetAllChecked(sender, e);
+            RadioButton clicked = sender as RadioButton;
+            if (clicked == _lastCheckedPosterRadio) {
+                clicked.IsChecked = false;
+                _lastCheckedPosterRadio = null;
+            } else {
+                _lastCheckedPosterRadio = clicked;
+            }
+            ApplyFilter();
+        }
+
+        private void SetThumbnailExist(object sender, RoutedEventArgs e)
+        {
+            if (!ConfigManager.Settings.PictureIndexCreated) {
+                MessageNotify.Error(LangManager.GetValueByKey("PleaseSetImageIndex"));
+                return;
+            }
+            RadioButton clicked = sender as RadioButton;
+            if (clicked == _lastCheckedThumbRadio) {
+                clicked.IsChecked = false;
+                _lastCheckedThumbRadio = null;
+            } else {
+                _lastCheckedThumbRadio = clicked;
+            }
+            ApplyFilter();
+        }
+
+        private void SetActorExist(object sender, RoutedEventArgs e)
+        {
+            RadioButton clicked = sender as RadioButton;
+            if (clicked == _lastCheckedActorRadio) {
+                clicked.IsChecked = false;
+                _lastCheckedActorRadio = null;
+            } else {
+                _lastCheckedActorRadio = clicked;
+            }
+            ApplyFilter();
+        }
+
+        
+        private void ResetToDefault()
+        {
+            OnlyShowSubsection.IsChecked = false;
+
+            var playRadios = playWrapPanel.Children.OfType<RadioButton>().ToList();
+            for (int i = 0; i < playRadios.Count; i++) playRadios[i].IsChecked = (i == 0);
+
+            var videoTypes = videoTypeWrapPanel.Children.OfType<ToggleButton>().ToList();
+            for (int i = 0; i < videoTypes.Count; i++) videoTypes[i].IsChecked = (i == 0);
+
+            var posterRadios = posterExistWrapPanel.Children.OfType<RadioButton>().ToList();
+            posterRadios.ForEach(rb => rb.IsChecked = false);
+            _lastCheckedPosterRadio = null;
+            var thumbRadios = thumbnailExistWrapPanel.Children.OfType<RadioButton>().ToList();
+            thumbRadios.ForEach(rb => rb.IsChecked = false);
+            _lastCheckedThumbRadio = null;
+            var actorRadios = actorExistWrapPanel.Children.OfType<RadioButton>().ToList();
+            actorRadios.ForEach(rb => rb.IsChecked = false);
+            _lastCheckedActorRadio = null;
+
+            rateSlider.MinValue = rateSlider.Minimum;
+            rateSlider.MaxValue = rateSlider.Maximum;
+
+            var timeRadios = timeWrapPanel.Children.OfType<ToggleButton>().ToList();
+            for (int i = 0; i < timeRadios.Count; i++) timeRadios[i].IsChecked = (i == 0);
+
+            var sizeRadios = sizeWrapPanel.Children.OfType<RadioButton>().ToList();
+            for (int i = 0; i < sizeRadios.Count; i++) sizeRadios[i].IsChecked = (i == 0);
+
+            var yearToggles = yearWrapPanel.Children.OfType<ToggleButton>().ToList();
+            yearToggles.ForEach(t => t.IsChecked = false);
+            var monthToggles = monthWrapPanel.Children.OfType<ToggleButton>().ToList();
+            monthToggles.ForEach(t => t.IsChecked = false);
+
+            var genreToggles = genreWrapPanel.Children.OfType<ToggleButton>().ToList();
+            genreToggles.ForEach(t => t.IsChecked = false);
+            var seriesToggles = seriesWrapPanel.Children.OfType<ToggleButton>().ToList();
+            seriesToggles.ForEach(t => t.IsChecked = false);
+            var directorToggles = directorWrapPanel.Children.OfType<ToggleButton>().ToList();
+            directorToggles.ForEach(t => t.IsChecked = false);
+            var studioToggles = studioWrapPanel.Children.OfType<ToggleButton>().ToList();
+            studioToggles.ForEach(t => t.IsChecked = false);
+
+            ItemsControl itemsControl = TagStampItemsControl;
+            for (int i = 0; i < itemsControl.Items.Count; i++) {
+                ContentPresenter presenter = (ContentPresenter)itemsControl.ItemContainerGenerator.ContainerFromItem(itemsControl.Items[i]);
+                if (presenter == null) continue;
+                PathCheckButton button = VisualHelper.FindElementByName<PathCheckButton>(presenter, "pathCheckButton");
+                if (button == null) continue;
+                button.IsChecked = true;
+            }
         }
 
 
@@ -644,16 +740,13 @@ namespace Jvedio.Core.UserControls
 
             // 标记
             if (TagStamps != null && TagStamps.Count > 0) {
-                bool allFalse = TagStamps.All(item => item.Selected == false);
+                sql += VideoMapper.SQL_LEFT_JOIN_TAGSTAMP;
+                bool allFalse = TagStamps.All(item => !item.Selected);
+                bool allTrue = TagStamps.All(item => item.Selected);
                 if (allFalse) {
-                    wrapper.IsNull("TagID");
-                    sql += VideoMapper.SQL_LEFT_JOIN_TAGSTAMP;
-                } else {
-                    bool allTrue = TagStamps.All(item => item.Selected == true);
-                    if (!allTrue) {
-                        wrapper.In("metadata_to_tagstamp.TagID", TagStamps.Where(item => item.Selected == true).Select(item => item.TagID.ToString()));
-                        sql += VideoMapper.SQL_JOIN_TAGSTAMP;
-                    }
+                    wrapper.Eq("metadata.DataID", -1);
+                } else if (!allTrue) {
+                    wrapper.In("metadata_to_tagstamp.TagID", TagStamps.Where(item => item.Selected).Select(item => item.TagID.ToString()));
                 }
             }
 
@@ -707,23 +800,46 @@ namespace Jvedio.Core.UserControls
             if ((bool)OnlyShowSubsection.IsChecked)
                 wrapper.NotEq("SubSection", string.Empty);
 
-            // 图片显示模式
+            // 图片存在性
             if (ConfigManager.Settings.PictureIndexCreated) {
-                List<RadioButton> plays = pictureWrapPanel.Children.OfType<RadioButton>().ToList();
-                int idx = 0;
-                for (int i = 0; i < plays.Count; i++) {
-                    if ((bool)plays[i].IsChecked) {
-                        idx = i;
-                        break;
-                    }
+                int posterSel = -1;
+                var posterRadios = posterExistWrapPanel.Children.OfType<RadioButton>().ToList();
+                for (int i = 0; i < posterRadios.Count; i++) {
+                    if ((bool)posterRadios[i].IsChecked) { posterSel = i; break; }
                 }
-                if (idx > 0) {
-                    int exists = (bool)pictureReverse.IsChecked ? 0 : 1;
-                    sql += VideoMapper.SQL_JOIN_COMMON_PICTURE_EXIST;
-                    wrapper.Eq("common_picture_exist.PathType", ConfigManager.Settings.PicPathMode)
-                        .Eq("common_picture_exist.ImageType", idx - 1)
-                        .Eq("common_picture_exist.Exist", exists);
+                int thumbSel = -1;
+                var thumbRadios = thumbnailExistWrapPanel.Children.OfType<RadioButton>().ToList();
+                for (int i = 0; i < thumbRadios.Count; i++) {
+                    if ((bool)thumbRadios[i].IsChecked) { thumbSel = i; break; }
                 }
+                if (posterSel >= 0) {
+                    sql += $" LEFT JOIN common_picture_exist cpe_p on cpe_p.DataID=metadata.DataID AND cpe_p.PathType={ConfigManager.Settings.PicPathMode} AND cpe_p.ImageType=1 AND cpe_p.Exist=1";
+                    if (posterSel == 0)
+                        wrapper.Eq("cpe_p.Exist", 1);
+                    else
+                        wrapper.IsNull("cpe_p.DataID");
+                }
+                if (thumbSel >= 0) {
+                    sql += $" LEFT JOIN common_picture_exist cpe_t on cpe_t.DataID=metadata.DataID AND cpe_t.PathType={ConfigManager.Settings.PicPathMode} AND cpe_t.ImageType=0 AND cpe_t.Exist=1";
+                    if (thumbSel == 0)
+                        wrapper.Eq("cpe_t.Exist", 1);
+                    else
+                        wrapper.IsNull("cpe_t.DataID");
+                }
+            }
+
+            // 演员信息
+            int actorSel = -1;
+            var actorRadios = actorExistWrapPanel.Children.OfType<RadioButton>().ToList();
+            for (int i = 0; i < actorRadios.Count; i++) {
+                if ((bool)actorRadios[i].IsChecked) { actorSel = i; break; }
+            }
+            if (actorSel >= 0) {
+                sql += " LEFT JOIN metadata_to_actor mta on mta.DataID=metadata.DataID";
+                if (actorSel == 0)
+                    wrapper.Ge("mta.ActorID", 1);
+                else
+                    wrapper.IsNull("mta.ActorID");
             }
 
             // 时长

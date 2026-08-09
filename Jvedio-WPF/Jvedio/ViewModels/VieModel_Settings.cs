@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.Crawler;
+using Jvedio.Core.Crawler;
 using Jvedio.Core.Enums;
 using Jvedio.Core.Plugins.Crawler;
 using Jvedio.Entity;
@@ -311,6 +311,15 @@ namespace Jvedio.ViewModel
 
             set {
                 _HttpTimeout = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        private int _SyncConcurrency = (int)ConfigManager.Settings.SyncConcurrency;
+        public int SyncConcurrency {
+            get { return _SyncConcurrency; }
+            set {
+                _SyncConcurrency = value;
                 RaisePropertyChanged();
             }
         }

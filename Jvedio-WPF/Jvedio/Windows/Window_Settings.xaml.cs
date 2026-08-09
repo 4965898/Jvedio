@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.Config;
+using Jvedio.Core.Config;
 using Jvedio.Core.Crawler;
 using Jvedio.Core.Enums;
 using Jvedio.Core.Global;
@@ -927,6 +927,7 @@ namespace Jvedio
             ConfigManager.Settings.IgnoreCertVal = vieModel.IgnoreCertVal;
             ConfigManager.Settings.AutoBackup = vieModel.AutoBackup;
             ConfigManager.Settings.AutoBackupPeriodIndex = vieModel.AutoBackupPeriodIndex;
+            ConfigManager.Settings.SyncConcurrency = vieModel.SyncConcurrency;
 
             // 代理
             ConfigManager.ProxyConfig.Server = vieModel.ProxyServer;
@@ -1179,28 +1180,35 @@ namespace Jvedio
                 for (int i = 0; i < total; i++) {
                     Video video = videos[i];
 
+                    bool hasSmall = File.Exists(video.GetSmallImage());
+                    bool hasBig = File.Exists(video.GetBigImage());
+                    bool hasScreen = false;
+                    try {
+                        string screenDir = video.GetScreenShot();
+                        if (!string.IsNullOrEmpty(screenDir) && Directory.Exists(screenDir))
+                            hasScreen = Directory.EnumerateFiles(screenDir, "*.*", System.IO.SearchOption.TopDirectoryOnly).Any();
+                    } catch { }
+
+                    // 将截图视为海报/缩略图存在
+                    hasSmall = hasSmall || hasScreen;
+                    hasBig = hasBig || hasScreen;
+
                     // 小图
-                    list.Add($"({video.DataID},{pathType},0,{(File.Exists(video.GetSmallImage()) ? 1 : 0)})");
+                    list.Add($"({video.DataID},{pathType},0,{(hasSmall ? 1 : 0)})");
 
                     // 大图
-                    list.Add($"({video.DataID},{pathType},1,{(File.Exists(video.GetBigImage()) ? 1 : 0)})");
+                    list.Add($"({video.DataID},{pathType},1,{(hasBig ? 1 : 0)})");
                     if (IndexCanceled)
                         return false;
-
-                    // todo 预览图的图片索引地址
-                    //list.Add($"({video.DataID},{pathType},1,{(File.Exists(video.GetExtraImage()) ? 1 : 0)})");
-                    //if (IndexCanceled)
-                    //    return false;
-
-                    // todo 影片截图的图片索引地址
 
                     App.Current.Dispatcher.Invoke(() => {
                         indexCreatingProgressBar.Value = Math.Round(((double)i + 1) / total * 100, 2);
                     });
                 }
 
-                string insertSql = $"begin;insert or replace into common_picture_exist(DataID,PathType,ImageType,Exist) values {string.Join(",", list)};commit;";
-                MapperManager.videoMapper.ExecuteNonQuery(insertSql);
+                string deleteSql = $"delete from common_picture_exist where PathType={pathType};";
+                string insertSql = $"insert into common_picture_exist(DataID,PathType,ImageType,Exist) values {string.Join(",", list)};";
+                MapperManager.videoMapper.ExecuteNonQuery($"begin;{deleteSql}{insertSql}commit;");
                 return true;
             });
             if (result)

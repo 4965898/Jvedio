@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.CustomEventArgs;
+using Jvedio.Core.CustomEventArgs;
 using Jvedio.Core.FFmpeg;
 using Jvedio.Core.Media;
 using Jvedio.Core.Net;
@@ -1110,8 +1110,15 @@ namespace Jvedio
             // 扫描预览图目录
             List<string> screenShotList = await GetImageList(video.GetScreenShot());
             List<string> imageList = await GetImageList(video.GetExtraImage());
-            vieModel.PreviewImageCount = imageList.Count;
+            bool bigExists = File.Exists(video.GetBigImage());
+            vieModel.PreviewImageCount = imageList.Count + (bigExists ? 1 : 0);
             vieModel.ScreenShotCount = screenShotList.Count;
+
+            try {
+                bool smallExists = File.Exists(video.GetSmallImage());
+                bool hasScreen = screenShotList.Count > 0;
+                Core.UserControls.VideoList.UpdateImageIndex(video.DataID, smallExists || hasScreen, bigExists || hasScreen);
+            } catch { }
 
             List<string> imagePathList = new List<string>();
 

@@ -1,4 +1,4 @@
-﻿-- 单文件存储全部信息
+-- 单文件存储全部信息
 
 -- 【公共表】
 -- 文件名：app_config.sqlite
@@ -214,7 +214,7 @@ create table common_picture_exist (
 
     CreateDate VARCHAR(30) DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%S', 'NOW', 'localtime')),
     UpdateDate VARCHAR(30) DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%S', 'NOW', 'localtime')),
-    unique(DataID,PathType,ImageType,Exist)
+    unique(DataID,PathType,ImageType)
 );
 CREATE INDEX common_picture_exist_idx_DataID_PathType_ImageType ON common_picture_exist (DataID,PathType,ImageType);
 COMMIT;

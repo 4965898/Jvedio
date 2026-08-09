@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.CustomEventArgs;
+using Jvedio.Core.CustomEventArgs;
 using Jvedio.Core.Enums;
 using Jvedio.Entity;
 using Jvedio.Entity.CommonSQL;
@@ -62,6 +62,7 @@ namespace Jvedio.Core.UserControls.ViewModels
             "metadata.ReleaseDate",
             "metadata.Rating",
             "metadata_video.Duration",
+            "ACTOR_FIRST_NAME",
         };
 
         public static string[] SelectFields =
@@ -668,10 +669,19 @@ namespace Jvedio.Core.UserControls.ViewModels
             if (random)
                 wrapper.Asc("RANDOM()");
             else {
-                if (SortDescending)
-                    wrapper.Desc(sortField);
-                else
-                    wrapper.Asc(sortField);
+                if (sortField == "ACTOR_FIRST_NAME") {
+                    string sub = "(select MIN(actor_info.ActorName) from metadata_to_actor join actor_info on metadata_to_actor.ActorID=actor_info.ActorID where metadata_to_actor.DataID=metadata.DataID)";
+                    wrapper.Asc($"CASE WHEN {sub} IS NULL OR {sub}='' THEN 1 ELSE 0 END");
+                    if (SortDescending)
+                        wrapper.Desc(sub);
+                    else
+                        wrapper.Asc(sub);
+                } else {
+                    if (SortDescending)
+                        wrapper.Desc(sortField);
+                    else
+                        wrapper.Asc(sortField);
+                }
             }
         }
 
@@ -703,6 +713,9 @@ namespace Jvedio.Core.UserControls.ViewModels
 
             PageChangedStarted?.Invoke();
 
+            RefreshVideoRenderToken();
+            Rendering = true;
+            RenderProgress = 0;
             for (int i = 0; i < VideoList.Count; i++) {
                 try {
                     RenderVideoCT.ThrowIfCancellationRequested();
@@ -710,8 +723,6 @@ namespace Jvedio.Core.UserControls.ViewModels
                     RenderVideoCTS?.Dispose();
                     break;
                 }
-
-                Rendering = true;
                 Video video = VideoList[i];
                 if (video == null)
                     continue;

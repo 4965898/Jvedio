@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.CustomEventArgs;
+using Jvedio.Core.CustomEventArgs;
 using Jvedio.Core.Scan;
 using Jvedio.Core.UserControls;
 using Jvedio.Core.UserControls.Tasks;
@@ -374,6 +374,7 @@ namespace Jvedio.ViewModels
                     };
 
                     taskList.onRestart += App.DownloadManager.Restart;
+                    taskList.onRestartAll += App.DownloadManager.RestartAllFailed;
 
                     App.DownloadManager.onRunning += () => {
                         TaskList list = GetTaskListByType(type);

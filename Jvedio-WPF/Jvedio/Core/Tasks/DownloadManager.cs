@@ -1,6 +1,8 @@
-﻿using Jvedio.Core.Net;
+using Jvedio.Core.Net;
 using SuperUtils.Framework.Tasks;
 using System;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Jvedio.Core.Tasks
 {
@@ -99,6 +101,36 @@ namespace Jvedio.Core.Tasks
         public override void ClearDispatcher()
         {
             Dispatcher.ClearDoneList();
+        }
+
+        public async void RestartAllFailed()
+        {
+            var failed = CurrentTasks.Where(t => t.Status == System.Threading.Tasks.TaskStatus.Canceled).ToList();
+            if (failed.Count == 0)
+                return;
+            int index = 0;
+            while (index < failed.Count) {
+                int batch = Math.Min(failed.Count - index, TASK_COUNT);
+                for (int i = 0; i < batch; i++) {
+                    failed[index + i].Restart();
+                }
+                bool completed = false;
+                while (!completed) {
+                    completed = true;
+                    for (int i = 0; i < batch; i++) {
+                        var t = failed[index + i];
+                        if (t.Status == System.Threading.Tasks.TaskStatus.Running ||
+                            t.Status == System.Threading.Tasks.TaskStatus.WaitingToRun) {
+                            completed = false;
+                            break;
+                        }
+                    }
+                    if (!completed)
+                        await Task.Delay(TASK_DELAY);
+                }
+                index += batch;
+            }
+            Start();
         }
     }
 }

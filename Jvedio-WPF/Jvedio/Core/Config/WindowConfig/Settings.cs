@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.Config.Base;
+using Jvedio.Core.Config.Base;
 using System.Collections.Generic;
 
 namespace Jvedio.Core.WindowConfig
@@ -7,7 +7,7 @@ namespace Jvedio.Core.WindowConfig
     {
         public const int DEFAULT_BACKUP_PERIOD_INDEX = 1;
 
-
+        public const int DEFAULT_SYNC_CONCURRENCY = 2;
 
         private Settings() : base($"WindowConfig.Settings")
         {
@@ -35,6 +35,8 @@ namespace Jvedio.Core.WindowConfig
             CacheExpiration = Jvedio.Core.Media.ImageCache.DEFAULT_CACHE_EXPIRATION;
 
             DelInfoAfterDelFile = true;
+
+            SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
         }
 
         public static List<int> BackUpPeriods = new List<int> { 1, 3, 7, 15, 30 };
@@ -98,6 +100,8 @@ namespace Jvedio.Core.WindowConfig
         public bool OverwriteNFO { get; set; }
 
         public string NFOSavePath { get; set; }
+
+        public long SyncConcurrency { get; set; }
 
 
 

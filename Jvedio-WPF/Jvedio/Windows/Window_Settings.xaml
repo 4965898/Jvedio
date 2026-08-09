@@ -1,4 +1,4 @@
-﻿<super:BaseWindow
+<super:BaseWindow
     x:Class="Jvedio.Window_Settings"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -7,6 +7,7 @@
     xmlns:fa="http://schemas.fontawesome.io/icons/"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:p="clr-namespace:Jvedio.Properties"
+    xmlns:wconf="clr-namespace:Jvedio.Core.WindowConfig;assembly=Jvedio"
     xmlns:super="https://github.com/SuperStudio/SuperControls"
     Title="{DynamicResource Settings}"
     Width="1000"
@@ -749,6 +750,24 @@
                                     <CheckBox Content="{DynamicResource SkipDownloadImage}" IsChecked="{Binding SkipExistImage, Mode=TwoWay}" />
                                     <CheckBox Content="{DynamicResource ForcedFetchInfo}" IsChecked="{Binding OverrideInfo, Source={x:Static config:ConfigManager.DownloadConfig}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
+                                    <StackPanel Margin="5" Orientation="Horizontal">
+                                        <TextBlock
+                                            MinWidth="150"
+                                            Style="{StaticResource BaseTextBlock}"
+                                            Text="同步影片信息并发数"
+                                            TextAlignment="Left" />
+                                        <super:SearchBox
+                                            MinWidth="100"
+                                            Background="{DynamicResource Window.Title.Background}"
+                                            ShowClearButton="False"
+                                            Text="{Binding SyncConcurrency, Mode=TwoWay}"
+                                            TextAlignment="Center" />
+                                        <TextBlock
+                                            Margin="10,0,0,0"
+                                            Style="{StaticResource BaseTextBlock}"
+                                            Text="默认并发数：" />
+                                        <Label Content="{x:Static wconf:Settings.DEFAULT_SYNC_CONCURRENCY}" Style="{StaticResource InfoLabel}" />
+                                    </StackPanel>
 
                                     <WrapPanel Margin="10,0" Orientation="Horizontal">
 

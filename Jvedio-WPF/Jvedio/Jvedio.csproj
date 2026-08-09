@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\EntityFramework.6.4.4\build\EntityFramework.props" Condition="Exists('..\packages\EntityFramework.6.4.4\build\EntityFramework.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -864,24 +864,15 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PreBuildEvent>mkdir "$(ProjectDir)bin\Debug"
-
-XCOPY  "$(ProjectDir)Reference\JvedioLib.dll"  "$(ProjectDir)bin\Debug"    /Y /i
-XCOPY  "$(ProjectDir)Resources\Jvedio.ico"  "$(ProjectDir)bin\Debug"    /Y /i
-
-XCOPY  "$(ProjectDir)Reference\MediaInfo.dll"  "$(ProjectDir)bin\Debug"    /Y /i
-XCOPY  "$(ProjectDir)Reference\MediaInfo.dll"  "$(ProjectDir)bin\Release"    /Y /i
-
 mkdir "$(ProjectDir)bin\Release"
 
-XCOPY  "$(ProjectDir)Reference\JvedioLib.dll"  "$(ProjectDir)bin\Release"    /Y /i
-XCOPY  "$(ProjectDir)Resources\Jvedio.ico"  "$(ProjectDir)bin\Release"    /Y /i
+if exist "$(ProjectDir)Reference\JvedioLib.dll" XCOPY "$(ProjectDir)Reference\JvedioLib.dll" "$(ProjectDir)bin\Debug" /Y /i
+if exist "$(ProjectDir)Resources\Jvedio.ico" XCOPY "$(ProjectDir)Resources\Jvedio.ico" "$(ProjectDir)bin\Debug" /Y /i
+if exist "$(ProjectDir)Reference\MediaInfo.dll" XCOPY "$(ProjectDir)Reference\MediaInfo.dll" "$(ProjectDir)bin\Debug" /Y /i
 
-XCOPY  "D:\SuperStudio\Newtonsoft.Json\Src\Newtonsoft.Json\bin\Release\net472\Newtonsoft.Json.dll" "$(ProjectDir)Reference"    /Y /i
-
-XCOPY "D:\SuperStudio\SuperUtils\SuperUtils\bin\Debug\SuperUtils.dll" "$(ProjectDir)Reference"    /Y /i
-
-XCOPY "D:\SuperStudio\SuperControls\SuperControls.Style\bin\Debug\SuperControls.Style.dll" "$(ProjectDir)Reference"    /Y /i
-
+if exist "$(ProjectDir)Reference\MediaInfo.dll" XCOPY "$(ProjectDir)Reference\MediaInfo.dll" "$(ProjectDir)bin\Release" /Y /i
+if exist "$(ProjectDir)Reference\JvedioLib.dll" XCOPY "$(ProjectDir)Reference\JvedioLib.dll" "$(ProjectDir)bin\Release" /Y /i
+if exist "$(ProjectDir)Resources\Jvedio.ico" XCOPY "$(ProjectDir)Resources\Jvedio.ico" "$(ProjectDir)bin\Release" /Y /i
     </PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>

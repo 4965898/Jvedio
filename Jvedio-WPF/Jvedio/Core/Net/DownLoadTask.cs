@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.Enums;
+using Jvedio.Core.Enums;
 using Jvedio.Core.Exceptions;
 using Jvedio.Entity;
 using SuperControls.Style;
@@ -145,7 +145,6 @@ namespace Jvedio.Core.Net
             object o = GetInfoFromExist("BigImageUrl", video, dict);
             string imageUrl = o != null ? o.ToString() : string.Empty;
             if (!string.IsNullOrEmpty(imageUrl)) {
-                // todo 原来的 domain 可能没法用，得替换 domain
                 Logger.Info($"url: {imageUrl}");
                 string saveFileName = video.GetBigImage(Path.GetExtension(imageUrl), false);
                 if (!File.Exists(saveFileName)) {
@@ -153,6 +152,14 @@ namespace Jvedio.Core.Net
                         if (!string.IsNullOrEmpty(error))
                             Logger.Error($"{imageUrl} => {error}");
                     });
+                    if (fileByte == null || fileByte.Length == 0) {
+                        Logger.Warning($"海报图下载失败，正在重试...");
+                        await Task.Delay(1000);
+                        fileByte = await downLoader.DownloadImage(imageUrl, header, (error) => {
+                            if (!string.IsNullOrEmpty(error))
+                                Logger.Error($"重试: {imageUrl} => {error}");
+                        });
+                    }
                     if (fileByte != null && fileByte.Length > 0) {
                         FileHelper.ByteArrayToFile(fileByte, saveFileName);
                         StatusText = "3.1 同步海报图成功";
@@ -176,7 +183,6 @@ namespace Jvedio.Core.Net
             object o = GetInfoFromExist("SmallImageUrl", video, dict);
             string imageUrl = o != null ? o.ToString() : string.Empty;
 
-            // 2. 小图
             if (!string.IsNullOrEmpty(imageUrl)) {
                 Logger.Info($"url: {imageUrl}");
                 string saveFileName = video.GetSmallImage(Path.GetExtension(imageUrl), false);
@@ -185,6 +191,30 @@ namespace Jvedio.Core.Net
                         if (!string.IsNullOrEmpty(error))
                             Logger.Error($"{imageUrl} => {error}");
                     });
+                    if (fileByte == null || fileByte.Length == 0) {
+                        Logger.Warning($"缩略图下载失败，正在重试...");
+                        await Task.Delay(1000);
+                        fileByte = await downLoader.DownloadImage(imageUrl, header, (error) => {
+                            if (!string.IsNullOrEmpty(error))
+                                Logger.Error($"重试: {imageUrl} => {error}");
+                        });
+                    }
+                    if (fileByte == null || fileByte.Length == 0) {
+                        object posterUrlObj = GetInfoFromExist("BigImageUrl", video, dict);
+                        if (posterUrlObj != null) {
+                            string posterUrl = posterUrlObj.ToString();
+                            if (posterUrl.EndsWith("_b.jpg", StringComparison.OrdinalIgnoreCase)) {
+                                string fallbackUrl = posterUrl.Replace("_b.jpg", "_s.jpg");
+                                if (!string.Equals(fallbackUrl, imageUrl, StringComparison.OrdinalIgnoreCase)) {
+                                    Logger.Info($"尝试备用缩略图URL: {fallbackUrl}");
+                                    fileByte = await downLoader.DownloadImage(fallbackUrl, header, (error) => {
+                                        if (!string.IsNullOrEmpty(error))
+                                            Logger.Error($"{fallbackUrl} => {error}");
+                                    });
+                                }
+                            }
+                        }
+                    }
                     if (fileByte != null && fileByte.Length > 0) {
                         FileHelper.ByteArrayToFile(fileByte, saveFileName);
                         StatusText = "4.1 同步缩略图成功";
@@ -224,20 +254,19 @@ namespace Jvedio.Core.Net
 
         public async Task<bool> DownloadActors(Video video, Dictionary<string, object> dict, VideoDownLoader downLoader, RequestHeader header)
         {
-            if (!ConfigManager.DownloadConfig.DownloadActor)
-                return true;
             object names = GetInfoFromExist("ActorNames", video, dict);
             object urls = GetInfoFromExist("ActressImageUrl", video, dict);
 
             if (names == null)
                 return false;
 
-            if (urls == null) {
+            bool downloadActorImage = ConfigManager.DownloadConfig.DownloadActor;
+
+            if (urls == null || !downloadActorImage) {
                 SaveActorNames(names, video);
                 return true;
             }
 
-            // 必须要有演员头像才能导入
             if (names != null &&
                 urls != null &&
                 names is List<string> actorNames &&
@@ -258,29 +287,32 @@ namespace Jvedio.Core.Net
                             actorMapper.Insert(actorInfo);
                         }
 
-                        // 保存信息
                         string sql = $"insert or ignore into metadata_to_actor (ActorID,DataID) values ({actorInfo.ActorID},{video.DataID})";
                         metaDataMapper.ExecuteNonQuery(sql);
                         StatusText = $"{i + 1}/{actorCount} 成功保存演员信息: {actorName}";
-                        // 下载图片
-                        string saveFileName = actorInfo.GetImagePath(video.Path, Path.GetExtension(url), false);
-                        if (!File.Exists(saveFileName)) {
-                            byte[] fileByte = await downLoader.DownloadImage(url, header, (error) => {
-                                if (!string.IsNullOrEmpty(error))
-                                    Logger.Error($"{url} => {error}");
-                            });
-                            if (fileByte != null && fileByte.Length > 0) {
-                                FileHelper.ByteArrayToFile(fileByte, saveFileName);
-                                StatusText = $"{i + 1}/{actorCount} 成功同步演员头像: {actorName}";
-                            } else
-                                Logger.Error($"{i + 1}/{actorCount} sync actor（{actorName}）image failed, file byte is empty");
-                        } else {
-                            Logger.Info($"{LangManager.GetValueByKey("SkipDownloadImage")} {saveFileName}");
+
+                        if (downloadActorImage) {
+                            string saveFileName = actorInfo.GetImagePath(video.Path, Path.GetExtension(url), false);
+                            if (!File.Exists(saveFileName)) {
+                                byte[] fileByte = await downLoader.DownloadImage(url, header, (error) => {
+                                    if (!string.IsNullOrEmpty(error))
+                                        Logger.Error($"{url} => {error}");
+                                });
+                                if (fileByte != null && fileByte.Length > 0) {
+                                    FileHelper.ByteArrayToFile(fileByte, saveFileName);
+                                    StatusText = $"{i + 1}/{actorCount} 成功同步演员头像: {actorName}";
+                                } else
+                                    Logger.Error($"{i + 1}/{actorCount} sync actor（{actorName}）image failed, file byte is empty");
+                            } else {
+                                Logger.Info($"{LangManager.GetValueByKey("SkipDownloadImage")} {saveFileName}");
+                            }
                         }
                     }
                     return true;
                 } else {
-                    Logger.Error("empty: ActressImageUrl,  actorNames");
+                    Logger.Warning($"actorNames.Count({actorNames?.Count}) != ActressImageUrl.Count({ActressImageUrl?.Count}), fallback to SaveActorNames");
+                    SaveActorNames(names, video);
+                    return true;
                 }
             } else {
                 Logger.Error("empty: names,  urls");
@@ -451,8 +483,8 @@ namespace Jvedio.Core.Net
                     if (header == null) {
                         header = new RequestHeader();
                         header.WebProxy = ConfigManager.ProxyConfig.GetWebProxy();
-                        header.TimeOut = ConfigManager.ProxyConfig.HttpTimeout * 1000; // 转为 ms
                     }
+                    header.TimeOut = ConfigManager.ProxyConfig.HttpTimeout * 1000;
                     Message = "";
                     StatusText = "3. 开始同步海报图";
                     success = await DownloadPoster(video, dict, downLoader, header);

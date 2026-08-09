@@ -1,4 +1,4 @@
-﻿using Jvedio.AvalonEdit;
+using Jvedio.AvalonEdit;
 using Jvedio.Core.Enums;
 using Jvedio.Core.Global;
 using Jvedio.Core.Media;
@@ -842,6 +842,15 @@ namespace Jvedio
 
             if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control && e.Key == Key.F) {
                 SetTabItemStatus(TabActionType.Search);
+                return;
+            }
+
+            if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control && e.Key == Key.A) {
+                var selected = vieModel.TabItemManager.GetSelected();
+                if (selected is VideoList videoList) {
+                    videoList.SelectAll(null, null);
+                    e.Handled = true;
+                }
                 return;
             }
 
