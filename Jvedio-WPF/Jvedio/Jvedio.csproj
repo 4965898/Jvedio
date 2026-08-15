@@ -264,6 +264,8 @@
     <Compile Include="Core\Config\Base\AbstractConfig.cs" />
     <Compile Include="Core\Config\Base\IConfig.cs" />
     <Compile Include="Core\Config\Common\DownloadConfig.cs" />
+    <Compile Include="Core\Config\Common\OnlineConfig.cs" />
+    <Compile Include="Core\Config\Common\TranslationConfig.cs" />
     <Compile Include="Core\Config\Common\JavaServerConfig.cs" />
     <Compile Include="Core\Config\Common\ThemeConfig.cs" />
     <Compile Include="Core\Config\Data\FilterConfig.cs" />
@@ -290,6 +292,7 @@
     <Compile Include="Core\Config\WindowConfig\Settings.cs" />
     <Compile Include="Core\Crawler\ActorSearch.cs" />
     <Compile Include="Core\Crawler\CrawlerHeader.cs" />
+    <Compile Include="Core\Crawler\OnlineSites.cs" />
     <Compile Include="Core\CustomEventArgs\PreviewImageEventArgs.cs" />
     <Compile Include="Core\Enums\AssociationType.cs" />
     <Compile Include="Core\Enums\DownLoadState.cs" />
@@ -421,6 +424,7 @@
     <Compile Include="Utils\Extern\JvedioLib.cs" />
     <Compile Include="Core\Tasks\DownloadManager.cs" />
     <Compile Include="Core\Tasks\ImageIndexManager.cs" />
+    <Compile Include="Core\Translation\TranslateManager.cs" />
     <Compile Include="Mapper\Common\AssociationMapper.cs" />
     <Compile Include="Mapper\Common\ActorMapper.cs" />
     <Compile Include="Mapper\Common\AIFaceMapper.cs" />

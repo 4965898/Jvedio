@@ -218,8 +218,16 @@ namespace Jvedio.ViewModel
 
         public void SaveLove()
         {
-            bool ok = metaDataMapper.UpdateFieldById("Grade", CurrentVideo.Grade.ToString(), CurrentVideo.DataID);
-            Logger.Info($"update data[{CurrentVideo.DataID}] grade[{CurrentVideo.Grade}] ret[{ok}] ");
+            long dataID = CurrentVideo.DataID;
+            string grade = CurrentVideo.Grade.ToString();
+            Task.Run(() => {
+                try {
+                    bool ok = metaDataMapper.UpdateFieldById("Grade", grade, dataID);
+                    Logger.Info($"update data[{dataID}] grade[{grade}] ret[{ok}] ");
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                }
+            });
         }
 
         public void Load(long dataID)

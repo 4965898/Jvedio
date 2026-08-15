@@ -84,10 +84,11 @@
                 Click="DownLoadWithUrl"
                 Header="{DynamicResource Menu_CustomUrl}"
                 Visibility="Collapsed" />
-            <MenuItem Click="EditInfo" Header="{DynamicResource Menu_EditInfo}" />
-            <MenuItem Click="AddToPlayerList" Header="{DynamicResource AddToPlayList}" />
             <MenuItem Name="TagMenuItems" Header="{DynamicResource AddTagStamp}" />
+            <MenuItem Name="OnlineJumpMenuItems" Header="{DynamicResource OnlineJump}" />
+            <MenuItem Click="EditInfo" Header="{DynamicResource Menu_EditInfo}" />
             <MenuItem Header="{DynamicResource Menu_Advance}">
+                <MenuItem Click="TranslateMovie" Header="{DynamicResource TranslateTitle}" />
                 <MenuItem Click="AddDataAssociation" Header="{DynamicResource DataAsso}" />
                 <MenuItem Click="GenerateScreenShot" Header="{DynamicResource Menu_GenerateScreenShot}" />
                 <MenuItem Click="GenerateGif" Header="{DynamicResource Menu_GenerateGif}" />
@@ -111,7 +112,7 @@
                 <MenuItem Click="DeletePosterAndThumbnail" Header="{DynamicResource Menu_DeletePosterAndThumbnail}" />
 
             </MenuItem>
-
+            <MenuItem Click="AddToPlayerList" Header="{DynamicResource AddToPlayList}" />
 
             <Separator />
             <MenuItem

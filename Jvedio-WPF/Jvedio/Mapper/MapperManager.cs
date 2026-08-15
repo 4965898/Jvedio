@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿using Jvedio.Core.DataBase;
+﻿﻿using Jvedio.Core.DataBase;
 using Jvedio.Core.DataBase.Tables;
 using Jvedio.Mapper;
 using System;
@@ -101,9 +101,49 @@ namespace Jvedio
                 Logger.Error(ex);
             }
 
+            ApplySqlitePragmas();
+
             Loaded = true;
             Logger.Info("init mapper ok");
             return Loaded;
+        }
+
+        /// <summary>
+        /// 为所有 SQLite 连接应用统一 PRAGMA：
+        /// - journal_mode=WAL：读写不互斥，大幅降低刮削写库与 UI 读统计的锁冲突
+        /// - busy_timeout=30000：写锁冲突时等待而不是立刻抛 "database is locked"
+        /// - synchronous=NORMAL：WAL 模式下安全，减少 fsync 停顿
+        /// 注意 busy_timeout/synchronous 是连接级设置，必须对每条连接逐一执行；
+        /// journal_mode 是文件级设置，执行一次即持久生效。
+        /// </summary>
+        private static void ApplySqlitePragmas()
+        {
+            object[] mappers = new object[] {
+                appDatabaseMapper, translationMapper, magnetsMapper, aIFaceMapper,
+                tagStampMapper, searchHistoryMapper, metaDataMapper, videoMapper,
+                pictureMapper, comicMapper, gameMapper, actorMapper, urlCodeMapper,
+                associationMapper, appConfigMapper,
+            };
+            string[] pragmas = new string[] {
+                "PRAGMA journal_mode=WAL;",
+                "PRAGMA busy_timeout=30000;",
+                "PRAGMA synchronous=NORMAL;",
+            };
+            foreach (object mapper in mappers) {
+                if (mapper == null)
+                    continue;
+                var execute = mapper.GetType().GetMethod("ExecuteNonQuery", new Type[] { typeof(string) });
+                if (execute == null)
+                    continue;
+                foreach (string sql in pragmas) {
+                    try {
+                        execute.Invoke(mapper, new object[] { sql });
+                    } catch (Exception ex) {
+                        Logger.Error($"apply pragma failed: {sql} => {ex.Message}");
+                    }
+                }
+            }
+            Logger.Info("apply sqlite pragmas ok (journal_mode=WAL, busy_timeout=30000, synchronous=NORMAL)");
         }
 
         public static void Dispose()

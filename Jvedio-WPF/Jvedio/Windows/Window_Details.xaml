@@ -103,6 +103,46 @@
             </Style.Triggers>
         </Style>
 
+        <!--  在线观看跳转按钮（参考浏览器脚本 jop-button_green：绿底白字圆角，hover 亮绿）  -->
+        <Style x:Key="OnlineJumpButton" TargetType="Button">
+            <Setter Property="Margin" Value="0,3,8,3" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Background" Value="#67C23A" />
+            <Setter Property="BorderBrush" Value="#67C23A" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border
+                            x:Name="bd"
+                            Padding="{TemplateBinding Padding}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="4">
+                            <ContentPresenter
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#95D475" />
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#95D475" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#5DAF34" />
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#5DAF34" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
 
     </Window.Resources>
 
@@ -257,6 +297,10 @@
 
                 <!--  标题  -->
                 <Grid Grid.Row="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="auto" />
+                        <RowDefinition Height="auto" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="auto" MinWidth="50" />
@@ -265,12 +309,14 @@
 
                     <Grid
                         x:Name="MouseMoveGrid"
+                        Grid.Row="0"
                         Grid.Column="0"
                         Background="Transparent"
                         MouseMove="MoveWindow" />
 
                     <TextBox
                         x:Name="TitleTextBox"
+                        Grid.Row="0"
                         Grid.Column="0"
                         Margin="0,0,50,0"
                         HorizontalAlignment="Left"
@@ -289,7 +335,7 @@
                             <ContextMenu>
                                 <MenuItem
                                     Click="TranslateMovie"
-                                    Header="{DynamicResource Translate}"
+                                    Header="{DynamicResource TranslateTitle}"
                                     Visibility="Collapsed" />
                                 <MenuItem Command="ApplicationCommands.Copy" Header="{DynamicResource Copy}" />
                                 <MenuItem Command="ApplicationCommands.SelectAll" Header="{DynamicResource SelectAllText}" />
@@ -297,10 +343,61 @@
                         </TextBox.ContextMenu>
                     </TextBox>
 
+                    <!--  翻译后的标题（中文），外文名下方另起一栏  -->
+                    <TextBox
+                        x:Name="TitleCNTextBox"
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        Margin="0,2,50,0"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Background="Transparent"
+                        FocusVisualStyle="{x:Null}"
+                        FontSize="16"
+                        FontWeight="Bold"
+                        Foreground="{DynamicResource Window.Sub.Foreground}"
+                        Text="{Binding CurrentVideo.TitleCN}"
+                        TextAlignment="Left"
+                        TextWrapping="NoWrap"
+                        ToolTip="{Binding RelativeSource={RelativeSource Mode=Self}, Path=Text}">
+                        <TextBox.Style>
+                            <Style BasedOn="{StaticResource ViewTextBox}" TargetType="TextBox">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CurrentVideo.TitleCN}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding CurrentVideo.TitleCN}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBox.Style>
+                        <TextBox.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Command="ApplicationCommands.Copy" Header="{DynamicResource Copy}" />
+                                <MenuItem Command="ApplicationCommands.SelectAll" Header="{DynamicResource SelectAllText}" />
+                            </ContextMenu>
+                        </TextBox.ContextMenu>
+                    </TextBox>
+
                     <StackPanel
+                        Grid.Row="0"
                         Grid.Column="2"
                         VerticalAlignment="Top"
                         Orientation="Horizontal">
+                        <Border
+                            Margin="10,5"
+                            Padding="5"
+                            super:CommonExt.HoverBackground="{DynamicResource Window.Title.Background}"
+                            CornerRadius="3"
+                            Cursor="Hand"
+                            MouseLeftButtonUp="TranslateMovie"
+                            Style="{StaticResource HoverBorder}">
+                            <TextBlock
+                                Grid.Column="1"
+                                Style="{StaticResource BaseTextBlock}"
+                                Text="{DynamicResource TranslateTitle}" />
+                        </Border>
                         <Border
                             Margin="10,5"
                             Padding="5"
@@ -1147,6 +1244,42 @@
 
 
 
+                                                </Grid>
+
+
+                                                <!--  在线观看  -->
+                                                <Grid
+                                                    x:Name="onlineJumpGrid"
+                                                    Margin="0,10,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="auto" />
+                                                        <ColumnDefinition Width="auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="auto" />
+                                                        <RowDefinition Height="*" />
+                                                    </Grid.RowDefinitions>
+                                                    <TextBlock
+                                                        Grid.Row="0"
+                                                        Grid.Column="0"
+                                                        Height="auto"
+                                                        VerticalAlignment="Center"
+                                                        Style="{StaticResource BaseTextBlock}"
+                                                        Text="{DynamicResource OnlineJump}" />
+                                                    <TextBlock
+                                                        Grid.Row="0"
+                                                        Grid.Column="1"
+                                                        Height="auto"
+                                                        Style="{StaticResource BaseTextBlock}"
+                                                        Text="：" />
+                                                    <WrapPanel
+                                                        x:Name="onlineJumpPanel"
+                                                        Grid.Row="1"
+                                                        Grid.Column="0"
+                                                        Grid.ColumnSpan="3"
+                                                        Margin="0,3,0,0"
+                                                        Orientation="Horizontal" />
                                                 </Grid>
 
 

@@ -60,6 +60,20 @@ namespace Jvedio.Entity
             }
         }
 
+        /// <summary>
+        /// 翻译后的标题（中文标题，详情页显示在外文名下方；可空）
+        /// </summary>
+        private string _TitleCN;
+
+        public string TitleCN {
+            get { return _TitleCN; }
+
+            set {
+                _TitleCN = value;
+                RaisePropertyChanged();
+            }
+        }
+
         private long _Size;
 
         public long Size {

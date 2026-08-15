@@ -132,6 +132,16 @@ namespace Jvedio
             InitMapper(); // 初始化数据库
             ConfigManager.Init(() => SetLang()); // 从数据库加载应用配置
 
+            // 恢复上次会话未完成的刮削任务（只恢复到任务列表，不自动开始；由用户点「重启全部失败」继续）
+            // 必须在 ConfigManager.Init 之后：任务重启后 DoWork 会读取 ConfigManager.DownloadConfig
+            try {
+                int restored = App.DownloadManager.RestoreTasksFromFile();
+                if (restored > 0)
+                    Logger.Info($"restored {restored} download tasks from last session");
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+
             await MoveOldFiles();
             InitAppData();
             DeleteDirs();

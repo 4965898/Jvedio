@@ -1,3 +1,4 @@
+using Jvedio.Core.Crawler;
 using Jvedio.Core.CustomEventArgs;
 using Jvedio.Core.FFmpeg;
 using Jvedio.Core.Media;
@@ -118,8 +119,35 @@ namespace Jvedio
                 ShowMagnets();
                 ShowActor();
                 vieModel.GetLabels();
+                LoadOnlineJumpButtons();
                 vieModel.LoadingData = false;
             };
+        }
+
+        /// <summary>
+        /// 在线观看：按当前影片番号生成各站跳转按钮（位置：标签下面）
+        /// </summary>
+        private void LoadOnlineJumpButtons()
+        {
+            if (onlineJumpGrid == null || onlineJumpPanel == null)
+                return;
+            onlineJumpPanel.Children.Clear();
+            string code = vieModel?.CurrentVideo?.VID;
+            if (string.IsNullOrEmpty(code)) {
+                onlineJumpGrid.Visibility = Visibility.Collapsed;
+                return;
+            }
+            onlineJumpGrid.Visibility = Visibility.Visible;
+            foreach (OnlineSite site in OnlineSites.Sites) {
+                Button button = new Button() {
+                    Content = site.Name,
+                    Style = (Style)FindResource("OnlineJumpButton"),
+                    ToolTip = site.GetUrl(code),
+                };
+                string url = site.GetUrl(code);
+                button.Click += (s, e) => FileHelper.TryOpenUrl(url);
+                onlineJumpPanel.Children.Add(button);
+            }
         }
 
         private void Window_ContentRendered(object sender, EventArgs e)
@@ -726,67 +754,27 @@ namespace Jvedio
             vieModel.CurrentVideo.OpenWeb();
         }
 
-        public void TranslateMovie(object sender, RoutedEventArgs e)
+        public async void TranslateMovie(object sender, RoutedEventArgs e)
         {
-            // if (IsTranslating) return;
-
-            // if (!Properties.Settings.Default.Enable_TL_BAIDU & !Properties.Settings.Default.Enable_TL_YOUDAO) { SuperControls.Style.MessageCard.Warning("请设置【有道翻译】并测试"); IsTranslating = false; return; }
-            // string result = "";
-            // MySqlite dataBase = new MySqlite("Translate");
-
-            // CurrentVideo movie = vieModel.CurrentVideo;
-            // IsTranslating = true;
-            ////检查是否已经翻译过，如有提示
-            // if (!string.IsNullOrEmpty(dataBase.SelectByField("translate_title", "youdao", movie.id)))
-            // {
-            //    if (new MsgBox( SuperControls.Style.LangManager.GetValueByKey("AlreadyTranslate")).ShowDialog() == false)
-            //    {
-            //        IsTranslating = false;
-            //        return;
-            //    }
-
-            // }
-
-            // string title = DataBase.SelectInfoByID("title", "movie", movie.id);
-
-            // if (title != "")
-            // {
-
-            // if (Properties.Settings.Default.Enable_TL_YOUDAO) result = await Translate.Youdao(title);
-            //    //保存
-            //    if (result != "")
-            //    {
-            //        dataBase.SaveYoudaoTranslateByID(movie.id, title, result, "title");
-            //        movie.title = result;
-            //        UpdateInfo(movie);
-            //    }
-            //    else
-            //    {
-            //        SuperControls.Style.MessageCard.Info(SuperControls.Style.LangManager.GetValueByKey("TranslateFail"));
-            //    }
-
-            // }
-            // string plot = DataBase.SelectInfoByID("plot", "movie", movie.id);
-            // if (plot != "")
-            // {
-            //    if (Properties.Settings.Default.Enable_TL_YOUDAO) result = await Translate.Youdao(plot);
-            //    //保存
-            //    if (result != "")
-            //    {
-            //        dataBase.SaveYoudaoTranslateByID(movie.id, plot, result, "plot");
-            //        movie.plot = result;
-            //        UpdateInfo(movie);
-            //        //SuperControls.Style.MessageCard.Info(SuperControls.Style.LangManager.GetValueByKey("TranslateSuccess"));
-            //    }
-            //    else
-            //    {
-            //        SuperControls.Style.MessageCard.Info(SuperControls.Style.LangManager.GetValueByKey("TranslateFail"));
-            //    }
-
-            // }
-            // dataBase.CloseDB();
-            // IsTranslating = false;
+            if (vieModel?.CurrentVideo == null || _IsTranslating)
+                return;
+            string title = vieModel.CurrentVideo.Title;
+            if (string.IsNullOrEmpty(title))
+                return;
+            _IsTranslating = true;
+            MessageNotify.Info(LangManager.GetValueByKey("TranslateTitle") + "...");
+            string result = await Jvedio.Core.Translation.TranslateManager.Translate(title);
+            _IsTranslating = false;
+            if (string.IsNullOrEmpty(result)) {
+                MessageCard.Warning(LangManager.GetValueByKey("TranslateFail"));
+                return;
+            }
+            metaDataMapper.UpdateFieldById("TitleCN", result, vieModel.CurrentVideo.DataID);
+            vieModel.CurrentVideo.TitleCN = result;
+            MessageNotify.Success(LangManager.GetValueByKey("TranslateSuccess"));
         }
+
+        private bool _IsTranslating = false;
 
         private void Grid_KeyUp(object sender, KeyEventArgs e)
         {
@@ -1382,7 +1370,14 @@ namespace Jvedio
             long id = getDataID(stackPanel);
             if (id <= 0)
                 return;
-            metaDataMapper.UpdateFieldById("Grade", rate.Value.ToString(), id);
+            string grade = rate.Value.ToString();
+            Task.Run(() => {
+                try {
+                    metaDataMapper.UpdateFieldById("Grade", grade, id);
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                }
+            });
             CanRateChange = false;
         }
 

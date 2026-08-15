@@ -138,6 +138,9 @@ namespace Jvedio
         public void Dispose()
         {
             SaveConfigValue();
+            // 退出前保存未完成任务快照，下次启动自动恢复继续刮削
+            DownloadManager.Exiting = true;
+            DownloadManager.SaveTasksToFile();
             DownloadManager.CancelAll();
             ScreenShotManager.CancelAll();
             ScanManager.CancelAll();

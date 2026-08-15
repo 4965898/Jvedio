@@ -38,6 +38,8 @@ namespace Jvedio
         public static Jvedio.Core.Config.JavaServerConfig JavaServerConfig { get; set; }
         public static Jvedio.Core.Config.Data.VideoConfig VideoConfig { get; set; }
         public static Jvedio.Core.Config.Data.FilterConfig FilterConfig { get; set; }
+        public static Jvedio.Core.Config.OnlineConfig OnlineConfig { get; set; }
+        public static Jvedio.Core.Config.TranslationConfig TranslationConfig { get; set; }
 
         private static void CreateInstance()
         {
@@ -62,6 +64,8 @@ namespace Jvedio
 
             VideoConfig = Jvedio.Core.Config.Data.VideoConfig.CreateInstance();
             FilterConfig = Jvedio.Core.Config.Data.FilterConfig.CreateInstance();
+            OnlineConfig = Jvedio.Core.Config.OnlineConfig.CreateInstance();
+            TranslationConfig = Jvedio.Core.Config.TranslationConfig.CreateInstance();
         }
 
         public static void SaveAll()
@@ -86,6 +90,8 @@ namespace Jvedio
             JavaServerConfig.Save();
             VideoConfig.Save();
             FilterConfig.Save();
+            OnlineConfig.Save();
+            TranslationConfig.Save();
         }
 
         public static void Restore()

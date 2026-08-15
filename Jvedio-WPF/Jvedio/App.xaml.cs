@@ -129,6 +129,14 @@ namespace Jvedio
         {
             ConfigManager.SaveAll();
 
+            // 兜底：退出时保存未完成的刮削任务（正常退出路径 Window_Main.Dispose 已保存）
+            try {
+                DownloadManager.Exiting = true;
+                DownloadManager.SaveTasksToFile();
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+
             Logger.Info(Environment.NewLine);
             Logger.Info("==== goodbye ====");
             Logger.Info(Environment.NewLine);

@@ -1,4 +1,5 @@
 ﻿using SuperUtils.NetWork.Entity;
+using System;
 using System.Collections.Generic;
 
 namespace Jvedio.Core.Crawler
@@ -29,6 +30,20 @@ namespace Jvedio.Core.Crawler
             WebProxy = ConfigManager.ProxyConfig.GetWebProxy();
             Default = new SuperUtils.NetWork.Crawler.CrawlerHeader(WebProxy).Default;
             GitHub = Default;
+        }
+
+        /// <summary>
+        /// 判断网页标题是否为 Cloudflare 人机验证挑战页（"Just a moment..."）。
+        /// 纯 HTTP 客户端无法执行浏览器 JS，必须由用户先在浏览器完成验证后，
+        /// 把新鲜的 cf_clearance Cookie 与一致的 User-Agent 填入刮削器请求头。
+        /// </summary>
+        public static bool IsCloudflareChallengeTitle(string title)
+        {
+            if (string.IsNullOrEmpty(title))
+                return false;
+            return title.IndexOf("just a moment", StringComparison.OrdinalIgnoreCase) >= 0
+                || title.IndexOf("attention required", StringComparison.OrdinalIgnoreCase) >= 0
+                || title.IndexOf("verify you are human", StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
 }

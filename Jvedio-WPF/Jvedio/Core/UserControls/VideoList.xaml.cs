@@ -1368,6 +1368,23 @@ namespace Jvedio.Core.UserControls
                         };
                         menuItem.Items.Add(menu);
                     });
+                } else if ("OnlineJumpMenuItems".Equals(item.Name) && item is MenuItem jumpMenu) {
+                    // 在线观看：按番号生成各站跳转链接
+                    jumpMenu.Items.Clear();
+                    string code = video.VID;
+                    if (string.IsNullOrEmpty(code)) {
+                        jumpMenu.IsEnabled = false;
+                    } else {
+                        jumpMenu.IsEnabled = true;
+                        foreach (Jvedio.Core.Crawler.OnlineSite site in Jvedio.Core.Crawler.OnlineSites.Sites) {
+                            MenuItem menu = new MenuItem() {
+                                Header = site.Name,
+                            };
+                            string url = site.GetUrl(code);
+                            menu.Click += (s, ev) => FileHelper.TryOpenUrl(url);
+                            jumpMenu.Items.Add(menu);
+                        }
+                    }
                 }
             }
         }
@@ -1647,8 +1664,51 @@ namespace Jvedio.Core.UserControls
 
         private void TranslateMovie(object sender, RoutedEventArgs e)
         {
-
+            if (_Translating)
+                return;
+            List<Video> videos = vieModel?.SelectedVideo;
+            if (videos == null || videos.Count == 0)
+                return;
+            _Translating = true;
+            string platform = Jvedio.Core.Translation.TranslateManager.PlatformName(
+                (Jvedio.Core.Translation.TranslatePlatform)ConfigManager.TranslationConfig.Platform);
+            MessageNotify.Info($"{LangManager.GetValueByKey("TranslateTitle")} ({platform}): {videos.Count}");
+            Task.Run(async () => {
+                int success = 0;
+                int failed = 0;
+                Dictionary<long, string> results = new Dictionary<long, string>();
+                try {
+                    foreach (Video video in videos) {
+                        if (string.IsNullOrEmpty(video.Title))
+                            continue;
+                        string result = await Jvedio.Core.Translation.TranslateManager.Translate(video.Title);
+                        if (!string.IsNullOrEmpty(result)) {
+                            metaDataMapper.UpdateFieldById("TitleCN", result, video.DataID);
+                            results[video.DataID] = result;
+                            success++;
+                        } else {
+                            failed++;
+                        }
+                        await Task.Delay(500); // 防限流
+                    }
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                }
+                App.Current.Dispatcher.BeginInvoke(new Action(() => {
+                    _Translating = false;
+                    MessageNotify.Success($"{LangManager.GetValueByKey("TranslateSuccess")} {success} / {videos.Count}" +
+                        (failed > 0 ? $", {LangManager.GetValueByKey("TranslateFail")} {failed}" : ""));
+                    // 刷新列表标题（翻译结果）
+                    foreach (var kv in results) {
+                        var item = vieModel.CurrentVideoList.FirstOrDefault(arg => arg.DataID == kv.Key);
+                        if (item != null)
+                            item.TitleCN = kv.Value;
+                    }
+                }));
+            });
         }
+
+        private bool _Translating = false;
 
         private void GenerateSmallImage(object sender, RoutedEventArgs e)
         {
@@ -1841,7 +1901,14 @@ namespace Jvedio.Core.UserControls
             if (sender is Rate rate &&
                 rate.Tag != null &&
                 long.TryParse(rate.Tag.ToString(), out long dataID) && dataID > 0) {
-                metaDataMapper.UpdateFieldById("Grade", rate.Value.ToString(), dataID);
+                string grade = rate.Value.ToString();
+                Task.Run(() => {
+                    try {
+                        metaDataMapper.UpdateFieldById("Grade", grade, dataID);
+                    } catch (Exception ex) {
+                        Logger.Error(ex);
+                    }
+                });
                 onStatistic?.Invoke();
                 onGradeChange?.Invoke(dataID, (float)rate.Value);
             }

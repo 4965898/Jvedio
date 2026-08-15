@@ -4,6 +4,7 @@ using Jvedio.Core.Enums;
 using Jvedio.Core.Global;
 using Jvedio.Core.Media;
 using Jvedio.Core.Plugins.Crawler;
+using Jvedio.Core.Translation;
 using Jvedio.Entity;
 using Jvedio.Entity.Common;
 using Jvedio.Mapper;
@@ -34,6 +35,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -281,6 +283,25 @@ namespace Jvedio
             InitRenameCombobox();
             InitProxy();
             InitLang();
+            InitTranslate(); // 翻译：类别 + 平台下拉初始化
+        }
+
+        private void InitTranslate()
+        {
+            if (translateClassComboBox == null)
+                return;
+            translateClassComboBox.Items.Clear();
+            translateClassComboBox.Items.Add(LangManager.GetValueByKey("TranslateClassAI"));
+            translateClassComboBox.Items.Add(LangManager.GetValueByKey("TranslateClassMachine"));
+            int platform = ConfigManager.TranslationConfig.Platform;
+            // 旧的 ChatGPTCompat=0 枚举已并入 OpenAI=0，AI 类平台值域 0-4，机器翻译类 100+
+            TranslatePlatformClass cls = platform >= 100 ? TranslatePlatformClass.Machine : TranslatePlatformClass.AI;
+            translateClassComboBox.SelectedIndex = (int)cls; // 触发 TranslateClass_SelectionChanged 联动平台下拉
+            // 平台下拉联动后加载当前平台配置
+            if (translatePlatformComboBox.SelectedItem is TranslatePlatformDef def) {
+                _LastTranslatePlatform = (int)def.Platform;
+                LoadTranslateSetting(def);
+            }
         }
 
         /// <summary>
@@ -708,13 +729,17 @@ namespace Jvedio
                 string title = await HttpHelper.AsyncGetWebTitle(server.Url, header);
                 if (string.IsNullOrEmpty(title)) {
                     server.Available = -1;
+                } else if (CrawlerHeader.IsCloudflareChallengeTitle(title)) {
+                    // 站点返回 Cloudflare 人机验证页：不是 Jvedio 的问题，需要用户更新浏览器 Cookie
+                    server.Available = -1;
+                    MessageCard.Warning(LangManager.GetValueByKey("CloudflareChallenge"));
                 } else {
                     server.Available = 1;
                 }
 
                 await Dispatcher.BeginInvoke((Action)delegate {
                     ServersDataGrid.Items.Refresh();
-                    if (!string.IsNullOrEmpty(title))
+                    if (!string.IsNullOrEmpty(title) && !CrawlerHeader.IsCloudflareChallengeTitle(title))
                         MessageCard.Success(title);
                 });
                 callback.Invoke(0);
@@ -992,6 +1017,142 @@ namespace Jvedio
                 PathType type = (PathType)idx;
                 if (type != PathType.RelativeToData)
                     vieModel.BasePicPath = vieModel.PicPaths[type.ToString()].ToString();
+            }
+        }
+
+        private void TranslateClass_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (translateClassComboBox == null || translatePlatformComboBox == null)
+                return;
+            int clsIdx = translateClassComboBox.SelectedIndex;
+            if (clsIdx < 0)
+                return;
+            TranslatePlatformClass cls = (TranslatePlatformClass)clsIdx;
+            List<TranslatePlatformDef> list = TranslatePlatforms.GetByClass(cls);
+            int currentPlatform = ConfigManager.TranslationConfig.Platform;
+            int selectIdx = 0;
+            for (int i = 0; i < list.Count; i++) {
+                if ((int)list[i].Platform == currentPlatform) {
+                    selectIdx = i;
+                    break;
+                }
+            }
+            translatePlatformComboBox.ItemsSource = list;
+            translatePlatformComboBox.SelectedIndex = selectIdx;
+        }
+
+        private int _LastTranslatePlatform = -1;
+
+        /// <summary>
+        /// 保存当前输入框内容到「上一个平台」的配置（切换平台前由 SelectionChanged 调用）
+        /// </summary>
+        private void SaveCurrentTranslateSetting()
+        {
+            if (_LastTranslatePlatform < 0)
+                return;
+            TranslationPlatformSetting setting = ConfigManager.TranslationConfig.GetSetting(_LastTranslatePlatform);
+            setting.Model = translateModelInput?.Text ?? string.Empty;
+            setting.ApiUrl = translateUrlInput?.Text ?? string.Empty;
+            setting.Field1 = translateField1?.Text ?? string.Empty;
+            setting.Field2 = translateField2?.Text ?? string.Empty;
+            setting.Field3 = translateField3?.Text ?? string.Empty;
+        }
+
+        /// <summary>
+        /// 加载指定平台设置到输入框（切换平台后调用）
+        /// </summary>
+        private void LoadTranslateSetting(TranslatePlatformDef def)
+        {
+            TranslationPlatformSetting setting = ConfigManager.TranslationConfig.GetSetting((int)def.Platform);
+            translateModelInput.Text = setting.Model;
+            translateUrlInput.Text = setting.ApiUrl;
+            translateField1.Text = setting.Field1;
+            translateField2.Text = setting.Field2;
+            translateField3.Text = setting.Field3;
+            // URL 输入框占位提示 = 当前平台默认地址
+            translateUrlInput.PlaceHolder = def.DefaultUrl ?? string.Empty;
+            translateTestResult.Text = string.Empty;
+        }
+
+        private void TranslatePlatform_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // InitializeComponent 期间 SelectedIndex 赋值也会触发本事件，此时后续控件尚未创建
+            if (translateField1Label == null || translateField2Label == null || translateField3Label == null ||
+                translateField2Panel == null || translateField3Panel == null || translateModelPanel == null ||
+                translateModelInput == null || translateUrlInput == null || translateTestResult == null)
+                return;
+            if (translatePlatformComboBox.SelectedItem is not TranslatePlatformDef def)
+                return;
+            // 先保存「上一个平台」的输入框内容（此时 SelectedItem 已是新平台），再加载新平台配置
+            SaveCurrentTranslateSetting();
+            ConfigManager.TranslationConfig.Platform = (int)def.Platform;
+            _LastTranslatePlatform = (int)def.Platform;
+            LoadTranslateSetting(def);
+            UpdateTranslateLabels();
+        }
+
+        private void UpdateTranslateLabels()
+        {
+            if (translatePlatformComboBox.SelectedItem is not TranslatePlatformDef def)
+                return;
+            translateField1Label.Text = string.IsNullOrEmpty(def.Field1Label) ? "—" : def.Field1Label;
+            translateField2Label.Text = string.IsNullOrEmpty(def.Field2Label) ? "—" : def.Field2Label;
+            translateField3Label.Text = string.IsNullOrEmpty(def.Field3Label) ? "—" : def.Field3Label;
+            translateField2Panel.Visibility = string.IsNullOrEmpty(def.Field2Label) ? Visibility.Collapsed : Visibility.Visible;
+            translateField3Panel.Visibility = string.IsNullOrEmpty(def.Field3Label) ? Visibility.Collapsed : Visibility.Visible;
+            translateModelPanel.Visibility = def.NeedModel ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void TranslateTestInput_TextChanged(object sender, TextChangedEventArgs e)
+        {
+        }
+
+        private async void TestTranslate(object sender, RoutedEventArgs e)
+        {
+            string text = translateTestInput.Text;
+            if (string.IsNullOrEmpty(text)) {
+                MessageCard.Warning("请输入要翻译的文本");
+                return;
+            }
+            // 测试前先把当前输入框内容保存到当前平台配置
+            SaveCurrentTranslateSetting();
+            translateTestResult.Text = "翻译中...";
+            string result = await TranslateManager.Translate(text);
+            if (!string.IsNullOrEmpty(result)) {
+                translateTestResult.Text = result;
+            } else {
+                string err = TranslateManager.LastError;
+                translateTestResult.Text = string.IsNullOrEmpty(err) ? "翻译失败，请检查配置" : "翻译失败：" + err;
+            }
+        }
+
+        private void ResetOnlineSites(object sender, RoutedEventArgs e)
+        {
+            foreach (OnlineSite site in OnlineSites.Sites)
+                site.UrlOverride = string.Empty;
+            RefreshOnlineSitesList();
+            MessageNotify.Success(LangManager.GetValueByKey("ResetDefault") + " - " + LangManager.GetValueByKey("OnlineJump"));
+        }
+
+        private void FillDefaultOnlineSite(object sender, RoutedEventArgs e)
+        {
+            // 把内置默认网址模板填入输入框，用户可直接在此基础上修改（如换镜像域名）
+            if ((sender as Button)?.Tag is OnlineSite site)
+                site.UrlOverride = site.UrlTemplate;
+            RefreshOnlineSitesList();
+        }
+
+        private void RefreshOnlineSitesList()
+        {
+            onlineSitesItemsControl.ItemsSource = null;
+            onlineSitesItemsControl.ItemsSource = OnlineSites.Sites;
+        }
+
+        private void OnlineSiteDefaultUrl_Loaded(object sender, RoutedEventArgs e)
+        {
+            // 只读 RichTextBox 支持鼠标选中文本 + Ctrl+C 复制（WPF 只读 TextBox 禁选）
+            if (sender is RichTextBox richTextBox && richTextBox.Tag is string url && !string.IsNullOrEmpty(url)) {
+                richTextBox.Document = new FlowDocument(new Paragraph(new Run("默认网址: " + url)));
             }
         }
 

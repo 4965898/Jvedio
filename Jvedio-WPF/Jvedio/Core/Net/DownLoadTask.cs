@@ -73,7 +73,7 @@ namespace Jvedio.Core.Net
         {
             {200,"成功获取资源" },
             {500,"远程服务器错误" },
-            {403,"远程服务器拒绝了您的访问（您的 IP 可能被限制了）" },
+            {403,"远程服务器拒绝了您的访问（IP 被限制或站点启用 Cloudflare 人机验证，请更新 Cookie/UA 或更换代理）" },
             {404,"远程服务器无该资源" },
         };
 
@@ -262,6 +262,17 @@ namespace Jvedio.Core.Net
 
             bool downloadActorImage = ConfigManager.DownloadConfig.DownloadActor;
 
+            // 部分站点的演员头像图床有防盗链/风控，带上刮削源根域名作为 Referer 提高成功率
+            if (header != null && dict != null && dict.ContainsKey("Url") && dict["Url"] != null) {
+                string referer = dict["Url"].ToString();
+                if (!string.IsNullOrEmpty(referer)) {
+                    if (header.Headers == null)
+                        header.Headers = new Dictionary<string, string>();
+                    if (!header.Headers.ContainsKey("referer"))
+                        header.Headers["referer"] = referer;
+                }
+            }
+
             if (urls == null || !downloadActorImage) {
                 SaveActorNames(names, video);
                 return true;
@@ -298,6 +309,15 @@ namespace Jvedio.Core.Net
                                     if (!string.IsNullOrEmpty(error))
                                         Logger.Error($"{url} => {error}");
                                 });
+                                // 头像图床多有风控（403），延迟重试一次
+                                if (fileByte == null || fileByte.Length == 0) {
+                                    Logger.Warning($"演员头像下载失败，正在重试... {url}");
+                                    await Task.Delay(1000);
+                                    fileByte = await downLoader.DownloadImage(url, header, (error) => {
+                                        if (!string.IsNullOrEmpty(error))
+                                            Logger.Error($"重试: {url} => {error}");
+                                    });
+                                }
                                 if (fileByte != null && fileByte.Length > 0) {
                                     FileHelper.ByteArrayToFile(fileByte, saveFileName);
                                     StatusText = $"{i + 1}/{actorCount} 成功同步演员头像: {actorName}";
@@ -447,6 +467,12 @@ namespace Jvedio.Core.Net
                 TimeWatch.Start();
                 if (DataType == DataType.Video) {
                     Video video = videoMapper.SelectVideoByID(DataID);
+                    if (video == null) {
+                        Message = $"不存在 DataID={DataID} 的资源";
+                        Logger.Error(Message);
+                        FinalizeWithCancel();
+                        return;
+                    }
                     RequestHeader header = null;
                     Dictionary<string, object> dict = null;
                     VideoDownLoader downLoader = new VideoDownLoader(video, Token, Logger);

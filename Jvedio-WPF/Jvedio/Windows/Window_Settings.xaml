@@ -1,8 +1,10 @@
-<super:BaseWindow
+﻿<super:BaseWindow
     x:Class="Jvedio.Window_Settings"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:config="clr-namespace:Jvedio;assembly=Jvedio"
+    xmlns:crawler="clr-namespace:Jvedio.Core.Crawler;assembly=Jvedio"
+    xmlns:translation="clr-namespace:Jvedio.Core.Translation;assembly=Jvedio"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:fa="http://schemas.fontawesome.io/icons/"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -998,9 +1000,249 @@
                             </StackPanel>
                         </Grid>
 
+                        <!--  在线观看跳转站点网址自定义  -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource SettingTitleStyle}" Text="{DynamicResource OnlineJump}" />
+                            <StackPanel
+                                Grid.Column="1"
+                                Margin="5"
+                                Orientation="Vertical">
+                                <TextBlock
+                                    Margin="0,0,0,5"
+                                    Style="{StaticResource BaseTextBlock}"
+                                    Text="{DynamicResource OnlineJumpTip}"
+                                    TextWrapping="Wrap" />
+                                <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl
+                                        x:Name="onlineSitesItemsControl"
+                                        ItemsSource="{Binding Source={x:Static crawler:OnlineSites.Sites}}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,3">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="90" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="auto" />
+                                                        <RowDefinition Height="auto" />
+                                                    </Grid.RowDefinitions>
+                                                    <TextBlock
+                                                        Grid.Row="0"
+                                                        Grid.Column="0"
+                                                        VerticalAlignment="Center"
+                                                        Style="{StaticResource BaseTextBlock}"
+                                                        Text="{Binding Name}" />
+                                                    <StackPanel
+                                                        Grid.Row="0"
+                                                        Grid.Column="1"
+                                                        Orientation="Horizontal">
+                                                        <TextBox
+                                                            Width="420"
+                                                            Margin="5,0"
+                                                            ToolTip="{Binding UrlTemplate}"
+                                                            Text="{Binding UrlOverride, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                                                        <Button
+                                                            Margin="5,0,0,0"
+                                                            Padding="6,2"
+                                                            Click="FillDefaultOnlineSite"
+                                                            Content="{DynamicResource FillDefault}"
+                                                            Tag="{Binding}" />
+                                                    </StackPanel>
+                                                    <RichTextBox
+                                                        Grid.Row="1"
+                                                        Grid.Column="1"
+                                                        Margin="5,2,0,0"
+                                                        Padding="0"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        FontSize="15"
+                                                        Foreground="#909399"
+                                                        HorizontalScrollBarVisibility="Hidden"
+                                                        IsReadOnly="True"
+                                                        Loaded="OnlineSiteDefaultUrl_Loaded"
+                                                        Tag="{Binding UrlTemplate}"
+                                                        VerticalScrollBarVisibility="Hidden" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                                <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
+                                    <Button Click="ResetOnlineSites" Content="{DynamicResource ResetDefault}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
 
 
 
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!--  翻译  -->
+            <TabItem Header="{DynamicResource Translation}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource SettingTitleStyle}" Text="{DynamicResource Translation}" />
+                            <StackPanel
+                                Grid.Column="1"
+                                Margin="5"
+                                Orientation="Vertical">
+                                <StackPanel Margin="0,3" Orientation="Horizontal">
+                                    <TextBlock
+                                        Width="100"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="{DynamicResource TranslateClass}" />
+                                    <ComboBox
+                                        x:Name="translateClassComboBox"
+                                        Width="280"
+                                        SelectionChanged="TranslateClass_SelectionChanged" />
+                                </StackPanel>
+                                <StackPanel Margin="0,3" Orientation="Horizontal">
+                                    <TextBlock
+                                        Width="100"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="{DynamicResource TranslatePlatform}" />
+                                    <ComboBox
+                                        x:Name="translatePlatformComboBox"
+                                        Width="280"
+                                        DisplayMemberPath="Name"
+                                        SelectionChanged="TranslatePlatform_SelectionChanged" />
+                                </StackPanel>
+                                <StackPanel
+                                    x:Name="translateModelPanel"
+                                    Margin="0,3"
+                                    Orientation="Horizontal">
+                                    <TextBlock
+                                        Width="100"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="{DynamicResource TranslateModel}" />
+                                    <super:SearchBox
+                                        x:Name="translateModelInput"
+                                        Width="380"
+                                        MinWidth="380"
+                                        ShowClearButton="False" />
+                                </StackPanel>
+                                <StackPanel Margin="0,3" Orientation="Horizontal">
+                                    <TextBlock
+                                        Width="100"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="{DynamicResource TranslateUrl}" />
+                                    <super:SearchBox
+                                        x:Name="translateUrlInput"
+                                        Width="380"
+                                        MinWidth="380"
+                                        ShowClearButton="False" />
+                                </StackPanel>
+                                <StackPanel Margin="0,3" Orientation="Horizontal">
+                                    <TextBlock
+                                        x:Name="translateField1Label"
+                                        Width="100"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="API Key" />
+                                    <super:SearchBox
+                                        x:Name="translateField1"
+                                        Width="380"
+                                        MinWidth="380"
+                                        ShowClearButton="False" />
+                                </StackPanel>
+                                <StackPanel
+                                    x:Name="translateField2Panel"
+                                    Margin="0,3"
+                                    Orientation="Horizontal">
+                                    <TextBlock
+                                        x:Name="translateField2Label"
+                                        Width="100"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="App ID" />
+                                    <super:SearchBox
+                                        x:Name="translateField2"
+                                        Width="380"
+                                        MinWidth="380"
+                                        ShowClearButton="False" />
+                                </StackPanel>
+                                <StackPanel
+                                    x:Name="translateField3Panel"
+                                    Margin="0,3"
+                                    Orientation="Horizontal">
+                                    <TextBlock
+                                        x:Name="translateField3Label"
+                                        Width="100"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="Client Secret" />
+                                    <super:SearchBox
+                                        x:Name="translateField3"
+                                        Width="380"
+                                        MinWidth="380"
+                                        ShowClearButton="False" />
+                                </StackPanel>
+                                <StackPanel Margin="0,3" Orientation="Horizontal">
+                                    <TextBlock
+                                        Width="100"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="{DynamicResource TranslateSourceLang}" />
+                                    <super:SearchBox
+                                        Width="380"
+                                        MinWidth="380"
+                                        PlaceHolder="留空 = 自动检测"
+                                        ShowClearButton="False"
+                                        Text="{Binding SourceLang, Source={x:Static config:ConfigManager.TranslationConfig}, Mode=TwoWay}" />
+                                </StackPanel>
+                                <StackPanel Margin="0,3" Orientation="Horizontal">
+                                    <TextBlock
+                                        Width="100"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="{DynamicResource TranslateTargetLang}" />
+                                    <super:SearchBox
+                                        Width="380"
+                                        MinWidth="380"
+                                        PlaceHolder="zh-CN"
+                                        ShowClearButton="False"
+                                        Text="{Binding TargetLang, Source={x:Static config:ConfigManager.TranslationConfig}, Mode=TwoWay}" />
+                                </StackPanel>
+                                <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                                    <TextBlock
+                                        Width="100"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="{DynamicResource TranslateTest}" />
+                                    <super:SearchBox
+                                        x:Name="translateTestInput"
+                                        Width="280"
+                                        MinWidth="280"
+                                        Text="テスト 123" />
+                                    <Button
+                                        Margin="5,0,0,0"
+                                        Click="TestTranslate"
+                                        Content="{DynamicResource TranslateTestRun}" />
+                                </StackPanel>
+                                <TextBlock
+                                    x:Name="translateTestResult"
+                                    Margin="105,5,0,0"
+                                    Style="{StaticResource BaseTextBlock}"
+                                    Text="" />
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

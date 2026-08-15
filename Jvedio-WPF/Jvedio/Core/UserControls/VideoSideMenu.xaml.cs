@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using static Jvedio.App;
@@ -266,44 +267,85 @@ namespace Jvedio.Core.UserControls
 
         /// <summary>
         /// 统计：加载时间 <70ms (15620个信息)
+        /// 异步化：统计查询全部移到后台线程，避免与后台刮削写库撞锁时阻塞 UI（database is locked 假死）。
         /// </summary>
+        private bool _StatisticBusy = false;
+
+        private bool _StatisticPending = false;
+
         public void Statistic(string searchText)
         {
-            long dbid = ConfigManager.Main.CurrentDBId;
-            AllVideoCount = metaDataMapper.SelectCount(new SelectWrapper<MetaData>().Eq("DBId", dbid).Eq("DataType", 0));
-            appDatabaseMapper.UpdateFieldById("Count", AllVideoCount.ToString(), dbid);
+            if (_StatisticBusy) {
+                _StatisticPending = true;
+                return;
+            }
+            _StatisticBusy = true;
+            string search = searchText ?? string.Empty;
+            Task.Run(() => {
+                try {
+                    long dbid = ConfigManager.Main.CurrentDBId;
+                    long allVideoCount = metaDataMapper.SelectCount(new SelectWrapper<MetaData>().Eq("DBId", dbid).Eq("DataType", 0));
 
-            FavoriteVideoCount = metaDataMapper.SelectCount(new SelectWrapper<MetaData>().Eq("DBId", dbid).Eq("DataType", 0).Gt("Grade", 0));
+                    long favoriteVideoCount = metaDataMapper.SelectCount(new SelectWrapper<MetaData>().Eq("DBId", dbid).Eq("DataType", 0).Gt("Grade", 0));
 
-            string actor_count_sql = "SELECT count(*) as Count " +
-                     "from (SELECT actor_info.ActorID FROM actor_info join metadata_to_actor " +
-                     "on metadata_to_actor.ActorID=actor_info.ActorID " +
-                     "join metadata " +
-                     "on metadata_to_actor.DataID=metadata.DataID " +
-                     $"WHERE metadata.DBId={dbid} and metadata.DataType={0} " +
-                     "GROUP BY actor_info.ActorID " +
-                     "UNION " +
-                     "select actor_info.ActorID  " +
-                     "FROM actor_info WHERE NOT EXISTS " +
-                     "(SELECT 1 from metadata_to_actor where metadata_to_actor.ActorID=actor_info.ActorID ) " +
-                     "GROUP BY actor_info.ActorID)";
+                    string actor_count_sql = "SELECT count(*) as Count " +
+                             "from (SELECT actor_info.ActorID FROM actor_info join metadata_to_actor " +
+                             "on metadata_to_actor.ActorID=actor_info.ActorID " +
+                             "join metadata " +
+                             "on metadata_to_actor.DataID=metadata.DataID " +
+                             $"WHERE metadata.DBId={dbid} and metadata.DataType={0} " +
+                             "GROUP BY actor_info.ActorID " +
+                             "UNION " +
+                             "select actor_info.ActorID  " +
+                             "FROM actor_info WHERE NOT EXISTS " +
+                             "(SELECT 1 from metadata_to_actor where metadata_to_actor.ActorID=actor_info.ActorID ) " +
+                             "GROUP BY actor_info.ActorID)";
 
-            AllActorCount = actorMapper.SelectCount(actor_count_sql);
+                    long allActorCount = actorMapper.SelectCount(actor_count_sql);
 
-            string label_count_sql = "SELECT COUNT(DISTINCT LabelName) as Count  from metadata_to_label " +
-                                    "join metadata on metadata_to_label.DataID=metadata.DataID " +
-                                     $"WHERE metadata.DBId={dbid} and metadata.DataType={0} ";
+                    string label_count_sql = "SELECT COUNT(DISTINCT LabelName) as Count  from metadata_to_label " +
+                                            "join metadata on metadata_to_label.DataID=metadata.DataID " +
+                                             $"WHERE metadata.DBId={dbid} and metadata.DataType={0} ";
 
-            AllLabelCount = metaDataMapper.SelectCount(label_count_sql);
-            DateTime date1 = DateTime.Now.AddDays(-1 * Jvedio.ViewModel.VieModel_Main.RECENT_DAY);
-            DateTime date2 = DateTime.Now;
-            RecentWatchCount = metaDataMapper.SelectCount(new SelectWrapper<MetaData>().Eq("DBId", dbid).Eq("DataType", 0).Between("ViewDate", DateHelper.ToLocalDate(date1), DateHelper.ToLocalDate(date2)));
+                    long allLabelCount = metaDataMapper.SelectCount(label_count_sql);
+                    DateTime date1 = DateTime.Now.AddDays(-1 * Jvedio.ViewModel.VieModel_Main.RECENT_DAY);
+                    DateTime date2 = DateTime.Now;
+                    long recentWatchCount = metaDataMapper.SelectCount(new SelectWrapper<MetaData>().Eq("DBId", dbid).Eq("DataType", 0).Between("ViewDate", DateHelper.ToLocalDate(date1), DateHelper.ToLocalDate(date2)));
 
-            // 类别
-            AllGenreCount = GetGenreDict(searchText).Count;
-            AllSeriesCount = GetListByField(LabelType.Series.ToString(), searchText).Count;
-            AllStudioCount = GetListByField(LabelType.Studio.ToString(), searchText).Count;
-            AllDirectorCount = GetListByField(LabelType.Director.ToString(), searchText).Count;
+                    // 类别
+                    int allGenreCount = GetGenreDict(search).Count;
+                    int allSeriesCount = GetListByField(LabelType.Series.ToString(), search).Count;
+                    int allStudioCount = GetListByField(LabelType.Studio.ToString(), search).Count;
+                    int allDirectorCount = GetListByField(LabelType.Director.ToString(), search).Count;
+
+                    App.Current.Dispatcher.BeginInvoke(new Action(() => {
+                        AllVideoCount = allVideoCount;
+                        FavoriteVideoCount = favoriteVideoCount;
+                        AllActorCount = allActorCount;
+                        AllLabelCount = allLabelCount;
+                        RecentWatchCount = recentWatchCount;
+                        AllGenreCount = allGenreCount;
+                        AllSeriesCount = allSeriesCount;
+                        AllStudioCount = allStudioCount;
+                        AllDirectorCount = allDirectorCount;
+                    }));
+
+                    // 统计计数写回库：后台执行，失败仅记日志，绝不抛出阻塞 UI
+                    try {
+                        appDatabaseMapper.UpdateFieldById("Count", allVideoCount.ToString(), dbid);
+                    } catch (Exception ex) {
+                        Logger.Error(ex);
+                    }
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                } finally {
+                    _StatisticBusy = false;
+                    if (_StatisticPending) {
+                        _StatisticPending = false;
+                        App.Current.Dispatcher.BeginInvoke(new Action(() => Statistic(search)));
+                    }
+                }
+            });
         }
 
 

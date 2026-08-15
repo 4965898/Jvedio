@@ -1,4 +1,4 @@
-[中文](README.md) [English](README_EN.md) [日本語](README_JP.md)
+﻿[中文](README.md) [English](README_EN.md) [日本語](README_JP.md)
 
 
 
@@ -81,7 +81,7 @@ Users : [User Guide](https://github.com/hitchao/Jvedio/wiki/02_Beginning)
 | 5.4.0.3 | 2025-12-30 | Maintenance update |
 | 5.4.0.4 | 2026-02-21 | One-click restart of failed sync tasks; extra filters |
 | 5.4.0.5 | 2026-05-02 | Filter by actor-info presence; other optimizations |
-| 5.4.0.6 | 2026-08-10 | Pagination rendering optimization (fix crash on fast page-flip and slowdown); auto rebuild of image-existence index; background startup scan; JavBus scraping fixes |
+| 5.4.0.6 | 2026-08-10 | Pagination rendering optimization (fix crash on fast page-flip and slowdown); auto rebuild of image-existence index; background startup scan; JavBus scraping fixes; SQLite lock fixes (no more "database is locked" freeze); scraping task persistence (resume manually after restart); numeric sort for video codes; watch-online quick links (27 sites, customizable URLs); title translation (AI/ChatGPT-compatible + Baidu/Google/DeepL etc., per-platform config) |
 
 
 # Software Characteristics

@@ -11,6 +11,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using static Jvedio.App;
 using static Jvedio.Core.UserControls.ObjectEventArgs;
 
 namespace Jvedio.Core.UserControls
@@ -306,7 +307,14 @@ nameof(ImageMode), typeof(int), typeof(ViewVideo), new PropertyMetadata(1));
             if (sender is Rate rate &&
                 rate.Tag != null &&
                 long.TryParse(rate.Tag.ToString(), out long DataID) && DataID > 0) {
-                MapperManager.metaDataMapper.UpdateFieldById("Grade", rate.Value.ToString(), DataID);
+                string grade = rate.Value.ToString();
+                System.Threading.Tasks.Task.Run(() => {
+                    try {
+                        MapperManager.metaDataMapper.UpdateFieldById("Grade", grade, DataID);
+                    } catch (Exception ex) {
+                        Logger.Error(ex);
+                    }
+                });
                 onStatistic?.Invoke();
                 RaiseEvent(new ObjectEventArgs((float)rate.Value, OnGradeChangeEvent, sender));
             }

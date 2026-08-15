@@ -16,6 +16,12 @@ namespace Jvedio.Mapper.BaseMapper
 
         static MySQLMapper<T> MySQLMapper { get; set; }
 
+        /// <summary>
+        /// 每个 mapper 实例一把锁（泛型静态字段，每个 T 一份）。
+        /// SqliteMapper 内部复用单条 SQLiteCommand，并发调用会互相覆盖 CommandText，
+        /// 因此所有转发到 SqliteMapper 的方法必须串行化。
+        /// </summary>
+        private static readonly object MapperLock = new object();
 
         #endregion
 
@@ -45,46 +51,52 @@ namespace Jvedio.Mapper.BaseMapper
 
         public override int ExecuteNonQuery(string sql)
         {
-            try {
+            lock (MapperLock) {
+                try {
 
-                if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
-                    if (SqliteMapper == null)
-                        return -1;
-                    return SqliteMapper.ExecuteNonQuery(sql);
-                } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
-                    if (MySQLMapper == null)
-                        return -1;
-                    return MySQLMapper.ExecuteNonQuery(sql);
+                    if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
+                        if (SqliteMapper == null)
+                            return -1;
+                        return SqliteMapper.ExecuteNonQuery(sql);
+                    } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
+                        if (MySQLMapper == null)
+                            return -1;
+                        return MySQLMapper.ExecuteNonQuery(sql);
+                    }
+                } catch (Exception ex) {
+                    Logger.Error(ex);
                 }
-            } catch (Exception ex) {
-                Logger.Error(ex);
-            }
 
-            return -1;
+                return -1;
+            }
         }
 
 
 
         public void InitSqlite(string sqlitePath)
         {
-            if (SqliteMapper == null)
-                SqliteMapper = new SqliteMapper<T>(sqlitePath);
+            lock (MapperLock) {
+                if (SqliteMapper == null)
+                    SqliteMapper = new SqliteMapper<T>(sqlitePath);
+            }
         }
 
         public override bool IsTableExists(string tableName)
         {
+            lock (MapperLock) {
 
-            if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
-                if (SqliteMapper == null)
-                    return false;
-                return SqliteMapper.IsTableExists(tableName);
-            } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
-                if (MySQLMapper == null)
-                    return false;
-                return MySQLMapper.IsTableExists(tableName);
+                if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
+                    if (SqliteMapper == null)
+                        return false;
+                    return SqliteMapper.IsTableExists(tableName);
+                } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
+                    if (MySQLMapper == null)
+                        return false;
+                    return MySQLMapper.IsTableExists(tableName);
+                }
+
+                return false;
             }
-
-            return false;
         }
 
         public override List<T> SelectByDict(Dictionary<string, object> dict, IWrapper<T> wrapper)
@@ -94,127 +106,145 @@ namespace Jvedio.Mapper.BaseMapper
 
         public override T SelectById(IWrapper<T> wrapper)
         {
+            lock (MapperLock) {
 
-            if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
-                if (SqliteMapper == null)
-                    return default(T);
-                return SqliteMapper.SelectById(wrapper);
-            } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
-                if (MySQLMapper == null)
-                    return default(T);
-                return MySQLMapper.SelectById(wrapper);
+                if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
+                    if (SqliteMapper == null)
+                        return default(T);
+                    return SqliteMapper.SelectById(wrapper);
+                } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
+                    if (MySQLMapper == null)
+                        return default(T);
+                    return MySQLMapper.SelectById(wrapper);
+                }
+
+                return default(T);
             }
-
-            return default(T);
         }
 
         public override long SelectCount(IWrapper<T> wrapper = null)
         {
+            lock (MapperLock) {
 
-            if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
-                if (SqliteMapper == null)
-                    return 0;
-                return SqliteMapper.SelectCount(wrapper);
-            } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
-                if (MySQLMapper == null)
-                    return 0;
-                return MySQLMapper.SelectCount(wrapper);
+                if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
+                    if (SqliteMapper == null)
+                        return 0;
+                    return SqliteMapper.SelectCount(wrapper);
+                } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
+                    if (MySQLMapper == null)
+                        return 0;
+                    return MySQLMapper.SelectCount(wrapper);
+                }
+
+                return 0;
             }
-
-            return 0;
         }
 
         public override long SelectCount(string sql)
         {
+            lock (MapperLock) {
 
-            if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
-                if (SqliteMapper == null)
-                    return 0;
-                return SqliteMapper.SelectCount(sql);
-            } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
-                if (MySQLMapper == null)
-                    return 0;
-                return MySQLMapper.SelectCount(sql);
+                if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
+                    if (SqliteMapper == null)
+                        return 0;
+                    return SqliteMapper.SelectCount(sql);
+                } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
+                    if (MySQLMapper == null)
+                        return 0;
+                    return MySQLMapper.SelectCount(sql);
+                }
+
+                return 0;
             }
-
-            return 0;
         }
 
         public override string SelectLastInsertRowId()
         {
-            if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
-                return SqliteMapper?.SelectLastInsertRowId();
-            } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
-                return MySQLMapper?.SelectLastInsertRowId();
-            }
+            lock (MapperLock) {
+                if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
+                    return SqliteMapper?.SelectLastInsertRowId();
+                } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
+                    return MySQLMapper?.SelectLastInsertRowId();
+                }
 
-            return null;
+                return null;
+            }
         }
 
         public override List<T> SelectList(IWrapper<T> wrapper = null)
         {
-            try {
-                if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
-                    return SqliteMapper?.SelectList(wrapper);
-                } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
-                    return MySQLMapper?.SelectList(wrapper);
+            lock (MapperLock) {
+                try {
+                    if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
+                        return SqliteMapper?.SelectList(wrapper);
+                    } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
+                        return MySQLMapper?.SelectList(wrapper);
+                    }
+                } catch (Exception ex) {
+                    Logger.Error(ex);
                 }
-            } catch (Exception ex) {
-                Logger.Error(ex);
-            }
 
-            return null;
+                return null;
+            }
         }
 
         public override T SelectOne(IWrapper<T> wrapper = null)
         {
+            lock (MapperLock) {
 
-            if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
-                if (SqliteMapper == null)
-                    return default(T);
-                return SqliteMapper.SelectOne(wrapper);
-            } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
-                if (MySQLMapper == null)
-                    return default(T);
-                return MySQLMapper.SelectOne(wrapper);
+                if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
+                    if (SqliteMapper == null)
+                        return default(T);
+                    return SqliteMapper.SelectOne(wrapper);
+                } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
+                    if (MySQLMapper == null)
+                        return default(T);
+                    return MySQLMapper.SelectOne(wrapper);
+                }
+
+                return default(T);
             }
-
-            return default(T);
         }
 
         public override List<Dictionary<string, object>> Select(IWrapper<T> wrapper)
         {
-            if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
-                return SqliteMapper?.Select(wrapper);
-            } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
-                return MySQLMapper?.Select(wrapper);
-            }
+            lock (MapperLock) {
+                if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
+                    return SqliteMapper?.Select(wrapper);
+                } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
+                    return MySQLMapper?.Select(wrapper);
+                }
 
-            return null;
+                return null;
+            }
         }
 
         public override List<Dictionary<string, object>> Select(string sql)
         {
-            if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
-                return SqliteMapper?.Select(sql);
-            } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
-                return MySQLMapper?.Select(sql);
-            }
+            lock (MapperLock) {
+                if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
+                    return SqliteMapper?.Select(sql);
+                } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
+                    return MySQLMapper?.Select(sql);
+                }
 
-            return null;
+                return null;
+            }
         }
 
         public override object InsertAndGetID(T entity)
         {
-            if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
-                return SqliteMapper?.InsertAndGetID(entity);
-            } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
-                if (MySQLMapper == null)
-                    return null;
-                return MySQLMapper?.InsertAndGetID(entity);
-            }
+            lock (MapperLock) {
+                if (Main.CurrentDataBaseType == DataBaseType.SQLite) {
+                    return SqliteMapper?.InsertAndGetID(entity);
+                } else if (Main.CurrentDataBaseType == DataBaseType.MySQL) {
+                    if (MySQLMapper == null)
+                        return null;
+                    return MySQLMapper?.InsertAndGetID(entity);
+                }
 
-            return null;
+                return null;
+            }
         }
 
         public override bool DeleteDataBase(string db_name)

@@ -1,4 +1,4 @@
-<ResourceDictionary
+﻿<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:sys="clr-namespace:System;assembly=mscorlib">
@@ -42,4 +42,24 @@
     <sys:String x:Key="Menu_DeletePosterOnly">仅删除海报图</sys:String>
     <sys:String x:Key="Menu_DeleteThumbnailOnly">仅删除缩略图</sys:String>
     <sys:String x:Key="Menu_DeletePosterAndThumbnail">同时删除海报图+缩略图</sys:String>
+    <sys:String x:Key="TaskInterrupted">上次未完成，可重启</sys:String>
+    <sys:String x:Key="CloudflareChallenge">站点返回 Cloudflare 人机验证页（Just a moment...），非软件问题。请先在浏览器完成验证，再把最新的 Cookie 与 User-Agent 粘贴到请求头中（Cookie 会过期，失效后需重新获取）</sys:String>
+    <sys:String x:Key="OnlineJump">在线观看</sys:String>
+    <sys:String x:Key="OnlineJumpTip">在线观看跳转站点网址（可自定义，留空 = 使用内置默认）。填写规则：填完整网址，{{code}} 是影片番号的占位符，必须保留，跳转时自动替换成番号。示例：默认是 https://javdb.com/search?q={{code}}，改用镜像站就填 https://镜像域名/search?q={{code}}。点「填默认」可把内置模板填入输入框后修改。</sys:String>
+    <sys:String x:Key="FillDefault">填默认</sys:String>
+    <sys:String x:Key="ResetDefault">恢复默认</sys:String>
+    <sys:String x:Key="Translation">翻译</sys:String>
+    <sys:String x:Key="TranslateClass">平台类别</sys:String>
+    <sys:String x:Key="TranslateClassAI">AI 平台（ChatGPT 兼容）</sys:String>
+    <sys:String x:Key="TranslateClassMachine">机器翻译平台</sys:String>
+    <sys:String x:Key="TranslatePlatform">平台</sys:String>
+    <sys:String x:Key="TranslateModel">模型</sys:String>
+    <sys:String x:Key="TranslateUrl">API 地址（留空用默认）</sys:String>
+    <sys:String x:Key="TranslateSourceLang">源语言</sys:String>
+    <sys:String x:Key="TranslateTargetLang">目标语言</sys:String>
+    <sys:String x:Key="TranslateTest">测试文本</sys:String>
+    <sys:String x:Key="TranslateTestRun">测试翻译</sys:String>
+    <sys:String x:Key="TranslateTitle">翻译标题</sys:String>
+    <sys:String x:Key="TranslateSuccess">翻译成功</sys:String>
+    <sys:String x:Key="TranslateFail">翻译失败，请检查翻译设置</sys:String>
 </ResourceDictionary>

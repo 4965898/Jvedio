@@ -37,6 +37,7 @@ namespace Jvedio.Mapper
             "metadata.DataID",
             "DBId",
             "Title",
+            "TitleCN",
             "Size",
             "Path",
             "Hash",

@@ -708,6 +708,20 @@ namespace Jvedio.Core.UserControls.ViewModels
                         wrapper.Desc(sub);
                     else
                         wrapper.Asc(sub);
+                } else if (sortField.IndexOf("VID", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    // 识别码排序：按「字母前缀 + 数字后缀」两段排，避免 LUXU-119 → LUXU-1190 → LUXU-120 的字符串序
+                    // 注意：wrapper.Asc/Desc 是覆盖语义（后调覆盖先调），多字段排序必须合并为单个表达式
+                    // 前缀：第一个 '-' 之前；数字：最后一个 '-' 之后（兼容 FC2-PPV-123456 双连字符），数字零填充 15 位再拼接
+                    string prefix = $"CASE WHEN {sortField} LIKE '%-%' THEN SUBSTR({sortField},1,INSTR({sortField},'-')-1) ELSE {sortField} END";
+                    string number = "CASE " +
+                        $"WHEN {sortField} LIKE '%-%-%' THEN CAST(SUBSTR({sortField}, INSTR({sortField},'-') + INSTR(SUBSTR({sortField}, INSTR({sortField},'-')+1), '-') + 1) AS INTEGER) " +
+                        $"WHEN {sortField} LIKE '%-%' THEN CAST(SUBSTR({sortField}, INSTR({sortField},'-')+1) AS INTEGER) " +
+                        "ELSE 0 END";
+                    string merged = $"(({prefix}) || printf('%015d', ({number}))) COLLATE NOCASE";
+                    if (SortDescending)
+                        wrapper.Desc(merged);
+                    else
+                        wrapper.Asc(merged);
                 } else {
                     if (SortDescending)
                         wrapper.Desc(sortField);

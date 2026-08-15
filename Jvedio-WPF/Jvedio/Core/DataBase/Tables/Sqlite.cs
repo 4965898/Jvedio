@@ -11,6 +11,7 @@ namespace Jvedio.Core.DataBase.Tables
                 "ALTER TABLE metadata ADD COLUMN PathExist INT DEFAULT 0;",
                 "ALTER TABLE actor_info ADD COLUMN ImageUrl TEXT;",
                 "ALTER TABLE common_search_history ADD COLUMN TypeMode INT DEFAULT 0;",
+                "ALTER TABLE metadata ADD COLUMN TitleCN TEXT DEFAULT '';",
                 "INSERT or ignore into common_tagstamp (TagID,Foreground,Background,TagName) " +
                     "VALUES (10000,'255,255,255,255','255,165,0,255','新加入');",
             };
