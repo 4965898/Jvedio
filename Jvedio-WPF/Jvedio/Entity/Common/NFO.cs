@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Xml;
 using static Jvedio.App;
@@ -73,6 +74,29 @@ namespace Jvedio.Entity
                 xE = XmlDoc.CreateElement(nodeName);
                 if (!string.IsNullOrEmpty(nodeID))
                     xE.SetAttribute(nodeID, nodeIDValue);
+                xE.InnerText = nodeText;
+                root.AppendChild(xE);
+                XmlDoc.Save(FilePath);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+        }
+
+        /// <summary>
+        /// 追加节点，支持多个属性（如 Kodi uniqueid 的 type/default）
+        /// </summary>
+        public void AppendNewNode(string nodeName, string nodeText, Dictionary<string, string> attributes)
+        {
+            try {
+                XmlDoc.Load(FilePath);
+                var root = XmlDoc.DocumentElement;
+                XmlElement xE = XmlDoc.CreateElement(nodeName);
+                if (attributes != null) {
+                    foreach (var kv in attributes) {
+                        if (!string.IsNullOrEmpty(kv.Key))
+                            xE.SetAttribute(kv.Key, kv.Value);
+                    }
+                }
                 xE.InnerText = nodeText;
                 root.AppendChild(xE);
                 XmlDoc.Save(FilePath);

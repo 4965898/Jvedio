@@ -217,13 +217,13 @@
                                     Grid.Column="1"
                                     MinWidth="80"
                                     VerticalAlignment="Center"
-                                    FontSize="12"
+                                    FontSize="{DynamicResource GlobalFontSize12}"
                                     Foreground="{DynamicResource Window.Sub.Foreground}"
                                     Style="{StaticResource BaseTextBlock}"
                                     Text="{Binding StatusText}" />
                                 <TextBlock
                                     Grid.Column="2"
-                                    FontSize="12"
+                                    FontSize="{DynamicResource GlobalFontSize12}"
                                     Foreground="{DynamicResource Button.Selected.BorderBrush}"
                                     Style="{StaticResource BaseTextBlock}"
                                     Text="{Binding Message}"

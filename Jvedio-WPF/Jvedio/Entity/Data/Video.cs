@@ -945,6 +945,23 @@ namespace Jvedio.Entity
                    Label?.IndexOfAnyString(Main.TagStringTranslated) >= 0;
         }
 
+        /// <summary>
+        /// 判断是否为「未修正」：文件名识别码后缀带 -U/-UC（如 ABC-123-U、ABC-123UC，hitchao/Jvedio#424），
+        /// 或类型/系列/标签包含未修正关键词（未修正/Uncensored/无码）。
+        /// 段边界匹配：U/UC 必须作为独立段（前面是文件名开头/分隔符/数字，后面是分隔符或结尾），
+        /// 避免误伤 UHD（如 ABC-123-UHD）、番号中间含 U（如 ABU-123）等。
+        /// </summary>
+        public bool IsUncensored()
+        {
+            string name = System.IO.Path.GetFileNameWithoutExtension(Path);
+            if (!string.IsNullOrEmpty(name) &&
+                Regex.IsMatch(name, @"(?:^|[-_\s]|[0-9])(u|uc)(?:$|[-_\s.])", RegexOptions.IgnoreCase))
+                return true;
+            return Genre?.IndexOfAnyString(Main.TagStringUncensored) >= 0 ||
+                   Series?.IndexOfAnyString(Main.TagStringUncensored) >= 0 ||
+                   Label?.IndexOfAnyString(Main.TagStringUncensored) >= 0;
+        }
+
         public static void SetImage(ref Video video, string imgPath)
         {
             if (video == null)
@@ -1119,6 +1136,8 @@ namespace Jvedio.Entity
             nfo.SetNodeText("studio", video.Studio);
             nfo.SetNodeText("id", video.VID);
             nfo.SetNodeText("num", video.VID);
+            // Kodi 标准唯一标识（hitchao/Jvedio#425/#429）：JavSP/Kodi 均识别 uniqueid type="num"
+            nfo.AppendNewNode("uniqueid", video.VID, new System.Collections.Generic.Dictionary<string, string> { { "type", "num" }, { "default", "true" } });
 
             // 类别
             foreach (var item in video.Genre?.Split(SuperUtils.Values.ConstValues.Separator)) {
@@ -1154,6 +1173,9 @@ namespace Jvedio.Entity
                         nfo.AppendNewNode("actor");
                         nfo.AppendNodeToNode("actor", "name", info.ActorName);
                         nfo.AppendNodeToNode("actor", "type", "Actor");
+                        // Kodi 演员头像（hitchao/Jvedio#388/#429）
+                        if (!string.IsNullOrEmpty(info.ImageUrl))
+                            nfo.AppendNodeToNode("actor", "thumb", info.ImageUrl);
                     }
                 }
             }

@@ -82,6 +82,16 @@ Users : [User Guide](https://github.com/hitchao/Jvedio/wiki/02_Beginning)
 | 5.4.0.4 | 2026-02-21 | One-click restart of failed sync tasks; extra filters |
 | 5.4.0.5 | 2026-05-02 | Filter by actor-info presence; other optimizations |
 | 5.4.0.6 | 2026-08-10 | Pagination rendering optimization (fix crash on fast page-flip and slowdown); auto rebuild of image-existence index; background startup scan; JavBus scraping fixes; SQLite lock fixes (no more "database is locked" freeze); scraping task persistence (resume manually after restart); numeric sort for video codes; watch-online quick links (27 sites, customizable URLs); title translation (AI/ChatGPT-compatible + Baidu/Google/DeepL etc., per-platform config) |
+| 5.4.1.8 (Jvedio29.16) | 2026-08-16 | Fixed 12 issues from the original repo: avatar stretching, context-menu direction, name sorting, URL double-prefix, NFO uniqueid & Kodi compatibility, NFO fallback, -U/-UC correction marking, page-number memory, actor avatars in separate directory, CSV export, ISO/.strm support |
+| 5.4.1.9 (Jvedio29.17) | 2026-08-17 | Export enhancements (CSV/Excel/JSON + one-click full-library export); actor shoe size field, cup dropdown, height/weight units |
+| 5.4.1.10 (Jvedio29.18) | 2026-08-17 | Batch NFO export; birthday date-picker + real-time age calculation |
+| 5.4.1.11 (Jvedio29.19) | 2026-08-17 | Right-click export now applies to selected videos only; detailed translation errors (HTTP status + response body) |
+| 5.4.1.12 (Jvedio29.20) | 2026-08-17 | Chinese-title field on edit page; per-platform translation config persisted independently; Bing Region header fix |
+| 5.4.1.13 (Jvedio29.21) | 2026-08-17 | Translation config moved to data dir (legacy config auto-migrated); Bing auto source-language fix |
+| 5.4.1.14 (Jvedio29.22) | 2026-08-17 | Fix single-video right-click title translation not responding |
+| 5.4.1.15 (Jvedio29.23) | 2026-08-17 | Settings > Display: follow system DPI + UI font-scale slider |
+| 5.4.1.16 (Jvedio29.24) | 2026-08-17 | Fix Settings page crash (DpiConfig static binding namespace prefix) |
+| 5.4.1.17 (Jvedio29.25) | 2026-08-17 | Font slider now covers all hardcoded font sizes (12/13/14/15, 89 spots) - sidebar and all UI text scale with it |
 
 
 # Software Characteristics

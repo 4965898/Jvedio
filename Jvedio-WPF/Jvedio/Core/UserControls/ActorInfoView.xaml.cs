@@ -43,10 +43,64 @@ namespace Jvedio.Core.UserControls
             set {
                 _CurrentActorInfo = value;
                 RaisePropertyChanged();
+                RefreshBirthdayUI();
+                RefreshAge();
+            }
+        }
+
+        /// <summary>
+        /// 详情页展示的年龄：生日有效时按当前日期实时计算，否则用库内 Age 值
+        /// </summary>
+        private int _DisplayAge;
+
+        public int DisplayAge {
+            get { return _DisplayAge; }
+
+            set {
+                _DisplayAge = value;
+                RaisePropertyChanged();
             }
         }
 
         #endregion
+
+        private void RefreshBirthdayUI()
+        {
+            if (BirthdayDatePicker == null)
+                return;
+            if (CurrentActorInfo != null && DateTime.TryParse(CurrentActorInfo.Birthday, out DateTime bd))
+                BirthdayDatePicker.SelectedDate = bd;
+            else
+                BirthdayDatePicker.SelectedDate = null;
+        }
+
+        private void RefreshAge()
+        {
+            if (CurrentActorInfo == null)
+                return;
+            string bd = CurrentActorInfo.Birthday;
+            DisplayAge = !string.IsNullOrEmpty(bd) && DateTime.TryParse(bd, out DateTime _)
+                ? ActorInfo.CalculateAge(bd)
+                : CurrentActorInfo.Age;
+        }
+
+        private void BirthdayDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (CurrentActorInfo == null)
+                return;
+            DatePicker dp = sender as DatePicker;
+            if (dp.SelectedDate.HasValue) {
+                string s = dp.SelectedDate.Value.ToString("yyyy-MM-dd");
+                if (CurrentActorInfo.Birthday != s) {
+                    CurrentActorInfo.Birthday = s;
+                    // 生日变更 → 实时重算年龄
+                    CurrentActorInfo.Age = ActorInfo.CalculateAge(s);
+                }
+            } else {
+                CurrentActorInfo.Birthday = "";
+            }
+            RefreshAge();
+        }
 
 
         public ActorInfoView()

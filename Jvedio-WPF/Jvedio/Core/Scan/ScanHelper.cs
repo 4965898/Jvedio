@@ -124,14 +124,14 @@ namespace Jvedio
                         }
                     });
 
-                    // 检查是否大于给定大小的影片
-                    foreach (var item in videos.Where(arg => arg.Size < minFileSize).Select(arg => arg.Path)) {
+                    // 检查是否大于给定大小的影片（.strm 为文本流链接，不受最小大小限制，hitchao/Jvedio#200）
+                    foreach (var item in videos.Where(arg => arg.Size < minFileSize && !arg.Path.ToLower().EndsWith(".strm")).Select(arg => arg.Path)) {
                         if (notImport.ContainsKey(item))
                             continue;
                         notImport.Add(item, NotImportReason.SizeTooSmall);
                     }
 
-                    videos.RemoveAll(arg => arg.Size < minFileSize);
+                    videos.RemoveAll(arg => arg.Size < minFileSize && !arg.Path.ToLower().EndsWith(".strm"));
                     import.AddRange(videos);
                 } catch (OperationCanceledException) {
                     callBack?.Invoke($"{SuperControls.Style.LangManager.GetValueByKey("Cancel")}");
@@ -148,7 +148,7 @@ namespace Jvedio
         {
             return File.Exists(filePath) &&
                 FilePattern.Contains(System.IO.Path.GetExtension(filePath).ToLower()) &&
-                new System.IO.FileInfo(filePath).Length >= MinFileSize;
+                (new System.IO.FileInfo(filePath).Length >= MinFileSize || filePath.ToLower().EndsWith(".strm"));
         }
 
         [PermissionSet(SecurityAction.Demand, Name = "FullTrust")]

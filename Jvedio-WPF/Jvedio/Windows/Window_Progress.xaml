@@ -20,7 +20,7 @@
     Topmost="True"
     WindowStartupLocation="CenterScreen"
     WindowStyle="None"
-    mc:Ignorable="d">
+    mc:Ignorable="d" FontSize="{DynamicResource GlobalFontSize}">
     <Grid Margin="10">
         <Border Background="{DynamicResource Window.Title.Background}" Effect="{StaticResource PopupDropShadowEffect}" />
         <StackPanel Margin="20" Orientation="Vertical">
@@ -58,7 +58,7 @@
                     Grid.Column="1"
                     Padding="5,0"
                     VerticalAlignment="Center"
-                    FontSize="14"
+                    FontSize="{DynamicResource GlobalFontSize}"
                     Text="{Binding ElementName=Progress_Window, Path=MainProgress, StringFormat=\{0\}%}"
                     TextAlignment="Center" />
             </Grid>
@@ -87,7 +87,7 @@
                     Grid.Column="1"
                     Padding="5,0"
                     VerticalAlignment="Center"
-                    FontSize="14"
+                    FontSize="{DynamicResource GlobalFontSize}"
                     Text="{Binding ElementName=Progress_Window, Path=SubProgress, StringFormat=\{0\}%}"
                     TextAlignment="Center" />
             </Grid>

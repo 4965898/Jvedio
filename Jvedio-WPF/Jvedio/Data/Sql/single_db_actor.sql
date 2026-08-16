@@ -20,6 +20,7 @@ create table actor_info(
     Hobby VARCHAR(500),
 
     Cup VARCHAR(1) DEFAULT 'Z',
+    ShoeSize VARCHAR(100),
     Chest INT,
     Waist INT,
     Hipline INT,

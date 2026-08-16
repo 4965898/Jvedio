@@ -21,7 +21,7 @@ namespace Jvedio.Core.Scan
     public class ScanTask : AbstractTask
     {
 
-        private const string DEFAULT_VIDEO_EXT = "3g2,3gp,3gp2,3gpp,amr,amv,asf,avi,bdmv,bik,d2v,divx,drc,dsa,dsm,dss,dsv,evo,f4v,flc,fli,flic,flv,hdmov,ifo,ivf,m1v,m2p,m2t,m2ts,m2v,m4b,m4p,m4v,mkv,mp2v,mp4,mp4v,mpe,mpeg,mpg,mpls,mpv2,mpv4,mov,mts,ogm,ogv,pss,pva,qt,ram,ratdvd,rm,rmm,rmvb,roq,rpm,smil,smk,swf,tp,tpr,ts,vob,vp6,webm,wm,wmp,wmv";
+        private const string DEFAULT_VIDEO_EXT = "3g2,3gp,3gp2,3gpp,amr,amv,asf,avi,bdmv,bik,d2v,divx,drc,dsa,dsm,dss,dsv,evo,f4v,flc,fli,flic,flv,hdmov,ifo,iso,ivf,m1v,m2p,m2t,m2ts,m2v,m4b,m4p,m4v,mkv,mp2v,mp4,mp4v,mpe,mpeg,mpg,mpls,mpv2,mpv4,mov,mts,ogm,ogv,pss,pva,qt,ram,ratdvd,rm,rmm,rmvb,roq,rpm,smil,smk,strm,swf,tp,tpr,ts,vob,vp6,webm,wm,wmp,wmv";
         private const string DEFAULT_IMAGE_EXT = "png,jpg,jpeg,bmp,jpe,ico,gif";
 
 
@@ -671,6 +671,10 @@ namespace Jvedio.Core.Scan
                 // 中文
                 if (video.IsCHS())
                     list.Add($"({video.DataID},2)");
+
+                // 未修正（文件名带 -U/-UC，hitchao/Jvedio#424）
+                if (video.IsUncensored())
+                    list.Add($"({video.DataID},3)");
 
                 // 新加入
                 // todo 由于设计之初未考虑到多的空余位置添加标记，因此新标记以 ID 10000开头

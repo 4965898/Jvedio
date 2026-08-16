@@ -16,7 +16,7 @@
     ShowInTaskbar="False"
     WindowStartupLocation="CenterScreen"
     WindowStyle="None"
-    mc:Ignorable="d">
+    mc:Ignorable="d" FontSize="{DynamicResource GlobalFontSize}">
     <Grid Background="Transparent" MouseMove="Grid_MouseMove">
         <!--<Image Name="bgImage" Stretch="UniformToFill">
             <Image.Effect>

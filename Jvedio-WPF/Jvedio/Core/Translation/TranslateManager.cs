@@ -186,6 +186,7 @@ namespace Jvedio.Core.Translation
                 Name = "微软翻译 (Bing)",
                 DefaultUrl = "https://api-apc.cognitive.microsofttranslator.com/translate",
                 Field1Label = "Subscription Key",
+                Field2Label = "服务地区（如 Koreacentral，可空）",
             },
             new TranslatePlatformDef() {
                 Platform = TranslatePlatform.Libre,
@@ -303,7 +304,7 @@ namespace Jvedio.Core.Translation
         private static async Task<string> ChatGPTCompat(string text, TranslationConfig cfg, TranslationPlatformSetting setting, TranslatePlatform platform)
         {
             TranslatePlatformDef def = TranslatePlatforms.GetDef(platform);
-            string url = string.IsNullOrEmpty(setting.ApiUrl) ? (def?.DefaultUrl ?? "") : setting.ApiUrl;
+            string url = NormalizeChatUrl(string.IsNullOrEmpty(setting.ApiUrl) ? (def?.DefaultUrl ?? "") : setting.ApiUrl);
             string model = string.IsNullOrEmpty(setting.Model) ? (def?.DefaultModel ?? "") : setting.Model;
             var body = new Dictionary<string, object> {
                 { "model", model },
@@ -318,14 +319,43 @@ namespace Jvedio.Core.Translation
                 LastError = "无响应（检查 API 地址与网络/代理）";
                 return null;
             }
-            JObject root = JObject.Parse(json);
+            JObject root;
+            try {
+                root = JObject.Parse(json);
+            } catch (Exception ex) {
+                LastError = $"响应不是有效 JSON（{ex.Message}）：{Truncate(json, 300)}";
+                return null;
+            }
             string content = root["choices"]?[0]?["message"]?["content"]?.ToString();
             if (string.IsNullOrEmpty(content)) {
-                LastError = root["error"]?["message"]?.ToString() ?? "响应缺少 choices[0].message.content（检查模型名/密钥）";
+                string errMsg = root["error"]?["message"]?.ToString();
+                LastError = !string.IsNullOrEmpty(errMsg)
+                    ? $"{errMsg}（原始响应：{Truncate(json, 300)}）"
+                    : $"响应缺少 choices[0].message.content（检查模型名/密钥）。原始响应：{Truncate(json, 300)}";
                 return null;
             }
             LastError = null;
             return content;
+        }
+
+        /// <summary>
+        /// 兼容用户填 base 地址或完整地址两种情况：非 /chat/completions 结尾时自动补全
+        /// </summary>
+        private static string NormalizeChatUrl(string url)
+        {
+            url = url?.Trim().TrimEnd('/');
+            if (string.IsNullOrEmpty(url))
+                return url;
+            if (!url.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+                url += "/chat/completions";
+            return url;
+        }
+
+        private static string Truncate(string s, int max)
+        {
+            if (string.IsNullOrEmpty(s))
+                return s;
+            return s.Length > max ? s.Substring(0, max) + "…" : s;
         }
 
         // ---------- 百度 ----------
@@ -428,10 +458,15 @@ namespace Jvedio.Core.Translation
 
         private static async Task<string> Bing(string text, TranslationConfig cfg, TranslationPlatformSetting setting)
         {
-            string src = string.IsNullOrEmpty(cfg.SourceLang) ? "auto" : cfg.SourceLang;
+            // Azure Translator 源语言必须用 BCP-47 代码（ja/en/zh-Hans），且不支持 "auto" 值：
+            // 留空（不传 from 参数）才是自动检测，传 "auto"/"JPN"/"Japan" 等都会 400 invalid
+            string src = string.IsNullOrEmpty(cfg.SourceLang) || cfg.SourceLang.Equals("auto", StringComparison.OrdinalIgnoreCase)
+                ? "" : cfg.SourceLang;
             string url = TranslatePlatforms.GetDef(TranslatePlatform.Bing).DefaultUrl +
-                $"?api-version=3.0&from={HttpUtility.UrlEncode(src)}&to={HttpUtility.UrlEncode(cfg.TargetLang)}";
-            string json = await PostJson(url, new object[] { new Dictionary<string, string> { { "Text", text } } }, null, GetValue(setting.Field1));
+                $"?api-version=3.0{(string.IsNullOrEmpty(src) ? "" : $"&from={HttpUtility.UrlEncode(src)}")}&to={HttpUtility.UrlEncode(cfg.TargetLang)}";
+            // Azure Translator 密钥绑定区域：必须带 Ocp-Apim-Subscription-Region 头（缺省会 401）
+            string region = string.IsNullOrEmpty(setting.Field2) ? "Koreacentral" : setting.Field2.Trim();
+            string json = await PostJson(url, new object[] { new Dictionary<string, string> { { "Text", text } } }, null, GetValue(setting.Field1), region);
             if (string.IsNullOrEmpty(json))
                 return null;
             JArray root = JArray.Parse(json);
@@ -515,17 +550,32 @@ namespace Jvedio.Core.Translation
             }
         }
 
-        private static async Task<string> PostJson(string url, object body, string bearerKey, string apiKey = null)
+        private static async Task<string> PostJson(string url, object body, string bearerKey, string apiKey = null, string region = null)
         {
             using (var client = CreateClient()) {
                 if (!string.IsNullOrEmpty(bearerKey))
                     client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", $"Bearer {bearerKey}");
                 if (!string.IsNullOrEmpty(apiKey))
                     client.DefaultRequestHeaders.TryAddWithoutValidation("Ocp-Apim-Subscription-Key", apiKey);
+                if (!string.IsNullOrEmpty(region))
+                    client.DefaultRequestHeaders.TryAddWithoutValidation("Ocp-Apim-Subscription-Region", region);
                 string json = JsonConvert.SerializeObject(body);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 var resp = await client.PostAsync(url, content);
-                resp.EnsureSuccessStatusCode();
+                if (!resp.IsSuccessStatusCode) {
+                    string bodyText = await resp.Content.ReadAsStringAsync();
+                    string detail = "";
+                    try {
+                        JObject err = JObject.Parse(bodyText);
+                        detail = err["error"]?["message"]?.ToString() ?? err["message"]?.ToString() ?? "";
+                    } catch { }
+                    if (string.IsNullOrEmpty(detail) && !string.IsNullOrEmpty(bodyText))
+                        detail = bodyText.Length > 200 ? bodyText.Substring(0, 200) + "…" : bodyText;
+                    string msg = $"HTTP {(int)resp.StatusCode} ({resp.ReasonPhrase})";
+                    if (!string.IsNullOrEmpty(detail))
+                        msg += "：" + detail;
+                    throw new HttpRequestException(msg);
+                }
                 return await resp.Content.ReadAsStringAsync();
             }
         }

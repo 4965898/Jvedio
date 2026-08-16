@@ -45,6 +45,23 @@
     <sys:String x:Key="TranslateTest">テストテキスト</sys:String>
     <sys:String x:Key="TranslateTestRun">翻訳テスト</sys:String>
     <sys:String x:Key="TranslateTitle">タイトル翻訳</sys:String>
+    <sys:String x:Key="TitleCN">翻訳タイトル</sys:String>
+    <sys:String x:Key="UseSystemDpiScale">システムスケーリングを使用（再起動が必要）</sys:String>
+    <sys:String x:Key="UiFontScale">UIフォントサイズ</sys:String>
+    <sys:String x:Key="UiFontScaleTip">UIフォントサイズを調整（即時反映）</sys:String>
     <sys:String x:Key="TranslateSuccess">翻訳成功</sys:String>
     <sys:String x:Key="TranslateFail">翻訳失敗、翻訳設定を確認してください</sys:String>
+    <sys:String x:Key="ExportVideoData">動画データをエクスポート</sys:String>
+    <sys:String x:Key="ExportActorList">女優リストをエクスポート</sys:String>
+    <sys:String x:Key="ExportSuccess">エクスポート完了、合計</sys:String>
+    <sys:String x:Key="ExportEmpty">エクスポートするデータがありません</sys:String>
+    <sys:String x:Key="Export">エクスポート</sys:String>
+    <sys:String x:Key="ExportLibraryAll">このライブラリの全動画をエクスポート</sys:String>
+    <sys:String x:Key="ExportLibraryTip">CSV / Excel / JSON 対応、現在のライブラリの全動画データをエクスポート</sys:String>
+    <sys:String x:Key="Actress_ShoeSize">靴のサイズ</sys:String>
+    <sys:String x:Key="ExportNormal">通常エクスポート（CSV / Excel / JSON）</sys:String>
+    <sys:String x:Key="ExportNfo">NFO としてエクスポート</sys:String>
+    <sys:String x:Key="ExportLibraryAllNfo">このライブラリの全動画を NFO としてエクスポート</sys:String>
+    <sys:String x:Key="SelectOutputFolder">NFO 出力フォルダを選択</sys:String>
+    <sys:String x:Key="AgeUnit">歳</sys:String>
 </ResourceDictionary>

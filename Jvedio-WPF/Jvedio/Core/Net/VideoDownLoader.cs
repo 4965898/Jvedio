@@ -171,9 +171,28 @@ namespace Jvedio.Core.Net
             return result;
         }
 
+        /// <summary>
+        /// 规范化图片 URL：部分爬虫插件返回的链接自带 "http:" 前缀，
+        /// 形成 "http:https://..." 双写（hitchao/Jvedio#421/#371），直接下载必然失败。
+        /// 取首个 "http(s)://" 位置截断清洗。
+        /// </summary>
+        public static string NormalizeUrl(string url)
+        {
+            if (string.IsNullOrEmpty(url))
+                return url;
+            url = url.Trim();
+            int idx = url.IndexOf("https://", StringComparison.OrdinalIgnoreCase);
+            if (idx < 0)
+                idx = url.IndexOf("http://", StringComparison.OrdinalIgnoreCase);
+            if (idx > 0)
+                url = url.Substring(idx);
+            return url;
+        }
+
         public async Task<byte[]> DownloadImage(string url, RequestHeader header, Action<string> onError = null)
         {
             try {
+                url = NormalizeUrl(url);
                 HttpClientHandler handler = new HttpClientHandler();
                 handler.AllowAutoRedirect = true;
                 handler.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;

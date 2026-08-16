@@ -14,7 +14,7 @@
     Foreground="{DynamicResource Window.Foreground}"
     Icon="pack://application:,,,/Resources/Jvedio.ico"
     WindowStartupLocation="CenterScreen"
-    mc:Ignorable="d">
+    mc:Ignorable="d" FontSize="{DynamicResource GlobalFontSize}">
 
     <super:BaseWindow.Resources>
 
@@ -169,10 +169,11 @@
 
                     <DockPanel LastChildFill="True">
                         <Label Content="{DynamicResource Actress_Birthday}" Style="{StaticResource BaseInfoLabel}" />
-                        <super:SearchBox
-                            Width="120"
+                        <DatePicker
+                            x:Name="BirthdayDatePicker"
+                            Width="140"
                             Margin="5"
-                            Text="{Binding CurrentActorInfo.Birthday, Mode=TwoWay}" />
+                            SelectedDateChanged="BirthdayDatePicker_SelectedDateChanged" />
 
                         <Label
                             MinWidth="0"
@@ -182,6 +183,12 @@
                             Width="120"
                             Margin="5"
                             Text="{Binding CurrentActorInfo.Age, Mode=TwoWay}" />
+                        <TextBlock
+                            Margin="0,0,10,0"
+                            VerticalAlignment="Center"
+                            FontSize="{DynamicResource GlobalFontSize12}"
+                            Foreground="{DynamicResource Window.Sub.Foreground}"
+                            Text="{DynamicResource AgeUnit}" />
 
                         <Label
                             MinWidth="0"
@@ -196,7 +203,12 @@
                             Width="120"
                             Margin="5"
                             Text="{Binding CurrentActorInfo.Height, Mode=TwoWay}" />
-
+                        <TextBlock
+                            Margin="0,0,10,0"
+                            VerticalAlignment="Center"
+                            FontSize="{DynamicResource GlobalFontSize12}"
+                            Foreground="{DynamicResource Window.Sub.Foreground}"
+                            Text="CM" />
 
                         <Label
                             MinWidth="0"
@@ -206,15 +218,23 @@
                             Width="120"
                             Margin="5"
                             Text="{Binding CurrentActorInfo.Weight, Mode=TwoWay}" />
+                        <TextBlock
+                            Margin="0,0,10,0"
+                            VerticalAlignment="Center"
+                            FontSize="{DynamicResource GlobalFontSize12}"
+                            Foreground="{DynamicResource Window.Sub.Foreground}"
+                            Text="KG" />
 
                         <Label
                             MinWidth="0"
                             Content="{DynamicResource Actress_Cup}"
                             Style="{StaticResource BaseInfoLabel}"
                             Visibility="{Binding TeenMode, Source={x:Static config:ConfigManager.Settings}, Mode=OneWay, Converter={StaticResource OppositeBooleanConverter}}" />
-                        <super:SearchBox
+                        <ComboBox
+                            x:Name="CupComboBox"
                             Margin="5"
-                            Text="{Binding CurrentActorInfo.Cup, Mode=TwoWay}"
+                            SelectedItem="{Binding CurrentActorInfo.Cup, Mode=TwoWay}"
+                            Style="{StaticResource BorderComboBox}"
                             Visibility="{Binding TeenMode, Source={x:Static config:ConfigManager.Settings}, Mode=OneWay, Converter={StaticResource OppositeBooleanConverter}}" />
                     </DockPanel>
 
@@ -264,6 +284,14 @@
                         <super:SearchBox Margin="5" Text="{Binding CurrentActorInfo.Nation, Mode=TwoWay}" />
                     </DockPanel>
 
+                    <StackPanel Orientation="Horizontal">
+                        <Label Content="{DynamicResource Actress_ShoeSize}" Style="{StaticResource BaseInfoLabel}" />
+                        <super:SearchBox
+                            Width="120"
+                            Margin="5"
+                            Text="{Binding CurrentActorInfo.ShoeSize, Mode=TwoWay}" />
+                    </StackPanel>
+
                     <Label Content="{DynamicResource Actress_Hobby}" Style="{StaticResource BaseInfoLabel}" />
 
 
@@ -280,7 +308,7 @@
                             AcceptsReturn="True"
                             Background="Transparent"
                             ContextMenu="{StaticResource TextBoxContextMenu}"
-                            FontSize="12"
+                            FontSize="{DynamicResource GlobalFontSize12}"
                             GotFocus="onTextBoxFocus"
                             LostFocus="onTextBoxLostFocus"
                             Style="{StaticResource BaseTextBox}"

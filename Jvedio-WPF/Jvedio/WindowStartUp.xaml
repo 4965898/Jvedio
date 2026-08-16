@@ -21,7 +21,7 @@
     TitleAlign="Left"
     TitleMargin="5 0"
     WindowStartupLocation="CenterScreen"
-    mc:Ignorable="d">
+    mc:Ignorable="d" FontSize="{DynamicResource GlobalFontSize}">
     <super:BaseWindow.Resources>
 
 
@@ -99,12 +99,12 @@
                             Foreground="{DynamicResource Window.Foreground}"
                             Text="{Binding Name}" />
                         <TextBlock
-                            FontSize="12"
+                            FontSize="{DynamicResource GlobalFontSize12}"
                             Foreground="{DynamicResource Control.Disabled.Background}"
                             Text="{Binding CreateDate}"
                             ToolTip="{Binding CreateDate}" />
                         <!--<TextBlock
-                            FontSize="12"
+                            FontSize="{DynamicResource GlobalFontSize12}"
                             Foreground="{DynamicResource Control.Disabled.Background}"
                             Text="{Binding Path, Converter={StaticResource SmallerPathConverter}, ConverterParameter=2}"
                             ToolTip="{Binding Path}" />-->
@@ -154,12 +154,12 @@
                             Foreground="{DynamicResource Window.Foreground}"
                             Text="{Binding Name}" />
                         <TextBlock
-                            FontSize="12"
+                            FontSize="{DynamicResource GlobalFontSize12}"
                             Foreground="{DynamicResource Control.Disabled.Background}"
                             Text="{Binding CreateDate}"
                             ToolTip="{Binding CreateDate}" />
                         <!--<TextBlock
-                            FontSize="12"
+                            FontSize="{DynamicResource GlobalFontSize12}"
                             Foreground="{DynamicResource Control.Disabled.Background}"
                             Text="{Binding Path, Converter={StaticResource SmallerPathConverter}, ConverterParameter=2}"
                             ToolTip="{Binding Path}" />-->
@@ -264,7 +264,7 @@
                             Margin="50,0"
                             HorizontalAlignment="Stretch"
                             VerticalAlignment="Top"
-                            FontSize="15"
+                            FontSize="{DynamicResource GlobalFontSize15}"
                             Style="{StaticResource BaseTextBlock}"
                             Text="{Binding LoadingText}"
                             TextAlignment="Center"
@@ -304,7 +304,7 @@
                             <TextBlock
                                 Margin="10"
                                 HorizontalAlignment="Center"
-                                FontSize="15"
+                                FontSize="{DynamicResource GlobalFontSize15}"
                                 Foreground="{DynamicResource Control.Disabled.Background}"
                                 Text="{Binding Version, FallbackValue=5.0}" />
                             <RadioButton
@@ -354,7 +354,7 @@
                                 <super:SearchBox
                                     Background="Transparent"
                                     Clear="SearchText_Changed"
-                                    FontSize="12"
+                                    FontSize="{DynamicResource GlobalFontSize12}"
                                     PlaceHolder="{DynamicResource Search}"
                                     Search="SearchText_Changed"
                                     SearchOnTextChanged="True"

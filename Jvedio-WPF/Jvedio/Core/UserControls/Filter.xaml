@@ -116,7 +116,7 @@
                     Style="{StaticResource RefreshHoverPath}" />
                 <TextBlock
                     HorizontalAlignment="Center"
-                    FontSize="12"
+                    FontSize="{DynamicResource GlobalFontSize12}"
                     Style="{StaticResource BaseTextBlock}"
                     Text="{DynamicResource Filter}" />
                 <super:HoverPath
@@ -180,7 +180,7 @@
                             Margin="1,0"
                             Padding="0,4"
                             Expand="TagStamp_Expand"
-                            FontSize="14"
+                            FontSize="{DynamicResource GlobalFontSize}"
                             Header="{DynamicResource TagStamp}"
                             IsExpanded="{Binding ExpandTag, ElementName=filter, Mode=TwoWay}"
                             IsSelected="False"
@@ -202,7 +202,7 @@
                                             Click="PathCheckButton_Click"
                                             CornerRadius="0"
                                             Fill="{Binding BackgroundBrush}"
-                                            FontSize="12"
+                                            FontSize="{DynamicResource GlobalFontSize12}"
                                             Foreground="{Binding ForegroundBrush}"
                                             IsChecked="{Binding Selected, Mode=TwoWay}"
                                             MainText="{Binding TagName}"
@@ -234,7 +234,7 @@
                         Margin="1,0"
                         Padding="0,4"
                         Expand="Common_Expand"
-                        FontSize="14"
+                        FontSize="{DynamicResource GlobalFontSize}"
                         Header="{DynamicResource Other}"
                         IsExpanded="{Binding ExpandCommon, ElementName=filter, Mode=TwoWay, FallbackValue=True}"
                         IsSelected="False"
@@ -245,7 +245,7 @@
                                 x:Name="OnlyShowSubsection"
                                 Margin="27,10"
                                 Content="{DynamicResource OnlyShowSubsection}"
-                                FontSize="12" />
+                                FontSize="{DynamicResource GlobalFontSize12}" />
                         </WrapPanel>
 
 
@@ -496,7 +496,7 @@
                         Margin="1,0"
                         Padding="0,4"
                         Expand="Genre_Expand"
-                        FontSize="14"
+                        FontSize="{DynamicResource GlobalFontSize}"
                         Header="{DynamicResource Genre}"
                         IsExpanded="{Binding ExpandGenre, ElementName=filter, Mode=TwoWay}"
                         IsSelected="False"
@@ -527,7 +527,7 @@
                                     Height="30"
                                     Margin="5"
                                     BorderBrush="{DynamicResource Button.Selected.BorderBrush}"
-                                    FontSize="12"
+                                    FontSize="{DynamicResource GlobalFontSize12}"
                                     Style="{StaticResource SearchBoxStyle}"
                                     Visibility="Hidden" />
                             </DockPanel>
@@ -544,7 +544,7 @@
                         Margin="1,0"
                         Padding="0,4"
                         Expand="Series_Expand"
-                        FontSize="14"
+                        FontSize="{DynamicResource GlobalFontSize}"
                         Header="{DynamicResource Tag}"
                         IsExpanded="{Binding ExpandSeries, ElementName=filter, Mode=TwoWay}"
                         IsSelected="False"
@@ -575,7 +575,7 @@
                                     Height="30"
                                     Margin="5"
                                     BorderBrush="{DynamicResource Button.Selected.BorderBrush}"
-                                    FontSize="12"
+                                    FontSize="{DynamicResource GlobalFontSize12}"
                                     Style="{StaticResource SearchBoxStyle}"
                                     Visibility="Hidden" />
                             </DockPanel>
@@ -590,7 +590,7 @@
                         Margin="1,0"
                         Padding="0,4"
                         Expand="Director_Expand"
-                        FontSize="14"
+                        FontSize="{DynamicResource GlobalFontSize}"
                         Header="{DynamicResource Director}"
                         IsExpanded="{Binding ExpandDirector, ElementName=filter, Mode=TwoWay}"
                         IsSelected="False"
@@ -621,7 +621,7 @@
                                     Height="30"
                                     Margin="5"
                                     BorderBrush="{DynamicResource Button.Selected.BorderBrush}"
-                                    FontSize="12"
+                                    FontSize="{DynamicResource GlobalFontSize12}"
                                     Style="{StaticResource SearchBoxStyle}"
                                     Visibility="Hidden" />
                             </DockPanel>
@@ -637,7 +637,7 @@
                         Margin="1,0"
                         Padding="0,4"
                         Expand="Studio_Expand"
-                        FontSize="14"
+                        FontSize="{DynamicResource GlobalFontSize}"
                         Header="{DynamicResource Made}"
                         IsExpanded="{Binding ExpandStudio, ElementName=filter, Mode=TwoWay}"
                         IsSelected="False"
@@ -668,7 +668,7 @@
                                     Height="30"
                                     Margin="5"
                                     BorderBrush="{DynamicResource Button.Selected.BorderBrush}"
-                                    FontSize="12"
+                                    FontSize="{DynamicResource GlobalFontSize12}"
                                     Style="{StaticResource SearchBoxStyle}"
                                     Visibility="Hidden" />
                             </DockPanel>

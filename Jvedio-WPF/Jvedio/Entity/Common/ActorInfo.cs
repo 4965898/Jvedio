@@ -148,6 +148,19 @@ namespace Jvedio.Entity
             }
         }
 
+        /// <summary>
+        /// 鞋码（脚码），国内常见 38/40 数字（hitchao/Jvedio issues 优化）
+        /// </summary>
+        private string _ShoeSize = string.Empty;
+
+        public string ShoeSize {
+            get { return _ShoeSize; }
+            set {
+                _ShoeSize = value;
+                RaisePropertyChanged();
+            }
+        }
+
         private int _Chest;
 
         public int Chest {
@@ -279,6 +292,22 @@ namespace Jvedio.Entity
             Gender = Gender.Girl;
         }
 
+        /// <summary>
+        /// 按生日计算当前年龄（不足周岁向下取整；生日无效返回 0）
+        /// </summary>
+        public static int CalculateAge(string birthday, DateTime? today = null)
+        {
+            if (string.IsNullOrEmpty(birthday))
+                return 0;
+            if (!DateTime.TryParse(birthday, out DateTime bd))
+                return 0;
+            DateTime now = today ?? DateTime.Today;
+            int age = now.Year - bd.Year;
+            if (now.Month < bd.Month || (now.Month == bd.Month && now.Day < bd.Day))
+                age--;
+            return age < 0 ? 0 : age;
+        }
+
         public static void SetImage(ref ActorInfo actorInfo)
         {
             // 加载图片
@@ -300,34 +329,51 @@ namespace Jvedio.Entity
             string result = string.Empty;
             PathType pathType = (PathType)ConfigManager.Settings.PicPathMode;
             string basePicPath = ConfigManager.Settings.PicPaths[pathType.ToString()].ToString();
-            if (pathType != PathType.RelativeToData) {
+
+            // 独立演员头像目录（hitchao/Jvedio#445/#338/#270）：
+            // 图片路径为「相对影片」时也回退到软件数据目录的 Actresses（Gfriends 等平铺导出目录），
+            // 保证演员列表页/详情页无需影片上下文也能显示头像；Actresses 目录不随图片路径模式变化。
+            string actressDir = null;
+            if (pathType == PathType.RelativeToData) {
+                string appPath = ConfigManager.Settings.PicPaths[PathType.RelativeToApp.ToString()].ToString();
+                actressDir = System.IO.Path.Combine(PathManager.CurrentUserFolder, appPath, "Actresses");
+            } else {
                 if (pathType == PathType.RelativeToApp)
                     basePicPath = System.IO.Path.Combine(PathManager.CurrentUserFolder, basePicPath);
-                string saveDir = System.IO.Path.Combine(basePicPath, "Actresses");
-                if (!Directory.Exists(saveDir))
-                    FileHelper.TryCreateDir(saveDir);
+                actressDir = System.IO.Path.Combine(basePicPath, "Actresses");
+            }
+            if (!Directory.Exists(actressDir))
+                FileHelper.TryCreateDir(actressDir);
 
-                // 优先使用 1_name.jpg 的方式
-                result = System.IO.Path.Combine(saveDir, $"{ActorID}_{ActorName}{ext}");
-                if (!File.Exists(result))
-                    result = System.IO.Path.Combine(saveDir, $"{ActorName}{ext}");
-            } else if (!string.IsNullOrEmpty(dataPath)) {
+            // 优先使用 1_name.jpg 的方式
+            result = System.IO.Path.Combine(actressDir, $"{ActorID}_{ActorName}{ext}");
+            if (!File.Exists(result))
+                result = System.IO.Path.Combine(actressDir, $"{ActorName}{ext}");
+            if (File.Exists(result))
+                return result;
+
+            // 相对影片：影片目录的演员头像子目录（.actor / .actors，MDCx 等外部刮削器输出）
+            if (pathType == PathType.RelativeToData && !string.IsNullOrEmpty(dataPath)) {
                 string basePath = System.IO.Path.GetDirectoryName(dataPath);
                 Dictionary<string, string> dict = (Dictionary<string, string>)ConfigManager.Settings.PicPaths[pathType.ToString()];
                 if (dict != null && dict.ContainsKey("ActorImagePath")) {
-                    string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(basePath, dict["ActorImagePath"]));
-                    string[] arr = FileHelper.TryGetAllFiles(path, "*.*");
-                    if (arr != null && arr.Length > 0) {
-                        List<string> list = arr.ToList();
-                        list = list.Where(arg => ScanTask.PICTURE_EXTENSIONS_LIST.Contains(System.IO.Path.GetExtension(arg).ToLower())).ToList();
-
-                        foreach (string item in list) {
+                    string[] dirs = {
+                        System.IO.Path.Combine(basePath, dict["ActorImagePath"]),
+                        System.IO.Path.Combine(basePath, ".actors"),
+                        System.IO.Path.Combine(basePath, ".actor"),
+                    };
+                    foreach (string dir in dirs) {
+                        string[] arr = FileHelper.TryGetAllFiles(dir, "*.*");
+                        if (arr == null || arr.Length == 0)
+                            continue;
+                        foreach (string item in arr) {
+                            if (!ScanTask.PICTURE_EXTENSIONS_LIST.Contains(System.IO.Path.GetExtension(item).ToLower()))
+                                continue;
                             if (System.IO.Path.GetFileNameWithoutExtension(item).ToLower().Equals(ActorName))
                                 return item;
                         }
                     }
                 }
-
             }
 
             // 替换成其他扩展名

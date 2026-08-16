@@ -29,7 +29,7 @@
     TitleHeight="30"
     TitleMargin="5 0"
     WindowStartupLocation="CenterScreen"
-    mc:Ignorable="d">
+    mc:Ignorable="d" FontSize="{DynamicResource GlobalFontSize}">
 
 
     <super:BaseWindow.Resources>
@@ -568,7 +568,7 @@
                                 Grid.Row="2"
                                 Margin="20"
                                 VerticalAlignment="Bottom"
-                                FontSize="12"
+                                FontSize="{DynamicResource GlobalFontSize12}"
                                 Foreground="{DynamicResource Window.Sub.Foreground}"
                                 Style="{StaticResource BaseTextBlock}"
                                 Text="@Jvedio Copyright © 2020">

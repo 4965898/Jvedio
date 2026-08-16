@@ -173,7 +173,7 @@ create table common_tagstamp (
     CreateDate VARCHAR(30) DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%S', 'NOW', 'localtime')),
     UpdateDate VARCHAR(30) DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%S', 'NOW', 'localtime'))
 );
-insert into common_tagstamp(Background,Foreground,TagName) values('154,88,183,255','255,255,255,255','HD'),('154,205,50,255','255,255,255,255','Translated');
+insert into common_tagstamp(Background,Foreground,TagName) values('154,88,183,255','255,255,255,255','HD'),('154,205,50,255','255,255,255,255','Translated'),('0,191,255,255','255,255,255,255','Uncensored');
 COMMIT;
 
 -- 资源关联

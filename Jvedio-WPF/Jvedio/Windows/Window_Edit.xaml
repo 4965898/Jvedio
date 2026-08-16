@@ -18,7 +18,7 @@
     Icon="pack://application:,,,/Resources/Jvedio.ico"
     Loaded="BaseWindow_Loaded"
     WindowStartupLocation="CenterScreen"
-    mc:Ignorable="d">
+    mc:Ignorable="d" FontSize="{DynamicResource GlobalFontSize}">
 
     <super:BaseWindow.Resources>
 
@@ -78,28 +78,28 @@
                                 <RadioButton
                                     Content="{DynamicResource Normal}"
                                     FocusVisualStyle="{x:Null}"
-                                    FontSize="15"
+                                    FontSize="{DynamicResource GlobalFontSize15}"
                                     Foreground="{DynamicResource Window.Foreground}"
                                     IsChecked="{Binding Path=CurrentVideo.VideoType, ConverterParameter=0, Converter={StaticResource VideoTypeConverter}, Mode=TwoWay}"
                                     Style="{StaticResource FlatRoundRadioButton}" />
                                 <RadioButton
                                     Content="{DynamicResource Uncensored}"
                                     FocusVisualStyle="{x:Null}"
-                                    FontSize="15"
+                                    FontSize="{DynamicResource GlobalFontSize15}"
                                     Foreground="{DynamicResource Window.Foreground}"
                                     IsChecked="{Binding Path=CurrentVideo.VideoType, ConverterParameter=1, Converter={StaticResource VideoTypeConverter}, Mode=TwoWay}"
                                     Style="{StaticResource FlatRoundRadioButton}" />
                                 <RadioButton
                                     Content="{DynamicResource Censored}"
                                     FocusVisualStyle="{x:Null}"
-                                    FontSize="15"
+                                    FontSize="{DynamicResource GlobalFontSize15}"
                                     Foreground="{DynamicResource Window.Foreground}"
                                     IsChecked="{Binding Path=CurrentVideo.VideoType, ConverterParameter=2, Converter={StaticResource VideoTypeConverter}, Mode=TwoWay}"
                                     Style="{StaticResource FlatRoundRadioButton}" />
                                 <RadioButton
                                     Content="{DynamicResource Europe}"
                                     FocusVisualStyle="{x:Null}"
-                                    FontSize="15"
+                                    FontSize="{DynamicResource GlobalFontSize15}"
                                     Foreground="{DynamicResource Window.Foreground}"
                                     IsChecked="{Binding Path=CurrentVideo.VideoType, ConverterParameter=3, Converter={StaticResource VideoTypeConverter}, Mode=TwoWay}"
                                     Style="{StaticResource FlatRoundRadioButton}" />
@@ -158,7 +158,7 @@
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBox
                                                             ContextMenu="{StaticResource CopyContextMenu}"
-                                                            FontSize="12"
+                                                            FontSize="{DynamicResource GlobalFontSize12}"
                                                             Style="{StaticResource ReadOnlyNoWrapTextBox}"
                                                             Text="{Binding ActorName, Mode=OneWay}" />
                                                         <super:HoverPath
@@ -230,7 +230,7 @@
                                                         Margin="5,0"
                                                         Padding="10"
                                                         HorizontalAlignment="Stretch"
-                                                        FontSize="12"
+                                                        FontSize="{DynamicResource GlobalFontSize12}"
                                                         Style="{StaticResource BaseTextBlock}"
                                                         Text="{Binding ActorName, Mode=TwoWay}"
                                                         TextWrapping="Wrap" />
@@ -366,7 +366,7 @@
                                                                 MouseUp="Border_MouseUp"
                                                                 Style="{StaticResource HoverBorder}">
                                                                 <TextBlock
-                                                                    FontSize="14"
+                                                                    FontSize="{DynamicResource GlobalFontSize}"
                                                                     Foreground="{DynamicResource Window.Sub.Foreground}"
                                                                     Style="{StaticResource BaseTextBlock}"
                                                                     Text="{Binding}" />
@@ -451,7 +451,7 @@
 
                         <super:TogglePanel
                             Padding="0,5"
-                            FontSize="15"
+                            FontSize="{DynamicResource GlobalFontSize15}"
                             Foreground="{DynamicResource Window.Foreground}"
                             Header="{DynamicResource Others}"
                             IsExpanded="{Binding MoreExpanded, Mode=TwoWay, FallbackValue=True}"
@@ -464,6 +464,10 @@
                                     <super:SearchBox Text="{Binding CurrentVideo.Title, Mode=TwoWay}" />
                                 </DockPanel>
 
+                                <DockPanel>
+                                    <Label Content="{DynamicResource TitleCN}" Style="{StaticResource BaseInfoLabel}" />
+                                    <super:SearchBox Text="{Binding CurrentVideo.TitleCN, Mode=TwoWay}" />
+                                </DockPanel>
 
 
 
@@ -549,7 +553,7 @@
                                             HorizontalAlignment="Stretch"
                                             Background="Transparent"
                                             BorderThickness="0"
-                                            FontSize="14"
+                                            FontSize="{DynamicResource GlobalFontSize}"
                                             GotFocus="onTextBoxGotFocus"
                                             LostFocus="onTextBoxLostFocus"
                                             Style="{StaticResource MultiLineTextBox}"
@@ -572,7 +576,7 @@
                                             HorizontalAlignment="Stretch"
                                             Background="Transparent"
                                             BorderThickness="0"
-                                            FontSize="14"
+                                            FontSize="{DynamicResource GlobalFontSize}"
                                             GotFocus="onTextBoxGotFocus"
                                             LostFocus="onTextBoxLostFocus"
                                             Style="{StaticResource MultiLineTextBox}"

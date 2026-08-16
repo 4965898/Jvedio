@@ -12,8 +12,12 @@ namespace Jvedio.Core.DataBase.Tables
                 "ALTER TABLE actor_info ADD COLUMN ImageUrl TEXT;",
                 "ALTER TABLE common_search_history ADD COLUMN TypeMode INT DEFAULT 0;",
                 "ALTER TABLE metadata ADD COLUMN TitleCN TEXT DEFAULT '';",
+                "ALTER TABLE actor_info ADD COLUMN ShoeSize VARCHAR(100);",
                 "INSERT or ignore into common_tagstamp (TagID,Foreground,Background,TagName) " +
                     "VALUES (10000,'255,255,255,255','255,165,0,255','新加入');",
+                // 未修正默认标签（hitchao/Jvedio#424：文件名 -U/-UC 自动标记）；老库迁移补 TagID=3
+                "INSERT or ignore into common_tagstamp (TagID,Foreground,Background,TagName) " +
+                    "VALUES (3,'255,255,255,255','0,191,255,255','Uncensored');",
             };
 
             public static List<string> PictureExistMigration { get; set; } = new List<string>()
@@ -242,6 +246,7 @@ namespace Jvedio.Core.DataBase.Tables
                         "Gender INT DEFAULT 0, " +
                         "Hobby VARCHAR(500), " +
                         "Cup VARCHAR(1) DEFAULT 'Z', " +
+                        "ShoeSize VARCHAR(100), " +
                         "Chest INT, " +
                         "Waist INT, " +
                         "Hipline INT, " +

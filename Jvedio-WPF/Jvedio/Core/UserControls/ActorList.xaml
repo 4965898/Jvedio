@@ -146,10 +146,12 @@
                                         Click="DownLoadSelectedActor"
                                         Header="{DynamicResource SyncInfo}"
                                         IsEnabled="False" />
+                                    <Separator />
+                                    <MenuItem Click="ExportActorList" Header="{DynamicResource ExportActorList}" />
                                 </ContextMenu>
                             </Border.ContextMenu>
                             <Border.Background>
-                                <ImageBrush ImageSource="{Binding SmallImage}" Stretch="Fill" />
+                                <ImageBrush ImageSource="{Binding SmallImage}" Stretch="UniformToFill" />
                             </Border.Background>
                             <Border.Style>
                                 <Style TargetType="Border">
@@ -224,7 +226,7 @@
                             Grid.Row="0"
                             Margin="5"
                             HorizontalAlignment="Left"
-                            FontSize="14"
+                            FontSize="{DynamicResource GlobalFontSize}"
                             Foreground="{DynamicResource Window.Foreground}"
                             IsEnabled="{Binding ActorEditMode, Source={x:Static config:ConfigManager.VideoConfig}, Converter={StaticResource OppositeBooleanConverter}}"
                             MaxLines="2"
@@ -256,7 +258,7 @@
                             MaxHeight="60"
                             Margin="4"
                             HorizontalAlignment="Left"
-                            FontSize="12"
+                            FontSize="{DynamicResource GlobalFontSize12}"
                             Foreground="{DynamicResource Window.Sub.Foreground}"
                             Style="{StaticResource ReadOnlyWrapTextBox}"
                             Text="{Binding InfoString}"
@@ -348,10 +350,12 @@
                                         Click="DownLoadSelectedActor"
                                         Header="{DynamicResource SyncInfo}"
                                         IsEnabled="False" />
+                                    <Separator />
+                                    <MenuItem Click="ExportActorList" Header="{DynamicResource ExportActorList}" />
                                 </ContextMenu>
                             </Border.ContextMenu>
                             <Border.Background>
-                                <ImageBrush ImageSource="{Binding SmallImage}" Stretch="Fill" />
+                                <ImageBrush ImageSource="{Binding SmallImage}" Stretch="UniformToFill" />
                             </Border.Background>
                             <Border.Style>
                                 <Style TargetType="Border">
@@ -419,7 +423,7 @@
                         Grid.Row="1"
                         Width="125"
                         Margin="0,5"
-                        FontSize="14"
+                        FontSize="{DynamicResource GlobalFontSize}"
                         Foreground="{DynamicResource Window.Foreground}"
                         IsEnabled="{Binding ActorEditMode, Source={x:Static config:ConfigManager.VideoConfig}, Converter={StaticResource OppositeBooleanConverter}}"
                         MaxLines="2"
@@ -579,7 +583,7 @@
                         Background="{DynamicResource Window.Title.Background}"
                         IsChecked="{Binding ActorShowCount, Mode=TwoWay, Source={x:Static config:ConfigManager.VideoConfig}}" />
                     <TextBlock
-                        FontSize="12"
+                        FontSize="{DynamicResource GlobalFontSize12}"
                         Style="{StaticResource BaseTextBlock}"
                         Text="显示数目" />
                 </StackPanel>
@@ -961,7 +965,7 @@
                 CornerRadius="5">
                 <TextBlock
                     VerticalAlignment="Center"
-                    FontSize="13"
+                    FontSize="{DynamicResource GlobalFontSize13}"
                     Style="{StaticResource BaseTextBlock}">
                     <TextBlock.Text>
                         <MultiBinding StringFormat="{} {0}/{1}">

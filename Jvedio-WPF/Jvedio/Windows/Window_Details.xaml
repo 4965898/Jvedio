@@ -22,7 +22,7 @@
     ResizeMode="NoResize"
     WindowStartupLocation="CenterScreen"
     WindowStyle="None"
-    mc:Ignorable="d">
+    mc:Ignorable="d" FontSize="{DynamicResource GlobalFontSize}">
 
     <Window.Resources>
 
@@ -772,7 +772,7 @@
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBox
                                                     VerticalAlignment="Center"
-                                                    FontSize="14"
+                                                    FontSize="{DynamicResource GlobalFontSize}"
                                                     Style="{StaticResource ViewTextBox}"
                                                     Text="{Binding CurrentVideo.ReleaseDate}" />
 
@@ -786,7 +786,7 @@
                                                     <TextBox
                                                         Margin="5,0"
                                                         VerticalAlignment="Center"
-                                                        FontSize="14"
+                                                        FontSize="{DynamicResource GlobalFontSize}"
                                                         Style="{StaticResource ViewTextBox}"
                                                         Text="{Binding CurrentVideo.Duration, StringFormat='\{0} min'}" />
                                                 </StackPanel>
@@ -912,7 +912,7 @@
                                                                             Width="80"
                                                                             MaxHeight="60"
                                                                             Margin="0,10"
-                                                                            FontSize="12"
+                                                                            FontSize="{DynamicResource GlobalFontSize12}"
                                                                             Foreground="{DynamicResource Window.Foreground}"
                                                                             Opacity="0.7"
                                                                             Style="{StaticResource BaseTextBlock}"
@@ -1229,7 +1229,7 @@
                                                                                     MouseUp="Border_MouseUp"
                                                                                     Style="{StaticResource HoverBorder}">
                                                                                     <TextBlock
-                                                                                        FontSize="14"
+                                                                                        FontSize="{DynamicResource GlobalFontSize}"
                                                                                         Foreground="{DynamicResource Window.Sub.Foreground}"
                                                                                         Style="{StaticResource BaseTextBlock}"
                                                                                         Text="{Binding}" />

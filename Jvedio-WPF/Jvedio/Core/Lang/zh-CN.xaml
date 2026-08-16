@@ -60,6 +60,23 @@
     <sys:String x:Key="TranslateTest">测试文本</sys:String>
     <sys:String x:Key="TranslateTestRun">测试翻译</sys:String>
     <sys:String x:Key="TranslateTitle">翻译标题</sys:String>
+    <sys:String x:Key="TitleCN">翻译后的标题</sys:String>
+    <sys:String x:Key="UseSystemDpiScale">使用系统缩放比例（需重启生效）</sys:String>
+    <sys:String x:Key="UiFontScale">界面字号</sys:String>
+    <sys:String x:Key="UiFontScaleTip">调节界面字号大小（立即生效）</sys:String>
     <sys:String x:Key="TranslateSuccess">翻译成功</sys:String>
     <sys:String x:Key="TranslateFail">翻译失败，请检查翻译设置</sys:String>
+    <sys:String x:Key="ExportVideoData">导出影片数据</sys:String>
+    <sys:String x:Key="ExportActorList">导出演员列表</sys:String>
+    <sys:String x:Key="ExportSuccess">导出成功，共</sys:String>
+    <sys:String x:Key="ExportEmpty">当前无查询结果，无法导出</sys:String>
+    <sys:String x:Key="Export">导出</sys:String>
+    <sys:String x:Key="ExportLibraryAll">导出本库所有影片</sys:String>
+    <sys:String x:Key="ExportLibraryTip">支持 CSV / Excel / JSON 格式，导出当前库的全部影片数据</sys:String>
+    <sys:String x:Key="Actress_ShoeSize">鞋码</sys:String>
+    <sys:String x:Key="ExportNormal">常规导出（CSV / Excel / JSON）</sys:String>
+    <sys:String x:Key="ExportNfo">导出为 NFO</sys:String>
+    <sys:String x:Key="ExportLibraryAllNfo">导出本库所有影片为 NFO</sys:String>
+    <sys:String x:Key="SelectOutputFolder">选择 NFO 输出文件夹</sys:String>
+    <sys:String x:Key="AgeUnit">岁</sys:String>
 </ResourceDictionary>

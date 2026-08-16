@@ -922,9 +922,24 @@ namespace Jvedio
             InitViewRename(vieModel.FormatString);
         }
 
+/// <summary>
+        /// 界面字号滑条：即时更新全局 FontSize 资源（DynamicResource 全窗口自动生效）
+        /// </summary>
+        private void UiFontScale_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (App.Current != null) {
+                double s = DpiConfig.UiFontScale;
+                App.Current.Resources["GlobalFontSize"] = 14.0 * s;
+                App.Current.Resources["GlobalFontSize12"] = 12.0 * s;
+                App.Current.Resources["GlobalFontSize13"] = 13.0 * s;
+                App.Current.Resources["GlobalFontSize15"] = 15.0 * s;
+            }
+        }
+
         private void Window_Closing(object sender, CancelEventArgs e)
         {
             SaveSettings();
+            DpiConfig.Save();
             ConfigManager.Settings.Save();
             ConfigManager.ProxyConfig.Save();
             ConfigManager.ScanConfig.Save();
@@ -1286,9 +1301,79 @@ namespace Jvedio
             FileHelper.TryOpenUrl(UrlManager.HEADER_HELP);
         }
 
-        private async void CreatePlayableIndex(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// 选项-库：导出本库所有影片数据（hitchao/Jvedio#346/#212）
+        /// </summary>
+        private async void ExportLibraryData(object sender, RoutedEventArgs e)
         {
-            vieModel.IndexCreating = true;
+            if (ConfigManager.Main == null)
+                return;
+            Microsoft.Win32.SaveFileDialog dlg = new Microsoft.Win32.SaveFileDialog();
+            dlg.Filter = "CSV 文件 (*.csv)|*.csv|Excel 文件 (*.xls)|*.xls|JSON 文件 (*.json)|*.json";
+            dlg.FileName = $"Jvedio全库影片_{DateTime.Now:yyyyMMdd_HHmmss}";
+            if (dlg.ShowDialog() != true)
+                return;
+            string savePath = dlg.FileName;
+            Jvedio.Core.Export.ExportHelper.ExportFormat format = GetExportFormat(dlg.FilterIndex);
+            string select = "SELECT DISTINCT metadata.DataID, metadata_video.VID, metadata.Title, metadata.TitleCN, " +
+                "metadata.Grade, metadata.ReleaseDate, metadata.Size, metadata.Genre, " +
+                "metadata_video.Series, metadata_video.Director, metadata_video.Studio, metadata.Path, " +
+                "(select group_concat(ActorName,' ') from metadata_to_actor join actor_info " +
+                "on metadata_to_actor.ActorID=actor_info.ActorID where metadata_to_actor.DataID=metadata.DataID) as ActorNames ";
+            string sql = select + VideoMapper.SQL_BASE +
+                $" WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType=0 ORDER BY metadata.DataID";
+            bool success = false;
+            int count = 0;
+            try {
+                count = await Task.Run(() => Jvedio.Core.Export.ExportHelper.ExportVideos(savePath, format, sql));
+                success = true;
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                MessageCard.Error(ex.Message);
+            }
+            if (success)
+                MessageCard.Success($"{LangManager.GetValueByKey("ExportSuccess")} {count}");
+        }
+
+        /// <summary>
+        /// 选项-库：导出本库所有影片为 NFO（Kodi/Jellyfin/Emby 标准，参考 sqlite2nfo.py）
+        /// </summary>
+        private async void ExportLibraryNfo(object sender, RoutedEventArgs e)
+        {
+            if (ConfigManager.Main == null)
+                return;
+            System.Windows.Forms.FolderBrowserDialog dlg = new System.Windows.Forms.FolderBrowserDialog();
+            dlg.Description = LangManager.GetValueByKey("SelectOutputFolder");
+            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                return;
+            string outputDir = dlg.SelectedPath;
+            string select = new SelectWrapper<Video>().Select(VideoMapper.SelectFields).ToSelect(false);
+            string sql = select + VideoMapper.SQL_BASE +
+                $" WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType=0";
+            bool success = false;
+            int count = 0;
+            try {
+                count = await Task.Run(() => Jvedio.Core.Export.ExportHelper.ExportVideosToNfo(outputDir, sql, ConfigManager.Main.CurrentDBId));
+                success = true;
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                MessageCard.Error(ex.Message);
+            }
+            if (success)
+                MessageCard.Success($"{LangManager.GetValueByKey("ExportSuccess")} {count}");
+        }
+
+        private static Jvedio.Core.Export.ExportHelper.ExportFormat GetExportFormat(int filterIndex)
+        {
+            switch (filterIndex) {
+                case 2: return Jvedio.Core.Export.ExportHelper.ExportFormat.Excel;
+                case 3: return Jvedio.Core.Export.ExportHelper.ExportFormat.Json;
+                default: return Jvedio.Core.Export.ExportHelper.ExportFormat.Csv;
+            }
+        }
+
+        private async void CreatePlayableIndex(object sender, RoutedEventArgs e)
+        {            vieModel.IndexCreating = true;
             IndexCanceled = false;
             long total = 0;
             bool result = await Task.Run(() => {

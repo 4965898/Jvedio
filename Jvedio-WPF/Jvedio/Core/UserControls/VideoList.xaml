@@ -134,6 +134,12 @@
             <MenuItem Click="CutFile" Header="{DynamicResource CutX}" />
 
             <Separator />
+            <MenuItem Header="{DynamicResource ExportVideoData}">
+                <MenuItem Click="ExportVideoData" Header="{DynamicResource ExportNormal}" />
+                <MenuItem Click="ExportVideoDataNfo" Header="{DynamicResource ExportNfo}" />
+            </MenuItem>
+
+            <Separator />
             <MenuItem
                 Click="DeleteID"
                 Header="{DynamicResource Menu_DeleteInfo}"
@@ -407,7 +413,7 @@
                     <TextBlock
                         Margin="10,0,5,0"
                         VerticalAlignment="Center"
-                        FontSize="14"
+                        FontSize="{DynamicResource GlobalFontSize}"
                         Foreground="{DynamicResource Window.Foreground}"
                         Style="{StaticResource BaseTextBlock}"
                         Text="{DynamicResource Edit}" />
@@ -546,6 +552,10 @@
                             <MenuItem Header="{DynamicResource AllData}">
                                 <MenuItem Click="GenerateAllScreenShot" Header="{DynamicResource Menu_GenerateScreenShot}" />
                                 <MenuItem Click="DownloadAllVideo" Header="{DynamicResource SyncInfo}" />
+                                <MenuItem Header="{DynamicResource ExportVideoData}">
+                                    <MenuItem Click="ExportAllVideoData" Header="{DynamicResource ExportNormal}" />
+                                    <MenuItem Click="ExportAllVideoDataNfo" Header="{DynamicResource ExportNfo}" />
+                                </MenuItem>
                             </MenuItem>
                         </ContextMenu>
                     </super:SimplePanel.ContextMenu>
@@ -908,7 +918,7 @@
                     CornerRadius="5">
                     <TextBlock
                         VerticalAlignment="Center"
-                        FontSize="13"
+                        FontSize="{DynamicResource GlobalFontSize13}"
                         Style="{StaticResource BaseTextBlock}">
                         <TextBlock.Text>
                             <MultiBinding StringFormat="{} {0}/{1}">

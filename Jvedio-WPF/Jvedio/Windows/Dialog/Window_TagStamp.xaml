@@ -14,7 +14,7 @@
     Foreground="{DynamicResource Window.Foreground}"
     Icon="pack://application:,,,/Resources/Jvedio.ico"
     WindowStartupLocation="CenterScreen"
-    mc:Ignorable="d">
+    mc:Ignorable="d" FontSize="{DynamicResource GlobalFontSize}">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="auto" />
@@ -29,7 +29,7 @@
             </Grid.ColumnDefinitions>
             <TextBlock
                 VerticalAlignment="Center"
-                FontSize="15"
+                FontSize="{DynamicResource GlobalFontSize15}"
                 Text="{DynamicResource Title}" />
             <super:SearchBox
                 Name="textBox"
@@ -48,7 +48,7 @@
             </Grid.ColumnDefinitions>
             <TextBlock
                 VerticalAlignment="Center"
-                FontSize="15"
+                FontSize="{DynamicResource GlobalFontSize15}"
                 Text="{DynamicResource Background}" />
             <Border
                 Name="border"
@@ -130,7 +130,7 @@
             </Grid.ColumnDefinitions>
             <TextBlock
                 VerticalAlignment="Center"
-                FontSize="15"
+                FontSize="{DynamicResource GlobalFontSize15}"
                 Text="{DynamicResource Foreground}" />
             <Border
                 Name="border2"

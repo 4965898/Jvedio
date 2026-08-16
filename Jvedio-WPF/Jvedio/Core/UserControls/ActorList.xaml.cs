@@ -12,6 +12,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -95,6 +96,7 @@ namespace Jvedio.Core.UserControls
             "Gender",
             "Hobby",
             "Cup",
+            "ShoeSize",
             "Chest",
             "Age",
             "Waist",
@@ -421,8 +423,7 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
         }
 
         public async void Select()
-        {
-            if (ConfigManager.Main == null)
+        {            if (ConfigManager.Main == null)
                 return;
 
             // 判断当前获取的队列
@@ -651,6 +652,54 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                     CurrentList[i].Count = count;
                     break;
                 }
+            }
+        }
+
+        /// <summary>
+        /// 导出当前筛选条件下的全部演员（hitchao/Jvedio#346/#212，支持 CSV/Excel/JSON）
+        /// </summary>
+        public async void ExportActorList(object sender, RoutedEventArgs e)
+        {
+            Microsoft.Win32.SaveFileDialog dlg = new Microsoft.Win32.SaveFileDialog();
+            dlg.Filter = "CSV 文件 (*.csv)|*.csv|Excel 文件 (*.xls)|*.xls|JSON 文件 (*.json)|*.json";
+            dlg.FileName = $"Jvedio演员列表_{DateTime.Now:yyyyMMdd_HHmmss}";
+            if (dlg.ShowDialog() != true)
+                return;
+            string savePath = dlg.FileName;
+            Jvedio.Core.Export.ExportHelper.ExportFormat format = GetExportFormat(dlg.FilterIndex);
+            bool search = !string.IsNullOrEmpty(SearchText);
+            string searchText = SearchText.ToProperSql();
+            await Task.Run(() => {
+                try {
+                    string filedSelect = new SelectWrapper<ActorInfo>().Select(SelectedField).ToSelect(false);
+                    string unionSelect = new SelectWrapper<ActorInfo>().Select(SelectedFieldUnion).ToSelect(false);
+                    string sql = $"{filedSelect} FROM actor_info " +
+                        $"join metadata_to_actor on metadata_to_actor.ActorID=actor_info.ActorID " +
+                        $"join metadata on metadata_to_actor.DataID=metadata.DataID " +
+                        $"WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType={0} " +
+                        $"{(search ? $"and actor_info.ActorName like '%{searchText}%' " : string.Empty)} " +
+                        $"GROUP BY actor_info.ActorID " +
+                        "UNION " +
+                        $"{unionSelect} FROM actor_info " +
+                        "WHERE NOT EXISTS(SELECT 1 from metadata_to_actor where metadata_to_actor.ActorID=actor_info.ActorID )" +
+                        $"{(search ? $"and actor_info.ActorName like '%{searchText}%' " : string.Empty)}  GROUP BY actor_info.ActorID";
+                    int count = Jvedio.Core.Export.ExportHelper.ExportActors(savePath, format, sql);
+                    App.Current.Dispatcher.BeginInvoke(new Action(() => {
+                        MessageCard.Info($"{LangManager.GetValueByKey("ExportSuccess")} {count}");
+                    }));
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                    App.Current.Dispatcher.BeginInvoke(new Action(() => MessageCard.Error(ex.Message)));
+                }
+            });
+        }
+
+        private static Jvedio.Core.Export.ExportHelper.ExportFormat GetExportFormat(int filterIndex)
+        {
+            switch (filterIndex) {
+                case 2: return Jvedio.Core.Export.ExportHelper.ExportFormat.Excel;
+                case 3: return Jvedio.Core.Export.ExportHelper.ExportFormat.Json;
+                default: return Jvedio.Core.Export.ExportHelper.ExportFormat.Csv;
             }
         }
 

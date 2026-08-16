@@ -9,6 +9,7 @@ using Jvedio.Core.UserControls.ViewModels;
 using Jvedio.Entity;
 using Jvedio.Entity.Common;
 using Jvedio.Entity.CommonSQL;
+using Jvedio.Mapper;
 using Microsoft.VisualBasic.FileIO;
 using SuperControls.Style;
 using SuperControls.Style.Windows;
@@ -132,6 +133,12 @@ namespace Jvedio.Core.UserControls
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
             BindingEventAfterRender();
+            // 恢复上次浏览页码（hitchao/Jvedio#430/#241）
+            long lastPage = ConfigManager.VideoConfig.LastPage;
+            if (lastPage > 1) {
+                vieModel.CurrentPage = (int)lastPage;
+                pagination.CurrentPage = (int)lastPage;
+            }
             Refresh(vieModel.CurrentPage);
         }
 
@@ -147,6 +154,141 @@ namespace Jvedio.Core.UserControls
         public void RefreshData(long dataID)
         {
             vieModel.RefreshData(dataID);
+        }
+
+        /// <summary>
+        /// 导出选中影片数据（海报右键子菜单；单选=当前影片，多选模式=选中的影片）
+        /// </summary>
+        public async void ExportVideoData(object sender, RoutedEventArgs e)
+        {
+            HandleMenuSelected(sender, 1);
+            if (vieModel.SelectedVideo.Count == 0) {
+                MessageCard.Info(LangManager.GetValueByKey("ExportEmpty"));
+                return;
+            }
+            Microsoft.Win32.SaveFileDialog dlg = new Microsoft.Win32.SaveFileDialog();
+            dlg.Filter = "CSV 文件 (*.csv)|*.csv|Excel 文件 (*.xls)|*.xls|JSON 文件 (*.json)|*.json";
+            dlg.FileName = $"Jvedio影片数据_{DateTime.Now:yyyyMMdd_HHmmss}";
+            if (dlg.ShowDialog() != true)
+                return;
+            string savePath = dlg.FileName;
+            Jvedio.Core.Export.ExportHelper.ExportFormat format = GetExportFormat(dlg.FilterIndex);
+            string select = "SELECT DISTINCT metadata.DataID, metadata_video.VID, metadata.Title, metadata.TitleCN, " +
+                "metadata.Grade, metadata.ReleaseDate, metadata.Size, metadata.Genre, " +
+                "metadata_video.Series, metadata_video.Director, metadata_video.Studio, metadata.Path, " +
+                "(select group_concat(ActorName,' ') from metadata_to_actor join actor_info " +
+                "on metadata_to_actor.ActorID=actor_info.ActorID where metadata_to_actor.DataID=metadata.DataID) as ActorNames ";
+            string ids = string.Join(",", vieModel.SelectedVideo.Select(v => v.DataID));
+            string sql = select + VideoMapper.SQL_BASE + $" WHERE metadata.DataID IN ({ids}) ORDER BY metadata.DataID";
+            await Task.Run(() => {
+                try {
+                    int count = Jvedio.Core.Export.ExportHelper.ExportVideos(savePath, format, sql);
+                    Dispatcher.BeginInvoke(new Action(() => {
+                        MessageCard.Info($"{LangManager.GetValueByKey("ExportSuccess")} {count}");
+                    }));
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                    Dispatcher.BeginInvoke(new Action(() => MessageCard.Error(ex.Message)));
+                }
+            });
+        }
+
+        /// <summary>
+        /// 导出本库全部影片数据（设置页按钮 / 空白处右键「全部功能-导出数据」共用，hitchao/Jvedio#346/#212）
+        /// </summary>
+        public async void ExportAllVideoData(object sender, RoutedEventArgs e)
+        {
+            Microsoft.Win32.SaveFileDialog dlg = new Microsoft.Win32.SaveFileDialog();
+            dlg.Filter = "CSV 文件 (*.csv)|*.csv|Excel 文件 (*.xls)|*.xls|JSON 文件 (*.json)|*.json";
+            dlg.FileName = $"Jvedio全库影片_{DateTime.Now:yyyyMMdd_HHmmss}";
+            if (dlg.ShowDialog() != true)
+                return;
+            string savePath = dlg.FileName;
+            Jvedio.Core.Export.ExportHelper.ExportFormat format = GetExportFormat(dlg.FilterIndex);
+            string select = "SELECT DISTINCT metadata.DataID, metadata_video.VID, metadata.Title, metadata.TitleCN, " +
+                "metadata.Grade, metadata.ReleaseDate, metadata.Size, metadata.Genre, " +
+                "metadata_video.Series, metadata_video.Director, metadata_video.Studio, metadata.Path, " +
+                "(select group_concat(ActorName,' ') from metadata_to_actor join actor_info " +
+                "on metadata_to_actor.ActorID=actor_info.ActorID where metadata_to_actor.DataID=metadata.DataID) as ActorNames ";
+            string sql = select + VideoMapper.SQL_BASE +
+                $" WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType=0 ORDER BY metadata.DataID";
+            await Task.Run(() => {
+                try {
+                    int count = Jvedio.Core.Export.ExportHelper.ExportVideos(savePath, format, sql);
+                    Dispatcher.BeginInvoke(new Action(() => {
+                        MessageCard.Info($"{LangManager.GetValueByKey("ExportSuccess")} {count}");
+                    }));
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                    Dispatcher.BeginInvoke(new Action(() => MessageCard.Error(ex.Message)));
+                }
+            });
+        }
+
+        /// <summary>
+        /// 导出选中影片为 NFO（海报右键子菜单；单选=当前影片，多选模式=选中的影片）
+        /// </summary>
+        public async void ExportVideoDataNfo(object sender, RoutedEventArgs e)
+        {
+            HandleMenuSelected(sender, 1);
+            if (vieModel.SelectedVideo.Count == 0) {
+                MessageCard.Info(LangManager.GetValueByKey("ExportEmpty"));
+                return;
+            }
+            System.Windows.Forms.FolderBrowserDialog dlg = new System.Windows.Forms.FolderBrowserDialog();
+            dlg.Description = LangManager.GetValueByKey("SelectOutputFolder");
+            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                return;
+            string outputDir = dlg.SelectedPath;
+            string select = new SelectWrapper<Video>().Select(VideoMapper.SelectFields).ToSelect(false);
+            string ids = string.Join(",", vieModel.SelectedVideo.Select(v => v.DataID));
+            string sql = select + VideoMapper.SQL_BASE + $" WHERE metadata.DataID IN ({ids})";
+            await Task.Run(() => {
+                try {
+                    int count = Jvedio.Core.Export.ExportHelper.ExportVideosToNfo(outputDir, sql, ConfigManager.Main.CurrentDBId);
+                    Dispatcher.BeginInvoke(new Action(() => {
+                        MessageCard.Info($"{LangManager.GetValueByKey("ExportSuccess")} {count}");
+                    }));
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                    Dispatcher.BeginInvoke(new Action(() => MessageCard.Error(ex.Message)));
+                }
+            });
+        }
+
+        /// <summary>
+        /// 导出本库全部影片为 NFO（空白处右键「全部功能-导出 NFO」）
+        /// </summary>
+        public async void ExportAllVideoDataNfo(object sender, RoutedEventArgs e)
+        {
+            System.Windows.Forms.FolderBrowserDialog dlg = new System.Windows.Forms.FolderBrowserDialog();
+            dlg.Description = LangManager.GetValueByKey("SelectOutputFolder");
+            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                return;
+            string outputDir = dlg.SelectedPath;
+            string select = new SelectWrapper<Video>().Select(VideoMapper.SelectFields).ToSelect(false);
+            string sql = select + VideoMapper.SQL_BASE +
+                $" WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType=0";
+            await Task.Run(() => {
+                try {
+                    int count = Jvedio.Core.Export.ExportHelper.ExportVideosToNfo(outputDir, sql, ConfigManager.Main.CurrentDBId);
+                    Dispatcher.BeginInvoke(new Action(() => {
+                        MessageCard.Info($"{LangManager.GetValueByKey("ExportSuccess")} {count}");
+                    }));
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                    Dispatcher.BeginInvoke(new Action(() => MessageCard.Error(ex.Message)));
+                }
+            });
+        }
+
+        private static Jvedio.Core.Export.ExportHelper.ExportFormat GetExportFormat(int filterIndex)
+        {
+            switch (filterIndex) {
+                case 2: return Jvedio.Core.Export.ExportHelper.ExportFormat.Excel;
+                case 3: return Jvedio.Core.Export.ExportHelper.ExportFormat.Json;
+                default: return Jvedio.Core.Export.ExportHelper.ExportFormat.Csv;
+            }
         }
 
         public void BindingEvent()
@@ -368,6 +510,8 @@ namespace Jvedio.Core.UserControls
             vieModel.CurrentPage = pagination.CurrentPage;
             vieModel.PageQueue.Enqueue(pagination.CurrentPage);
             vieModel.LoadData();
+            // 记忆浏览页码（hitchao/Jvedio#430/#241）：重开软件接续上次浏览位置
+            ConfigManager.VideoConfig.LastPage = pagination.CurrentPage;
         }
 
         private void MovieItemsControl_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -1666,6 +1810,7 @@ namespace Jvedio.Core.UserControls
         {
             if (_Translating)
                 return;
+            HandleMenuSelected(sender, 1);   // 单选=当前影片，多选=选中的影片
             List<Video> videos = vieModel?.SelectedVideo;
             if (videos == null || videos.Count == 0)
                 return;

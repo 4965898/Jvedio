@@ -287,7 +287,38 @@ namespace Jvedio.Entity
                 NfoParse.Parse(ref movie, node.Name, node.InnerText);
             }
 
+            // Kodi 标准 uniqueid 标签（hitchao/Jvedio#425，JavSP 等刮削器输出）：
+            // <uniqueid type="num" default="true">SONE-219</uniqueid> / <uniqueid type="cid">sone00219</uniqueid>
+            // 注意不能把 "uniqueid" 加进 NFO 解析列表——多个 uniqueid 节点会按文档顺序互相覆盖（cid 值会盖掉 num 值）。
+            // 特判：仅当 id 为空时，优先取 default="true" 的，其次 type="num" 的，最后取第一个。
+            if (string.IsNullOrEmpty(movie.id)) {
+                XmlNode uidNode = doc.SelectSingleNode("movie/uniqueid[@default='true']")
+                    ?? doc.SelectSingleNode("movie/uniqueid[@type='num']")
+                    ?? doc.SelectSingleNode("movie/uniqueid");
+                if (uidNode != null && !string.IsNullOrEmpty(uidNode.InnerText))
+                    movie.id = uidNode.InnerText.Trim();
+            }
+
             // 对于 NFO ，只要没有 VID，就不导入
+            if (string.IsNullOrEmpty(movie.id)) {
+                // 兜底（hitchao/Jvedio#415/#381）：部分 NFO 无 <id>/<uniqueid>（只有 title/plot 等），
+                // 但同目录视频文件名含番号——从同目录第一个视频文件名提取识别码
+                string dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir)) {
+                    foreach (string file in Directory.EnumerateFiles(dir)) {
+                        string ext = Path.GetExtension(file).ToLower();
+                        if (ext == ".nfo" || !ScanTask.VIDEO_EXTENSIONS_LIST.Contains(ext))
+                            continue;
+                        string vid = JvedioLib.Security.Identify.GetVID(Path.GetFileNameWithoutExtension(file));
+                        if (!string.IsNullOrEmpty(vid)) {
+                            movie.id = vid;
+                            Logger.Info($"NFO 无识别码，从同目录视频文件名提取: {vid} ({path})");
+                            break;
+                        }
+                    }
+                }
+            }
+
             if (string.IsNullOrEmpty(movie.id))
                 return null;
 

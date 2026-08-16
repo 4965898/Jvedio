@@ -47,7 +47,7 @@
                         </Viewbox>
                         <TextBlock
                             Margin="5"
-                            FontSize="12"
+                            FontSize="{DynamicResource GlobalFontSize12}"
                             Style="{StaticResource BaseTextBlock}"
                             Text="{DynamicResource Add}" />
                     </StackPanel>
@@ -81,7 +81,7 @@
                     <DataTemplate>
                         <Border Style="{StaticResource RoundInfoBorder}">
                             <TextBlock
-                                FontSize="14"
+                                FontSize="{DynamicResource GlobalFontSize}"
                                 Foreground="{DynamicResource Window.Sub.Foreground}"
                                 PreviewMouseLeftButtonUp="Label_MouseUp"
                                 Style="{StaticResource BaseTextBlock}"

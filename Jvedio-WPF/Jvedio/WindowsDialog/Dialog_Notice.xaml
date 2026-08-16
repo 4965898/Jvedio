@@ -13,7 +13,7 @@
     Background="{DynamicResource Window.Background}"
     Icon="pack://application:,,,/Resources/Jvedio.ico"
     WindowStartupLocation="CenterScreen"
-    mc:Ignorable="d">
+    mc:Ignorable="d" FontSize="{DynamicResource GlobalFontSize}">
 
     <Window.Resources>
         <Style x:Key="BaseTextBox" TargetType="{x:Type TextBox}">

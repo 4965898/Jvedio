@@ -55,6 +55,23 @@
     <sys:String x:Key="TranslateTest">Test Text</sys:String>
     <sys:String x:Key="TranslateTestRun">Test</sys:String>
     <sys:String x:Key="TranslateTitle">Translate Title</sys:String>
+    <sys:String x:Key="TitleCN">Translated Title</sys:String>
+    <sys:String x:Key="UseSystemDpiScale">Use System Scaling (restart required)</sys:String>
+    <sys:String x:Key="UiFontScale">UI Font Scale</sys:String>
+    <sys:String x:Key="UiFontScaleTip">Adjust UI font size (takes effect immediately)</sys:String>
     <sys:String x:Key="TranslateSuccess">Translation succeeded</sys:String>
     <sys:String x:Key="TranslateFail">Translation failed, check translation settings</sys:String>
+    <sys:String x:Key="ExportVideoData">Export Videos</sys:String>
+    <sys:String x:Key="ExportActorList">Export Actors</sys:String>
+    <sys:String x:Key="ExportSuccess">Exported</sys:String>
+    <sys:String x:Key="ExportEmpty">No query result to export</sys:String>
+    <sys:String x:Key="Export">Export</sys:String>
+    <sys:String x:Key="ExportLibraryAll">Export All Videos in This Library</sys:String>
+    <sys:String x:Key="ExportLibraryTip">Supports CSV / Excel / JSON, exports all videos of the current library</sys:String>
+    <sys:String x:Key="Actress_ShoeSize">Shoe Size</sys:String>
+    <sys:String x:Key="ExportNormal">Normal Export (CSV / Excel / JSON)</sys:String>
+    <sys:String x:Key="ExportNfo">Export as NFO</sys:String>
+    <sys:String x:Key="ExportLibraryAllNfo">Export All Videos in This Library as NFO</sys:String>
+    <sys:String x:Key="SelectOutputFolder">Select NFO Output Folder</sys:String>
+    <sys:String x:Key="AgeUnit">yrs</sys:String>
 </ResourceDictionary>

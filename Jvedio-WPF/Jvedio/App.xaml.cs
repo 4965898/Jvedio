@@ -1,4 +1,5 @@
 ﻿using Jvedio.Core.Global;
+using Jvedio.Core.Config;
 using Jvedio.Core.Tasks;
 using SuperControls.Style.Windows;
 using SuperUtils.IO;
@@ -9,6 +10,7 @@ using SuperControls.Style;
 using System.Text;
 using System.Windows.Interop;
 using SuperUtils.Systems;
+using System.Runtime.InteropServices;
 using Jvedio.Windows;
 #if DEBUG
 #else
@@ -36,7 +38,31 @@ namespace Jvedio
         static App()
         {
             Init();
+            // 必须在任何窗口创建前：读缩放配置并设置进程 DPI 感知（勾选=PerMonitorV2 跟随系统缩放，需重启生效）
+            DpiConfig.Load();
+            ApplyDpiAwareness();
         }
+
+        /// <summary>
+        /// 设置进程 DPI 感知：勾选「使用系统缩放比例」= PerMonitorV2（跨屏实时、热切换缩放即时生效）；
+        /// 不勾选 = 阻止 WPF 自动启用 PerMonitor（固定 96 DPI 渲染，UI 不随系统缩放）。
+        /// 注意：DPI 感知为进程级且只能在窗口创建前设置一次，改动需重启程序生效。
+        /// </summary>
+        private static void ApplyDpiAwareness()
+        {
+            try {
+                if (!DpiConfig.UseSystemDpiScale) {
+                    AppContext.SetSwitch("Switch.System.Windows.DoNotUsePerMonitorDpiAwareness", true);
+                } else {
+                    SetProcessDpiAwarenessContext((IntPtr)(-4)); // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+                }
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+        }
+
+        [DllImport("user32.dll")]
+        private static extern bool SetProcessDpiAwarenessContext(IntPtr value);
 
         public static void Init()
         {
@@ -61,11 +87,39 @@ namespace Jvedio
 
         }
 
+        /// <summary>
+        /// 修复 WPF 系统级菜单对齐 bug：双屏(副屏在左)环境下 MenuDropAlignment 被置为 true，
+        /// 导致右键菜单次级选项从左边弹出、鼠标无法选中（hitchao/Jvedio#398）。
+        /// </summary>
+        private static void FixMenuDropAlignment()
+        {
+            try {
+                var field = typeof(SystemParameters).GetField("_menuDropAlignment",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+                if (field != null && field.GetValue(null) is bool value && value)
+                    field.SetValue(null, false);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
+            // 全局字号资源按用户缩放比例初始化（窗口创建前）
+            try {
+                double s = DpiConfig.UiFontScale;
+                this.Resources["GlobalFontSize"] = 14.0 * s;
+                this.Resources["GlobalFontSize12"] = 12.0 * s;
+                this.Resources["GlobalFontSize13"] = 13.0 * s;
+                this.Resources["GlobalFontSize15"] = 15.0 * s;
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+
             SuperUtils.Handler.LogHandler.Logger = Logger;
             SuperControls.Style.Handler.LogHandler.Logger = Logger;
 
+            FixMenuDropAlignment();
             Logger.Info(Environment.NewLine);
             Logger.Info("     ██╗██╗   ██╗███████╗██████╗ ██╗ ██████╗ ");
             Logger.Info("     ██║██║   ██║██╔════╝██╔══██╗██║██╔═══██╗");

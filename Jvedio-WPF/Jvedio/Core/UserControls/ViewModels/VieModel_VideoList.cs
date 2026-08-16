@@ -120,9 +120,19 @@ namespace Jvedio.Core.UserControls.ViewModels
 
 
         /// <summary>
-        /// 杩囨护鍣ㄤ紶杩涚殑
+        /// 过滤器传进来的
         /// </summary>
         public SelectWrapper<Video> FilterWrapper { get; set; }
+
+        /// <summary>
+        /// 导出用：最近一次查询的 join 部分 SQL（FROM + JOIN，hitchao/Jvedio#346/#212）
+        /// </summary>
+        public string LastQuerySql { get; set; }
+
+        /// <summary>
+        /// 导出用：最近一次查询的 wrapper（where/order）
+        /// </summary>
+        public SelectWrapper<Video> LastWrapper { get; set; }
 
         /// <summary>
         /// 杩囨护鍣ㄤ紶杩涚殑 SQL
@@ -686,6 +696,10 @@ namespace Jvedio.Core.UserControls.ViewModels
             arg.SQL = sql;
             RenderSqlChanged?.Invoke(null, arg);
 
+            // 导出用：保存本次查询的 join 部分与 where 条件（hitchao/Jvedio#346/#212）
+            LastQuerySql = sql;
+            LastWrapper = wrapper;
+
             onPageChange?.Invoke(TotalCount);
             _RenderTask = RenderAsync(version);
         }
@@ -702,12 +716,15 @@ namespace Jvedio.Core.UserControls.ViewModels
                 wrapper.Asc("RANDOM()");
             else {
                 if (sortField == "ACTOR_FIRST_NAME") {
+                    // 演员名排序：空/无演员(NULL)强制排末尾，且必须合并为单个表达式
+                    // （Asc/Desc 是覆盖语义，后调覆盖先调，两次调用会丢掉空值处理）
+                    // 注意：ORDER BY a, b ASC/DESC 中方向只作用于最后一个键，CASE 键恒 ASC → 空值恒排末尾，升降序均正确（实测）
                     string sub = "(select MIN(actor_info.ActorName) from metadata_to_actor join actor_info on metadata_to_actor.ActorID=actor_info.ActorID where metadata_to_actor.DataID=metadata.DataID)";
-                    wrapper.Asc($"CASE WHEN {sub} IS NULL OR {sub}='' THEN 1 ELSE 0 END");
+                    string merged = $"CASE WHEN {sub} IS NULL OR {sub}='' THEN 1 ELSE 0 END, {sub} COLLATE NOCASE";
                     if (SortDescending)
-                        wrapper.Desc(sub);
+                        wrapper.Desc(merged);
                     else
-                        wrapper.Asc(sub);
+                        wrapper.Asc(merged);
                 } else if (sortField.IndexOf("VID", StringComparison.OrdinalIgnoreCase) >= 0) {
                     // 识别码排序：按「字母前缀 + 数字后缀」两段排，避免 LUXU-119 → LUXU-1190 → LUXU-120 的字符串序
                     // 注意：wrapper.Asc/Desc 是覆盖语义（后调覆盖先调），多字段排序必须合并为单个表达式
@@ -718,6 +735,15 @@ namespace Jvedio.Core.UserControls.ViewModels
                         $"WHEN {sortField} LIKE '%-%' THEN CAST(SUBSTR({sortField}, INSTR({sortField},'-')+1) AS INTEGER) " +
                         "ELSE 0 END";
                     string merged = $"(({prefix}) || printf('%015d', ({number}))) COLLATE NOCASE";
+                    if (SortDescending)
+                        wrapper.Desc(merged);
+                    else
+                        wrapper.Asc(merged);
+                } else if (sortField == "metadata.Title") {
+                    // 按名称排序：空/未同步标题(NULL)强制排末尾，避免「新加入未同步影片」混排到最前、
+                    // 「最近播放(已同步)」被挤到末尾（hitchao/Jvedio#362/#437）
+                    // 注意：wrapper.Asc/Desc 是覆盖语义（后调覆盖先调），多键必须合并为单个表达式（逗号分隔）
+                    string merged = $"CASE WHEN {sortField} IS NULL OR {sortField}='' THEN 1 ELSE 0 END, {sortField} COLLATE NOCASE";
                     if (SortDescending)
                         wrapper.Desc(merged);
                     else

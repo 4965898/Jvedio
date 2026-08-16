@@ -5,10 +5,16 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:d1p1="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:local="clr-namespace:Jvedio"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib"
     d1p1:Ignorable="d"
     StartupUri="WindowStartUp.xaml">
     <Application.Resources>
         <ResourceDictionary>
+            <!-- 全局界面字号（基础 × 用户缩放比例，启动时按配置覆盖） -->
+            <sys:Double x:Key="GlobalFontSize">14</sys:Double>
+            <sys:Double x:Key="GlobalFontSize12">12</sys:Double>
+            <sys:Double x:Key="GlobalFontSize13">13</sys:Double>
+            <sys:Double x:Key="GlobalFontSize15">15</sys:Double>
             <ResourceDictionary.MergedDictionaries>
                 <!--  Lang  -->
                 <ResourceDictionary Source="pack://application:,,,/SuperControls.Style;Component/Lang/zh-CN.xaml" />

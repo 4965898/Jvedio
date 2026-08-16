@@ -40,6 +40,8 @@ namespace Jvedio
         private Window_EditActor()
         {
             InitializeComponent();
+            // 罩杯下拉菜单：全部字母 A-Z（hitchao/Jvedio issues 优化）
+            CupComboBox.ItemsSource = Enumerable.Range('A', 26).Select(c => (char)c).ToList();
         }
 
 
@@ -64,6 +66,37 @@ namespace Jvedio
                 return;
             CurrentActorInfo = ActorInfo.GetById(ActorID);
             SetGender();
+            InitBirthdayPicker();
+        }
+
+        /// <summary>
+        /// 同步生日日历控件（生日变更自动重算年龄，见 BirthdayDatePicker_SelectedDateChanged）
+        /// </summary>
+        private void InitBirthdayPicker()
+        {
+            if (BirthdayDatePicker == null || CurrentActorInfo == null)
+                return;
+            if (DateTime.TryParse(CurrentActorInfo.Birthday, out DateTime bd))
+                BirthdayDatePicker.SelectedDate = bd;
+            else
+                BirthdayDatePicker.SelectedDate = null;
+        }
+
+        private void BirthdayDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (CurrentActorInfo == null)
+                return;
+            DatePicker dp = sender as DatePicker;
+            if (dp.SelectedDate.HasValue) {
+                string s = dp.SelectedDate.Value.ToString("yyyy-MM-dd");
+                if (CurrentActorInfo.Birthday != s) {
+                    CurrentActorInfo.Birthday = s;
+                    // 生日变更 → 实时重算年龄（年龄仍可手动修改）
+                    CurrentActorInfo.Age = ActorInfo.CalculateAge(s);
+                }
+            } else {
+                CurrentActorInfo.Birthday = "";
+            }
         }
 
         private void SetGender()

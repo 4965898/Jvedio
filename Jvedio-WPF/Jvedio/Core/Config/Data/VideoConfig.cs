@@ -18,6 +18,7 @@ namespace Jvedio.Core.Config.Data
             SortDescending = false;
             OnlyShowSubSection = false;
             PageSize = 20;
+            LastPage = 1;
 
             DisplayID = true;
             DisplayTitle = true;
@@ -43,6 +44,18 @@ namespace Jvedio.Core.Config.Data
             get { return _PageSize; }
             set {
                 _PageSize = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 上次浏览的页码（hitchao/Jvedio#430/#241）：重开软件接续上次浏览位置
+        /// </summary>
+        private long _LastPage;
+        public long LastPage {
+            get { return _LastPage; }
+            set {
+                _LastPage = value;
                 RaisePropertyChanged();
             }
         }

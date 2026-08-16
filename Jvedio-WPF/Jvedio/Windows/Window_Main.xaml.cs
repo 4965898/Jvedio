@@ -59,6 +59,8 @@ namespace Jvedio
 
         public static string[] TagStringTranslated { get; set; }
 
+        public static string[] TagStringUncensored { get; set; }
+
 
         public static DataBaseType CurrentDataBaseType { get; set; }
 
@@ -111,6 +113,7 @@ namespace Jvedio
             ClickFilterDict = new List<string>() { "Genre", "Series", "Studio", "Director", };
             TagStringHD = new string[] { "hd", "高清" };
             TagStringTranslated = new string[] { "中文", "日本語", "Translated", "English" };
+            TagStringUncensored = new string[] { "未修正", "Uncensored", "无码" };
             CurrentDataBaseType = DataBaseType.SQLite;
             ClickGoBackToStartUp = false;
             CurrentDataType = DataType.Video;

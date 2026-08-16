@@ -88,7 +88,7 @@
                         </ContextMenu>
                     </Border.ContextMenu>
                     <Border.Background>
-                        <ImageBrush ImageSource="{Binding CurrentActorInfo.SmallImage}" Stretch="Fill" />
+                        <ImageBrush ImageSource="{Binding CurrentActorInfo.SmallImage}" Stretch="UniformToFill" />
                     </Border.Background>
                 </Border>
 
@@ -100,7 +100,7 @@
                     AcceptsReturn="False"
                     Background="Transparent"
                     ContextMenu="{StaticResource CopyContextMenu}"
-                    FontSize="14"
+                    FontSize="{DynamicResource GlobalFontSize}"
                     FontWeight="Bold"
                     Foreground="{DynamicResource Window.Foreground}"
                     IsReadOnly="True"
@@ -179,12 +179,26 @@
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource ActorInfoTextBlock}" Text="{DynamicResource Actress_Birthday}" />
-                        <TextBox Style="{StaticResource ActorTextBox}" Text="{Binding CurrentActorInfo.Birthday, Mode=TwoWay}" />
+                        <DatePicker
+                            x:Name="BirthdayDatePicker"
+                            Width="140"
+                            Margin="10,5"
+                            VerticalAlignment="Center"
+                            SelectedDateChanged="BirthdayDatePicker_SelectedDateChanged" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource ActorInfoTextBlock}" Text="{DynamicResource Actress_Age}" />
-                        <TextBox Style="{StaticResource ActorTextBox}" Text="{Binding CurrentActorInfo.Age, Mode=TwoWay}" />
+                        <TextBox
+                            IsReadOnly="True"
+                            Style="{StaticResource ActorTextBox}"
+                            Text="{Binding DisplayAge, Mode=OneWay}" />
+                        <TextBlock
+                            Margin="0,10,0,10"
+                            VerticalAlignment="Center"
+                            FontSize="{DynamicResource GlobalFontSize12}"
+                            Foreground="{DynamicResource Window.Sub.Foreground}"
+                            Text="{DynamicResource AgeUnit}" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
@@ -195,6 +209,23 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource ActorInfoTextBlock}" Text="{DynamicResource Actress_Height}" />
                         <TextBox Style="{StaticResource ActorTextBox}" Text="{Binding CurrentActorInfo.Height, Mode=TwoWay}" />
+                        <TextBlock
+                            Margin="0,10,0,10"
+                            VerticalAlignment="Center"
+                            FontSize="{DynamicResource GlobalFontSize12}"
+                            Foreground="{DynamicResource Window.Sub.Foreground}"
+                            Text="CM" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource ActorInfoTextBlock}" Text="{DynamicResource Actress_Weight}" />
+                        <TextBox Style="{StaticResource ActorTextBox}" Text="{Binding CurrentActorInfo.Weight, Mode=TwoWay}" />
+                        <TextBlock
+                            Margin="0,10,0,10"
+                            VerticalAlignment="Center"
+                            FontSize="{DynamicResource GlobalFontSize12}"
+                            Foreground="{DynamicResource Window.Sub.Foreground}"
+                            Text="KG" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">
@@ -216,6 +247,11 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource ActorInfoTextBlock}" Text="{DynamicResource Actress_Hipline}" />
                         <TextBox Style="{StaticResource ActorTextBox}" Text="{Binding CurrentActorInfo.Hipline, Mode=TwoWay}" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource ActorInfoTextBlock}" Text="{DynamicResource Actress_ShoeSize}" />
+                        <TextBox Style="{StaticResource ActorTextBox}" Text="{Binding CurrentActorInfo.ShoeSize, Mode=TwoWay}" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal">

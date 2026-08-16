@@ -16,7 +16,7 @@
     Icon="pack://application:,,,/Resources/Jvedio.ico"
     SizeToContent="Height"
     WindowStartupLocation="CenterScreen"
-    mc:Ignorable="d">
+    mc:Ignorable="d" FontSize="{DynamicResource GlobalFontSize}">
 
 
     <Grid>
@@ -46,7 +46,7 @@
                     BorderThickness="0"
                     CaretBrush="{DynamicResource Window.Foreground}"
                     ContextMenu="{StaticResource TextBoxContextMenu}"
-                    FontSize="15"
+                    FontSize="{DynamicResource GlobalFontSize15}"
                     Foreground="{DynamicResource Window.Foreground}"
                     GotFocus="AddMovieTextBox_GotFocus"
                     LostFocus="AddMovieTextBox_LostFocus"
@@ -81,26 +81,26 @@
                     <RadioButton
                         Content="{DynamicResource Normal}"
                         FocusVisualStyle="{x:Null}"
-                        FontSize="15"
+                        FontSize="{DynamicResource GlobalFontSize15}"
                         Foreground="{DynamicResource Window.Foreground}"
                         IsChecked="True"
                         Style="{StaticResource FlatRoundRadioButton}" />
                     <RadioButton
                         Content="{DynamicResource Uncensored}"
                         FocusVisualStyle="{x:Null}"
-                        FontSize="15"
+                        FontSize="{DynamicResource GlobalFontSize15}"
                         Foreground="{DynamicResource Window.Foreground}"
                         Style="{StaticResource FlatRoundRadioButton}" />
                     <RadioButton
                         Content="{DynamicResource Censored}"
                         FocusVisualStyle="{x:Null}"
-                        FontSize="15"
+                        FontSize="{DynamicResource GlobalFontSize15}"
                         Foreground="{DynamicResource Window.Foreground}"
                         Style="{StaticResource FlatRoundRadioButton}" />
                     <RadioButton
                         Content="{DynamicResource Europe}"
                         FocusVisualStyle="{x:Null}"
-                        FontSize="15"
+                        FontSize="{DynamicResource GlobalFontSize15}"
                         Foreground="{DynamicResource Window.Foreground}"
                         Style="{StaticResource FlatRoundRadioButton}" />
                 </StackPanel>
