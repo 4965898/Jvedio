@@ -607,6 +607,20 @@ SQL 全部改为 `LEFT JOIN` + `IsNull` 判定，不再混用 `INNER JOIN` + 取
 
 **验证**：修补后 DLL 用 `snos-401.txt` 实测返回 12 个字段，Director/Rating 均在；评分归一逻辑（"86"→4.3、五分制"4.3"不受影响）经独立用例验证。Jvedio 侧改动待重建 exe 后实测。
 
+### 3.38 补全「发行商」字段 + 在线观看按钮排序（2026-08-17，发布 5.4.1.18 / Jvedio29.26）
+
+**需求**：JavDB/JavBus 详情页都把影片分为「片商/製作商」与「发行商/發行商」，本软件此前只有单一「制作（Studio）」字段，缺少发行商；另要求详情页在线观看按钮把 JavDB、JavBus、JAVLib 置顶、MISSAV 第四。
+
+**实现**：
+- **发行商（Publisher）字段补全**：
+  - 数据层早已支持（`metadata_video.Publisher` 列 + `VideoMapper.SelectFields` + `Video.Publisher` 属性），缺的只是 UI 与爬虫填充。
+  - UI 三处：详情页 [Window_Details.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Details.xaml) 在「制作」行下新增「发行商」只读行（`{DynamicResource Publisher}`）；编辑页 [Window_Edit.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Edit.xaml) 在制作商行下新增可编辑 SearchBox（绑定 `CurrentVideo.Publisher`）；三语 i18n 新增 `Publisher` 键（发行商 / Publisher / 発売元）。
+  - 爬虫：Bus2（JavBus）[Class1.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Crawler/Bus2/BusCrawler/Class1.cs) 新增 `發行商 → result["Publisher"]` 解析分支（重新编译 `BusCrawler.dll`）。
+  - **遗留**：db（JavDB）的 `DBCrawler.dll` 是二进制插件，无法用补丁增加「發行商」解析逻辑，需照 Bus2 模式重写为源码后才能自动填充；当前 db 的发行商只能手工编辑（已与用户确认先测试当前版本，重写列为后续项）。
+- **在线观看按钮排序**：[OnlineSites.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Crawler/OnlineSites.cs) 的 `Sites` 列表重排：JavDB → JavBus → JAVLib → MISSAV → FANZA 動画 → …（其余 23 个保持原序）；右键菜单与详情页共用该列表，自动生效。
+
+**验证**：Release 编译通过（BuildTools + ReferenceAssemblies.net472 + LangVersion=9.0），版本号 5.4.1.17→5.4.1.18；部署 `E:\Jvedio-5.3.1\Jvedio29.26.exe`；`BusCrawler.dll` 重新编译待 Jvedio 关闭后替换 `plugins/crawlers/bus/`。
+
 ---
 
 ## 四、踩坑经验（重点）

@@ -74,4 +74,5 @@
     <sys:String x:Key="ExportLibraryAllNfo">Export All Videos in This Library as NFO</sys:String>
     <sys:String x:Key="SelectOutputFolder">Select NFO Output Folder</sys:String>
     <sys:String x:Key="AgeUnit">yrs</sys:String>
+    <sys:String x:Key="Publisher">Publisher</sys:String>
 </ResourceDictionary>

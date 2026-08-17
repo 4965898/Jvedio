@@ -83,6 +83,23 @@ namespace Jvedio.Core.Crawler
 
         public static List<OnlineSite> Sites { get; } = new List<OnlineSite>() {
             new OnlineSite() {
+                Name = "JavDB",
+                UrlTemplate = "https://javdb.com/search?q={{code}}",
+            },
+            new OnlineSite() {
+                Name = "JavBus",
+                UrlTemplate = "https://javbus.com/{{code}}",
+                CodeFormatter = JavBusFormat,
+            },
+            new OnlineSite() {
+                Name = "JAVLib",
+                UrlTemplate = "https://www.javlibrary.com/cn/vl_searchbyid.php?keyword={{code}}",
+            },
+            new OnlineSite() {
+                Name = "MISSAV",
+                UrlTemplate = "https://missav.ws/{{code}}/",
+            },
+            new OnlineSite() {
                 Name = "FANZA 動画",
                 UrlTemplate = "https://www.dmm.co.jp/digital/videoa/-/detail/=/cid={{code}}/",
                 CodeFormatter = FanzaFormat,
@@ -90,10 +107,6 @@ namespace Jvedio.Core.Crawler
             new OnlineSite() {
                 Name = "Jable",
                 UrlTemplate = "https://jable.tv/videos/{{code}}/",
-            },
-            new OnlineSite() {
-                Name = "MISSAV",
-                UrlTemplate = "https://missav.ws/{{code}}/",
             },
             new OnlineSite() {
                 Name = "123av",
@@ -178,19 +191,6 @@ namespace Jvedio.Core.Crawler
             new OnlineSite() {
                 Name = "javhub",
                 UrlTemplate = "https://javhub.net/search/{{code}}",
-            },
-            new OnlineSite() {
-                Name = "JavBus",
-                UrlTemplate = "https://javbus.com/{{code}}",
-                CodeFormatter = JavBusFormat,
-            },
-            new OnlineSite() {
-                Name = "JavDB",
-                UrlTemplate = "https://javdb.com/search?q={{code}}",
-            },
-            new OnlineSite() {
-                Name = "JAVLib",
-                UrlTemplate = "https://www.javlibrary.com/cn/vl_searchbyid.php?keyword={{code}}",
             },
         };
     }

@@ -105,6 +105,11 @@ namespace BusCrawler
                         var a = node.SelectSingleNode("a");
                         if (a != null) result["Studio"] = a.InnerText?.Trim();
                     }
+                    else if (text.Contains("發行商"))
+                    {
+                        var a = node.SelectSingleNode("a");
+                        if (a != null) result["Publisher"] = a.InnerText?.Trim();
+                    }
                     else if (text.Contains("系列"))
                     {
                         var a = node.SelectSingleNode("a");

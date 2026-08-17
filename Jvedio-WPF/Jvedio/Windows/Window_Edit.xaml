@@ -529,6 +529,11 @@
                                     <super:SearchBox Margin="5" Text="{Binding CurrentVideo.Studio, Mode=TwoWay}" />
                                 </DockPanel>
 
+                                <DockPanel>
+                                    <Label Content="{DynamicResource Publisher}" Style="{StaticResource BaseInfoLabel}" />
+                                    <super:SearchBox Margin="5" Text="{Binding CurrentVideo.Publisher, Mode=TwoWay}" />
+                                </DockPanel>
+
 
                                 <DockPanel>
                                     <Label Content="{DynamicResource Country}" Style="{StaticResource BaseInfoLabel}" />

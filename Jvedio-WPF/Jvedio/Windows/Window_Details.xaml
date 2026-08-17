@@ -1075,6 +1075,21 @@
                                                     </Border>
                                                 </StackPanel>
 
+                                                <StackPanel Style="{StaticResource InfoStackPanel}" Tag="{Binding CurrentVideo.Publisher}">
+                                                    <TextBlock Style="{StaticResource BaseTextBlock}" Text="{DynamicResource Publisher}" />
+                                                    <TextBlock Style="{StaticResource BaseTextBlock}" Text="：" />
+                                                    <Border
+                                                        MaxWidth="250"
+                                                        Margin="2"
+                                                        Style="{StaticResource HoverBorder}">
+                                                        <TextBlock
+                                                            Style="{StaticResource BaseTextBlock}"
+                                                            Text="{Binding CurrentVideo.Publisher}"
+                                                            TextTrimming="WordEllipsis"
+                                                            TextWrapping="NoWrap" />
+                                                    </Border>
+                                                </StackPanel>
+
 
 
                                                 <!--  类别  -->
