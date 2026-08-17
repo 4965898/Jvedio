@@ -589,6 +589,24 @@ SQL 全部改为 `LEFT JOIN` + `IsNull` 判定，不再混用 `INNER JOIN` + 取
 
 **验证**：Release 编译通过；部署 `E:\Jvedio-5.3.1\Jvedio29.25.exe`（v5.4.1.17）。
 
+### 3.37 db（JavDB）刮削器：导演/评分字段无法刮削（2026-08-17）
+
+**现象**（用户反馈）：使用 db（JavDB，非豆瓣）刮削器同步影片信息，标题/演员/类别/图片等都正常，唯独**导演（Director）与评分（Rating）字段为空**。
+
+**根因**（两个独立 bug 叠加，分别定位）：
+
+1. **导演——`DBCrawler.dll` 解析标签写错**：用 IL 反编译 `plugins/crawlers/db/DBCrawler.dll`（`Jvedio.Crawler.DBCrawler.<Parse>d__14.MoveNext`）发现，导演信息行分支匹配的标签字符串是 **`賣家`**，而 JavDB 当前详情页该行标签是 **`導演`**（实测样本 `snos-401.txt`：`<strong>導演:</strong>`）→ `IndexOf("賣家")` 永远 -1 → 导演分支永不触发 → `Info["Director"]` 从未被爬虫写入。
+2. **评分——`Video.ParseDictInfo` 不支持 float**：DBCrawler 其实**有**返回 `Rating`，但 [Video.cs:717](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Entity/Data/Video.cs#L717) 的 `ParseDictInfo` 反射赋值只处理 `string`/`int` 两种属性类型，而 `MetaData.Rating` 是 **`float`** → 命中不了任何分支 → 评分被静默丢弃。
+
+**修复**：
+
+- **DBCrawler.dll 二进制修补**（导演）：把 #US 堆中 `賣家`（UTF-16 `E3 8C B6 5B`）字节原位替换为 `導演`（`0E 5C 14 6F`，等长 4 字节、不改文件结构）。部署目录 `E:\Jvedio-5.3.1\plugins\crawlers\db\DBCrawler.dll` 与根目录副本已修补，原文件备份为 `.orig`。用保存的详情页 HTML 直接调 `Parse()` 实测：Director 由缺失 → 正常返回 `ヒモパン・オブ・ジョイトイ`。
+- **[Video.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Entity/Data/Video.cs) `ParseDictInfo` 增加数值类型分支 + 评分五分制归一**：在原有 `string`/`int` 之后补 `long`/`float`/`double` 三个 `TryParse` 分支；并对 `Rating` 属性做 `>10 → /20` 归一（JavDB 详情页是 5 分制，DBCrawler 却按 `Math.Ceiling(5分制×20)` 存成百分制整数，如 4.27→86；Jvedio 库表注释为满分 5 分，故 86 入库前 /20 还原为 4.3）。
+
+**注意**：二进制补丁只对当前这份 `DBCrawler.dll` 生效，但原仓库（hitchao/Jvedio）已归档、插件不会再更新，此补丁可长期使用；若重新下载插件副本需重打。
+
+**验证**：修补后 DLL 用 `snos-401.txt` 实测返回 12 个字段，Director/Rating 均在；评分归一逻辑（"86"→4.3、五分制"4.3"不受影响）经独立用例验证。Jvedio 侧改动待重建 exe 后实测。
+
 ---
 
 ## 四、踩坑经验（重点）

@@ -732,6 +732,19 @@ namespace Jvedio.Entity
                         } else if (info.PropertyType == typeof(int)) {
                             int.TryParse(str, out int val);
                             info.SetValue(this, val);
+                        } else if (info.PropertyType == typeof(long)) {
+                            long.TryParse(str, out long val);
+                            info.SetValue(this, val);
+                        } else if (info.PropertyType == typeof(float)) {
+                            float.TryParse(str, out float val);
+                            // db(JavDB) 爬虫按百分制返回（Math.Ceiling(5分制*20)），
+                            // Jvedio 库表注释为满分 5 分；值 >10 视为百分制做 /20 归一（不影响未来五分制爬虫）
+                            if (info.Name == "Rating" && val > 10f)
+                                val /= 20f;
+                            info.SetValue(this, val);
+                        } else if (info.PropertyType == typeof(double)) {
+                            double.TryParse(str, out double val);
+                            info.SetValue(this, val);
                         }
                     }
                 }
