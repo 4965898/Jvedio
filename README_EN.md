@@ -92,6 +92,7 @@ Users : [User Guide](https://github.com/hitchao/Jvedio/wiki/02_Beginning)
 | 5.4.1.15 (Jvedio29.23) | 2026-08-17 | Settings > Display: follow system DPI + UI font-scale slider |
 | 5.4.1.16 (Jvedio29.24) | 2026-08-17 | Fix Settings page crash (DpiConfig static binding namespace prefix) |
 | 5.4.1.17 (Jvedio29.25) | 2026-08-17 | Font slider now covers all hardcoded font sizes (12/13/14/15, 89 spots) - sidebar and all UI text scale with it |
+| 5.4.1.18 (Jvedio29.26) | 2026-08-17 | Fix db (JavDB) scraper not scraping director/rating (director label fix + ParseDictInfo float support + 5-point rating normalization); add Publisher field (details/edit pages + trilingual; JavBus parses 發行商); fix "two Publishers" display bug (SuperControls mistranslated the Studio key as "Publisher", now overridden to Studio); online-watch button ordering (JavDB/JavBus/JAVLib first, MISSAV 4th) |
 
 
 # Software Characteristics
