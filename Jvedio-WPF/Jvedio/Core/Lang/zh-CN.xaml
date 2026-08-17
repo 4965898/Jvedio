@@ -80,4 +80,5 @@
     <sys:String x:Key="SelectOutputFolder">选择 NFO 输出文件夹</sys:String>
     <sys:String x:Key="AgeUnit">岁</sys:String>
     <sys:String x:Key="Publisher">发行商</sys:String>
+    <sys:String x:Key="Studio">制作商</sys:String>
 </ResourceDictionary>

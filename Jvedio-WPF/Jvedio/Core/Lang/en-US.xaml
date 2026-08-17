@@ -75,4 +75,5 @@
     <sys:String x:Key="SelectOutputFolder">Select NFO Output Folder</sys:String>
     <sys:String x:Key="AgeUnit">yrs</sys:String>
     <sys:String x:Key="Publisher">Publisher</sys:String>
+    <sys:String x:Key="Studio">Studio</sys:String>
 </ResourceDictionary>

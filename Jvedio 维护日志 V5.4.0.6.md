@@ -621,6 +621,8 @@ SQL 全部改为 `LEFT JOIN` + `IsNull` 判定，不再混用 `INNER JOIN` + 取
 
 **验证**：Release 编译通过（BuildTools + ReferenceAssemblies.net472 + LangVersion=9.0），版本号 5.4.1.17→5.4.1.18；部署 `E:\Jvedio-5.3.1\Jvedio29.26.exe`；`BusCrawler.dll` 重新编译待 Jvedio 关闭后替换 `plugins/crawlers/bus/`。
 
+> **3.38 追加修复（同日）**：用户实测新 exe 发现「原本的制作/片商没了，反而出现两个发行商」。**根因**：SuperControls.Style 的 `Lang/zh-CN.xaml` 里把 `Studio` 键误译为 **「发行商」**（用运行时合并字典实测：`Made=制作`、`Studio=发行商`、`Publisher=发行商`），编辑页/侧边栏/筛选/设置等处 `{DynamicResource Studio}` 全部错显「发行商」，叠加我新增的发行商行 → 两个「发行商」。**修复**：在 Jvedio 三语 Lang 文件里覆盖 `Studio` 键为「制作商 / Studio / メーカー」（合并顺序 Jvedio 在 SuperControls 之后，优先级更高，实测 `Studio=制作商`），一处修复即纠正全部用到 Studio 键的界面；另在仓库内用独立 WPF 测试程序按 App.xaml 真实合并顺序校验键值，杜绝靠猜。
+
 ---
 
 ## 四、踩坑经验（重点）

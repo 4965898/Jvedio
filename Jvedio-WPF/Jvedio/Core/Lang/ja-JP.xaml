@@ -65,4 +65,5 @@
     <sys:String x:Key="SelectOutputFolder">NFO 出力フォルダを選択</sys:String>
     <sys:String x:Key="AgeUnit">歳</sys:String>
     <sys:String x:Key="Publisher">発売元</sys:String>
+    <sys:String x:Key="Studio">メーカー</sys:String>
 </ResourceDictionary>
