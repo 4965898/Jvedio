@@ -426,6 +426,7 @@
     <Compile Include="Utils\Extern\JvedioLib.cs" />
     <Compile Include="Core\Tasks\DownloadManager.cs" />
     <Compile Include="Core\Tasks\ImageIndexManager.cs" />
+    <Compile Include="Core\Tasks\DataIndexManager.cs" />
     <Compile Include="Core\Translation\TranslateManager.cs" />
     <Compile Include="Mapper\Common\AssociationMapper.cs" />
     <Compile Include="Mapper\Common\ActorMapper.cs" />

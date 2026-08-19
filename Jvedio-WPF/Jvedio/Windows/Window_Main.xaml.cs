@@ -5,6 +5,7 @@ using Jvedio.Core.Media;
 using Jvedio.Core.Plugins.Crawler;
 using Jvedio.Core.Scan;
 using Jvedio.Core.Server;
+using DataIndexManager = Jvedio.Core.Tasks.DataIndexManager;
 using Jvedio.Core.UserControls;
 using Jvedio.Entity;
 using Jvedio.Entity.Common;
@@ -161,6 +162,11 @@ namespace Jvedio
             CheckServerStatus();
             InitAvalonEdit();
             InitSideMenu();
+
+            // 启动即后台静默重建一次资源存在性（可播放）索引：
+            // 覆盖上次会话期间外部新增/删除的本地文件（无需用户手动点「建立资源存在索引」）
+            if (ConfigManager.ScanConfig.DataExistsIndexAfterScan)
+                DataIndexManager.RebuildSilently();
         }
 
         public void InitSideMenu()
@@ -805,6 +811,10 @@ namespace Jvedio
                     if (ConfigManager.FFmpegConfig.ScreenShotAfterImport) {
                         ScreenShotAfterImport(insertVideos);
                     }
+
+                    // 扫描后后台静默重建资源存在性（可播放）索引，避免「不可播放」筛选残留过期结果
+                    if (ConfigManager.ScanConfig.DataExistsIndexAfterScan)
+                        DataIndexManager.RebuildSilently();
                 });
             }
             scanTask.Running = false;
@@ -832,6 +842,9 @@ namespace Jvedio
                 LoadAll();
             if (ConfigManager.FFmpegConfig.ScreenShotAfterImport)
                 ScreenShotAfterImport(insertVideos);
+            // 启动静默扫描完成后同样后台重建资源存在性索引
+            if (ConfigManager.ScanConfig.DataExistsIndexAfterScan)
+                DataIndexManager.RebuildSilently();
         }
 
         private void OnDragFileOver(object sender, DragEventArgs e)

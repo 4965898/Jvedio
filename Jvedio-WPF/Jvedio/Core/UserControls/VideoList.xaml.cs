@@ -5,6 +5,7 @@ using Jvedio.Core.FFmpeg;
 using Jvedio.Core.Global;
 using Jvedio.Core.Media;
 using Jvedio.Core.Net;
+using DataIndexManager = Jvedio.Core.Tasks.DataIndexManager;
 using Jvedio.Core.UserControls.ViewModels;
 using Jvedio.Entity;
 using Jvedio.Entity.Common;
@@ -716,6 +717,9 @@ namespace Jvedio.Core.UserControls
                 List<Video> temp = vieModel.SelectedVideo.ToList();
                 DeleteIDs(GetVideosByMenu(sender as MenuItem, 0), vieModel.SelectedVideo, false);
                 onDeleteID?.Invoke(temp);
+            } else if (num > 0) {
+                // 保留记录时同步更新可播放索引，避免「不可播放」筛选残留过期结果
+                DataIndexManager.MarkPathMissing(vieModel.SelectedVideo.Select(v => v.DataID).ToArray());
             }
 
             MessageNotify.Info($"{SuperControls.Style.LangManager.GetValueByKey("Message_DeleteToRecycleBin")} {num}/{totalCount}");
@@ -912,7 +916,9 @@ namespace Jvedio.Core.UserControls
                 }
             }
 
-
+            // 文件已移动/重命名到新路径，同步更新可播放索引
+            if (dict.Count > 0)
+                DataIndexManager.MarkPathExists(dict.Keys.ToArray());
         }
 
 

@@ -616,7 +616,7 @@ SQL 全部改为 `LEFT JOIN` + `IsNull` 判定，不再混用 `INNER JOIN` + 取
   - 数据层早已支持（`metadata_video.Publisher` 列 + `VideoMapper.SelectFields` + `Video.Publisher` 属性），缺的只是 UI 与爬虫填充。
   - UI 三处：详情页 [Window_Details.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Details.xaml) 在「制作」行下新增「发行商」只读行（`{DynamicResource Publisher}`）；编辑页 [Window_Edit.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Edit.xaml) 在制作商行下新增可编辑 SearchBox（绑定 `CurrentVideo.Publisher`）；三语 i18n 新增 `Publisher` 键（发行商 / Publisher / 発売元）。
   - 爬虫：Bus2（JavBus）[Class1.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Crawler/Bus2/BusCrawler/Class1.cs) 新增 `發行商 → result["Publisher"]` 解析分支（重新编译 `BusCrawler.dll`）。
-  - **遗留**：db（JavDB）的 `DBCrawler.dll` 是二进制插件，无法用补丁增加「發行商」解析逻辑，需照 Bus2 模式重写为源码后才能自动填充；当前 db 的发行商只能手工编辑（已与用户确认先测试当前版本，重写列为后续项）。
+  - **遗留（2026-08-19 已解决，见 3.40）**：db（JavDB）的 `DBCrawler.dll` 原为二进制插件，无法用补丁增加「發行商」解析逻辑；已照 Bus2 模式反编译还原为源码重建（`Core/Crawler/Db2/DbCrawler/`）并新增「發行」→ Publisher 解析，部署新 `DBCrawler.dll`，db 发行商现在可以自动刮削。
 - **在线观看按钮排序**：[OnlineSites.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Crawler/OnlineSites.cs) 的 `Sites` 列表重排：JavDB → JavBus → JAVLib → MISSAV → FANZA 動画 → …（其余 23 个保持原序）；右键菜单与详情页共用该列表，自动生效。
 
 **验证**：Release 编译通过（BuildTools + ReferenceAssemblies.net472 + LangVersion=9.0），版本号 5.4.1.17→5.4.1.18；部署 `E:\Jvedio-5.3.1\Jvedio29.26.exe`；`BusCrawler.dll` 重新编译待 Jvedio 关闭后替换 `plugins/crawlers/bus/`。
@@ -624,6 +624,46 @@ SQL 全部改为 `LEFT JOIN` + `IsNull` 判定，不再混用 `INNER JOIN` + 取
 > **3.38 追加修复（同日）**：用户实测新 exe 发现「原本的制作/片商没了，反而出现两个发行商」。**根因**：SuperControls.Style 的 `Lang/zh-CN.xaml` 里把 `Studio` 键误译为 **「发行商」**（用运行时合并字典实测：`Made=制作`、`Studio=发行商`、`Publisher=发行商`），编辑页/侧边栏/筛选/设置等处 `{DynamicResource Studio}` 全部错显「发行商」，叠加我新增的发行商行 → 两个「发行商」。**修复**：在 Jvedio 三语 Lang 文件里覆盖 `Studio` 键为「制作商 / Studio / メーカー」（合并顺序 Jvedio 在 SuperControls 之后，优先级更高，实测 `Studio=制作商`），一处修复即纠正全部用到 Studio 键的界面；另在仓库内用独立 WPF 测试程序按 App.xaml 真实合并顺序校验键值，杜绝靠猜。
 
 ---
+
+### 3.39 可播放索引自动维护（DataIndexManager，2026-08-19，版本 5.4.1.19 / Jvedio29.27）
+
+**现象**：筛选器「可播放/不可播放」残留过期结果——影片已下载/放入本地 MP4 文件（对应库内记录的 `Path` 已存在），点「不可播放」仍被筛出来；只有手动到「选项-库」点「建立资源存在索引」才能恢复正确，用户猜测是「影片索引信息更新不及时」。
+
+**根因**：`可播放`筛选读的是 `metadata.PathExist`（0=不可播放/文件不存在，1=可播放/文件存在），该列**只有两条写入路径**：①扫描导入/更新时对「命中」的影片写 1；②手动「建立资源存在索引」全量重建。因此：
+- 影片的本地文件**已经存在但路径与库内记录一致**时，扫描会把它判为「同路径同大小」的 NotImport（去重分支），**不会**回写 `PathExist`——文件明明在，索引仍是 0；
+- 下载文件后**没有重跑扫描/重建索引**时，索引自然过期。
+- 配置里 `ScanConfig.DataExistsIndexAfterScan`（默认 true，设置页「扫描后重建资源存在索引」）是**死代码**：从未有任何逻辑读取它去触发重建。
+
+**修复**（新增 [DataIndexManager.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Tasks/DataIndexManager.cs)，仿 ImageIndexManager 单飞模式）：
+- **启动即静默重建**（[Window_Main.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Main.xaml.cs) `Window_ContentRendered`）：进入库后后台重建一次 `PathExist`，覆盖上次会话期间外部新增/删除的本地文件，升级后无需手动重建即可看到正确筛选结果。
+- **扫描后全量静默重建**：手动扫描（`ScanComplete`）与启动后台扫描（`OnBackgroundScanComplete`）完成后，若 `DataExistsIndexAfterScan` 为 true → `DataIndexManager.RebuildSilently()` 后台重建 `PathExist`（逻辑与手动按钮完全一致：先全部置 1，再把 `File.Exists(Path)` 为假的置 0），**顺手激活了原本的死配置**。
+- **增量更新**（文件系统变化即时同步，无需等扫描）：
+  - 删除文件（保留记录时，[VideoList.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/VideoList.xaml.cs) `DeleteFile`）→ `MarkPathMissing(DataID…)` 置 0；
+  - 移动/重命名文件（`UpdateVideo`）→ `MarkPathExists(DataID…)` 置 1；
+  - 编辑页修改本地路径（[VieModel_Edit.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/ViewModels/VieModel_Edit.cs) `Save`）→ 按新路径是否 `File.Exists` 置 1/0。
+- 单飞防并发：`_Rebuilding` 标志 + `_PendingRebuild` 合并，重建期间再次请求只记 pending、完成后自动补跑；失败仅 `Logger.Error`，绝不打断扫描/启动主流程。
+
+> **3.39 追加修复（同日，用户实测反馈）**：升级后点击「不可播放」筛选 / 打开详情页出现严重卡顿甚至 `database is locked` 闪退。**根因**：`RebuildOnce` 用 `metaDataMapper.SelectList()` 把整表映射成 `MetaData` 实体（Genre/Label 等 setter 为每行建 ObservableCollection，4 万行映射极重、长时间占 Mapper 锁），再拼 `begin;update metadata set PathExist=1;{4万条 update};commit;` 巨型单事务——启动重建与主界面查询/详情页回写撞锁，busy_timeout 耗尽即报 `database is locked`。**修复**：①查询改为 `select DataID, Path` 两列原始数据（`metaDataMapper.Select(string)`），不做实体映射；②更新改为**分块小事务**（每 500 行一条 `update ... where DataID in (...)`，`UpdateChunked`），单条事务毫秒级、写锁短暂持有，与其他读写交错进行，彻底消除长锁。验证：Release 编译通过并重新部署 `E:\Jvedio-5.3.1\Jvedio29.27.exe`。**教训**：后台全量任务必须「轻量查询（只取所需列、避免实体映射）+ 分块事务」，任何「整表映射 + 巨型单事务」放在启动/后台都是锁冲突与卡顿的温床。
+
+**验证**：Release 编译通过（BuildTools + ReferenceAssemblies.net472 + LangVersion=9.0），版本号 5.4.1.18→5.4.1.19。
+
+**经验**：全局索引的时效性要「事件驱动 + 单飞后台重建 + 增量修正」三管齐下；新增配置项时先确认它有没有被真正消费（`DataExistsIndexAfterScan` 挂了 N 个版本从没被读过）；筛选类功能若基于缓存列，凡是能让磁盘状态变化的操作（扫描/删除/移动/改路径）都必须在完成回调里同步该列，只靠「用户手动重建」迟早踩坑。
+
+---
+
+### 3.40 DB（JavDB）爬虫补齐「发行商（Publisher）」字段（2026-08-19）
+
+**现象**：用户用 DB（javdb）刮削 SSNI-560 时导演字段正常，但发行商刮不到（此前 3.38 已列为遗留：DBCrawler.dll 是二进制插件，无法补丁加「發行商」解析）。
+
+**根因**：`DBCrawler.dll`（二进制插件）的 `Parse()` 只解析了 日期/時長/導演/評分/類別/片商/系列/演員，**从没有「發行」→ Publisher 分支**——所以导演能刮到、发行商永远缺失（数据层 `Video.Publisher` 早已支持，缺的是爬虫侧返回该键）。
+
+**修复**（照 Bus2 模式把二进制插件还原为源码重建）：
+- 用 ilspycmd 反编译 `DBCrawler.dll` 得到完整源码（含搜索拿 DataCode、磁力解析、FC2 处理、图片/演员/类别等全部逻辑）。
+- 新建源码工程 [Db2/DbCrawler](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Crawler/Db2/DbCrawler/DbCrawler.csproj)（`AssemblyName=DBCrawler`，类型仍是 `Jvedio.Crawler.DBCrawler`，与插件加载器兼容），**保留原全部逻辑**，在 `Parse()` 的「片商」与「系列」之间新增 `else if (infoNode.InnerText.IndexOf("發行") >= 0)` → `Info.Add("Publisher", …)`（JavDB 页面发行商字段标签为「發行」，链接 `/publishers/`）。
+- 编译出新的 `DBCrawler.dll`，部署 `E:\Jvedio-5.3.1\plugins\crawlers\db\DBCrawler.dll`（旧二进制备份为 `DBCrawler.dll.bak-pre-publisher`），并归档 `build-output\DBCrawler.dll`。
+- **验证**：写独立 net472 测试程序加载新 DLL，用用户保存的真实 `SSNI-560.html` 反射调用 `Parse()`——`Publisher = S1 NO.1 STYLE` 正确刮出，导演/片商/日期/时长/系列/评分/类别/演员全部正常。依赖校验：新 DLL 引用的 `CommonNet.dll` 与部署目录 SHA1 一致。
+
+**经验**：遇到「二进制插件缺字段」时，「反编译还原为源码 + 最小增量改 + 重编译」比二进制补丁安全得多——既有二进制补丁只改字符串标签，加新字段/新逻辑几乎不可行；反编译后先用独立测试程序以真实页面样本验证，再替换部署，避免动线上插件零验证。
 
 ## 四、踩坑经验（重点）
 
@@ -806,6 +846,7 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 | 中 | 部分新文案硬编码未走 `DynamicResource` | 统一走资源字典 |
 | 中 | `SyncConcurrency` 无范围校验 | 加 `Min=1, Max=10` 校验，防用户填 0 或过大被封 |
 | ~~已实现~~ | ~~刮削获得海报/缩略图后，`common_picture_exist` 索引不及时~~ | ✅ 已实现（2026-08-10，见 3.10）：`Core/Tasks/ImageIndexManager.cs` 静默累计刮削/截图成功数，达阈值（`Settings.AutoRebuildImageIndexCount`，默认 10，选项-库可改，0=关闭）后在后台整库重建图片索引，单飞防并发 + 阈值防抖，失败仅记日志 |
+| ~~已实现~~ | ~~「可播放/不可播放」筛选残留过期结果（下载本地文件后仍被判不可播放，须手动重建索引）~~ | ✅ 已实现（2026-08-19，见 3.39）：`Core/Tasks/DataIndexManager.cs` 扫描完成后后台静默重建 `metadata.PathExist`（受 `DataExistsIndexAfterScan` 开关控制，默认开），删除/移动/改路径时增量同步，无需手动点「建立资源存在索引」 |
 | ~~已实现~~ | ~~启动时索引「库关联目录」耗几秒~十几秒，阻塞进入主界面~~ | ✅ 已实现（2026-08-10，见 3.11）：`WindowStartUp.LoadDataBase` 不再 `while` 等待，扫描任务注册进 `App.ScanManager` 后台运行，主窗口立即打开；完成后回调静默刷新统计/加载；右下角扫描按钮状态圈：运行中=旋转高亮圆圈，完成=绿圈白勾 |
 | ~~已实现~~ | ~~原仓库 issues 中可修的 bug 与紧迫功能~~ | ✅ 已批量实现（2026-08-16，见 3.27，发布 5.4.1.8/Jvedio29.16）：头像拉伸（#436）、右键菜单方向（#398）、名称排序（#437/#362）、URL 双前缀（#421/#371）、uniqueid（#425）、NFO 兜底（#415/#381）、-U/-UC 标记（#424）、页码记忆（#430/#241）、NFO Kodi 导出（#429/#388）、头像独立目录（#445/#338/#270）、CSV 导出（#346/#212）、ISO/.strm（#401/#200） |
 | 低 | `bus-fixed` 示例目录为空 | 删除或补上修复后的 main.json |
@@ -844,6 +885,7 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 | 视频列表 | [VideoList.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/VideoList.xaml)、[VideoList.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/VideoList.xaml.cs) |
 | 图片缓存 | [ImageCache.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Media/ImageCache.cs)、[MetaData.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Entity/Data/MetaData.cs)（默认图 Freeze） |
 | 图片索引重建 | [ImageIndexManager.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Tasks/ImageIndexManager.cs) |
+| 可播放索引维护 | [DataIndexManager.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Tasks/DataIndexManager.cs)、[Window_Main.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Main.xaml.cs)（扫描后重建）、[VideoList.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/VideoList.xaml.cs)（删除/移动）、[VieModel_Edit.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/ViewModels/VieModel_Edit.cs)（改路径） |
 | 后台扫描/状态圈 | [WindowStartUp.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/WindowStartUp.xaml.cs)、[Window_Main.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Main.xaml)（扫描状态圈）、[Window_Main.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Main.xaml.cs)（OnBackgroundScanComplete） |
 | 关联数据 | [AssociationMapper.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Mapper/Common/AssociationMapper.cs)、[VieModel_SearchAsso.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Dialog/VieModels/VieModel_SearchAsso.cs) |
 | 标签戳 | [TagStamp.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Entity/CommonSQL/TagStamp.cs)、[Video.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Entity/Data/Video.cs)（SetTagStamps） |

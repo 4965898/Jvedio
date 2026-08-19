@@ -1,8 +1,11 @@
-﻿using Jvedio.Entity;
+﻿using Jvedio.Core.Tasks;
+using Jvedio.Entity;
 using SuperUtils.Framework.ORM.Utils;
 using SuperUtils.WPF.VieModel;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
@@ -275,6 +278,17 @@ namespace Jvedio.ViewModel
                 // 演员
                 MapperManager.videoMapper.SaveActor(CurrentVideo, ViewActors.ToList());
                 Logger.Info("save actors");
+
+                // 保存后同步资源存在性（可播放）索引：新路径存在则视为可播放
+                try {
+                    string path = CurrentVideo.Path;
+                    if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                        DataIndexManager.MarkPathExists(DataID);
+                    else
+                        DataIndexManager.MarkPathMissing(DataID);
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                }
 
                 return update1 > 0 & update2 > 0;
             });
