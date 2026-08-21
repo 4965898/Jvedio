@@ -115,12 +115,19 @@ namespace Jvedio
 
             vieModel = new VieModel_Details(this);
             vieModel.QueryCompleted += async delegate {
-                await LoadImage(vieModel.ShowScreenShot);
-                ShowMagnets();
-                ShowActor();
-                vieModel.GetLabels();
-                LoadOnlineJumpButtons();
-                vieModel.LoadingData = false;
+                // 必须 try/finally：LoadImage 等任一步骤异常/挂起都会让 LoadingData 卡死为 true，
+                // 导致左右箭头点击 vieModel.Load 直接 return（详情页"翻页无反应"的根因之一）
+                try {
+                    await LoadImage(vieModel.ShowScreenShot);
+                    ShowMagnets();
+                    ShowActor();
+                    vieModel.GetLabels();
+                    LoadOnlineJumpButtons();
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                } finally {
+                    vieModel.LoadingData = false;
+                }
             };
         }
 
@@ -243,9 +250,18 @@ namespace Jvedio
             if (vieModel.CurrentVideo != null && vieModel.CurrentVideo.TagStamp != null &&
                 vieModel.CurrentVideo.TagStamp.Any(arg => arg.TagID == TagStamp.TAG_ID_NEW_ADD)) {
                 string sql = $"delete from metadata_to_tagstamp where TagID='{TagStamp.TAG_ID_NEW_ADD}' and DataID='{DataID}'";
-                tagStampMapper.ExecuteNonQuery(sql);
+                // 写库放后台线程：翻译/刮削批量写库时（SQLite 写写互斥）UI 线程最多可被 busy_timeout 卡 30s，
+                // 表现为翻页按钮"点击无反应"
+                long dataID = DataID;
+                Task.Run(() => {
+                    try {
+                        tagStampMapper.ExecuteNonQuery(sql);
+                    } catch (Exception ex) {
+                        Logger.Error(ex);
+                    }
+                });
                 onRemoveTagStamp?.Invoke();
-                windowMain?.RefreshData(DataID);
+                windowMain?.RefreshData(dataID);
             }
         }
 
@@ -534,22 +550,10 @@ namespace Jvedio
 
         public void PreviousMovie(object sender, MouseButtonEventArgs e)
         {
-            if (DataIDs.Count == 0)
+            if (vieModel?.CurrentVideo == null)
                 return;
             CancelLoadImage = true;
-            long nextID = 0L;
-            for (int i = 0; i < DataIDs.Count; i++) {
-                long id = DataIDs[i];
-                int idx = i;
-                if (id == vieModel.CurrentVideo.DataID) {
-                    idx--;
-                    if (idx < 0)
-                        idx = DataIDs.Count - 1;
-                    nextID = DataIDs[idx];
-                    break;
-                }
-            }
-
+            long nextID = GetAdjacentDataID(false);
             if (nextID > 0) {
                 CancelLoadImage = false;
                 vieModel.Load(nextID);
@@ -560,29 +564,71 @@ namespace Jvedio
 
         public void NextMovie(object sender, MouseButtonEventArgs e)
         {
-            if (DataIDs.Count == 0)
+            if (vieModel?.CurrentVideo == null)
                 return;
             CancelLoadImage = true;
-
-            long nextID = 0L;
-            for (int i = 0; i < DataIDs.Count; i++) {
-                long id = DataIDs[i];
-                int idx = i;
-                if (id == vieModel.CurrentVideo.DataID) {
-                    idx++;
-                    if (idx >= DataIDs.Count)
-                        idx = 0;
-                    nextID = DataIDs[idx];
-                    break;
-                }
-            }
-
+            long nextID = GetAdjacentDataID(true);
             if (nextID > 0) {
                 CancelLoadImage = false;
                 vieModel.Load(nextID);
                 vieModel.SelectImageIndex = 0;
                 RemoveNewAddTag();
             }
+        }
+
+        /// <summary>
+        /// 取当前影片的上一部/下一部 DataID。
+        /// DataIDs 是打开详情页时的快照，列表被刷新/筛选/换页后会过期（当前影片不在其中），
+        /// 此时先重建一次；仍匹配不上则回退整库顺序，保证翻页按钮始终可用。
+        /// </summary>
+        private long GetAdjacentDataID(bool next)
+        {
+            if (vieModel?.CurrentVideo == null)
+                return 0;
+            long currentID = vieModel.CurrentVideo.DataID;
+            if (DataIDs.Count == 0)
+                InitDataIDs();
+            for (int round = 0; round < 2; round++) {
+                if (DataIDs.Count > 0) {
+                    int currentIdx = DataIDs.IndexOf(currentID);
+                    if (currentIdx >= 0) {
+                        int idx = next ? currentIdx + 1 : currentIdx - 1;
+                        if (idx < 0)
+                            idx = DataIDs.Count - 1;
+                        else if (idx >= DataIDs.Count)
+                            idx = 0;
+                        return DataIDs[idx];
+                    }
+                }
+                if (round == 0)
+                    InitDataIDs(); // 快照过期，重建一次
+            }
+            // 回退：整库顺序翻看（例如详情页打开时当前列表 wrapper 快照失效）
+            try {
+                List<long> all = GetAllDataIDs();
+                if (all != null && all.Count > 0) {
+                    int currentIdx = all.IndexOf(currentID);
+                    if (currentIdx >= 0) {
+                        int idx = next ? currentIdx + 1 : currentIdx - 1;
+                        if (idx < 0)
+                            idx = all.Count - 1;
+                        else if (idx >= all.Count)
+                            idx = 0;
+                        return all[idx];
+                    }
+                }
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+            return 0;
+        }
+
+        private List<long> GetAllDataIDs()
+        {
+            List<Dictionary<string, object>> list = videoMapper.Select("select metadata.DataID from metadata order by metadata.DataID");
+            if (list == null)
+                return new List<long>();
+            return list.Select(arg => long.Parse(arg["DataID"].ToString())).ToList();
         }
 
         public void OpenExtraImagePath(object sender, RoutedEventArgs e)
@@ -1089,7 +1135,9 @@ namespace Jvedio
 
 
             await Task.Run(async () => {
-                await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, (Action)delegate {
+                // 用 Normal 而非 Background：Background 优先级低于输入/渲染，
+                // 主窗口渲染/动画持续时会被饿死，导致 LoadImage 永不完成 → LoadingData 卡死 → 翻页无反应
+                await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Normal, (Action)delegate {
                     imageItemsControl.ItemsSource = video.PreviewImageList;
                     SetImage(0);
                 });
@@ -1118,8 +1166,8 @@ namespace Jvedio
 
             // 加载预览图/截图
             foreach (var path in imagePathList) {
-                await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new LoadExtraImageDelegate(LoadExtraImage), BitmapImageFromFile(path));
-                await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new LoadExtraPathDelegate(LoadExtraPath), path);
+                await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new LoadExtraImageDelegate(LoadExtraImage), BitmapImageFromFile(path));
+                await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Normal, new LoadExtraPathDelegate(LoadExtraPath), path);
                 if (CancelLoadImage)
                     break;
             }

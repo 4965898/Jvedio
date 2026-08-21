@@ -54,6 +54,15 @@
 | 5.4.1.15（Jvedio29.23） | 2026-08-17 | 选项-界面新增缩放设置：跟随系统缩放(PerMonitorV2) + 界面字号滑条（见 3.34） |
 | 5.4.1.16（Jvedio29.24） | 2026-08-17 | 修复设置页打开报错：DpiConfig 静态绑定命名空间前缀错误（见 3.35） |
 | 5.4.1.17（Jvedio29.25） | 2026-08-17 | 字号滑条覆盖全部硬编码字号（12/13/14/15，89 处）（见 3.36） |
+| 5.4.1.20（Jvedio29.28） | 2026-08-21 | 批量翻译修复（快照选中列表，杜绝「集合已修改」中断）+ 右下角新增翻译按钮（文+T 图标）+ 翻译任务页（取消所有/重启所有/清除列表，见 3.41） |
+| 5.4.1.21（Jvedio29.29） | 2026-08-21 | 移除翻译开始后的自动跳转翻译任务页（用户不希望在翻译时打断当前浏览），任务页改纯手动入口（右下角「文+T」按钮） |
+| 5.4.1.22（Jvedio29.30） | 2026-08-21 | 翻译图标重绘为翻译软件通用样式：「文/T」等大字号、中间斜杠分隔，颜色/背景与其他三个状态栏图标一致 |
+| 5.4.1.23（Jvedio29.31） | 2026-08-21 | 修复翻译中无法追加新批量：移除会话级 _Translating 防重入标志，翻译任务支持运行中添加（旧任务完成后自动接续，同同步信息模块），按 DataID 去重防重复翻译 |
+| 5.4.1.24（Jvedio29.32） | 2026-08-21 | 修复详情页左右翻页箭头失效（LoadingData 卡死 try/finally + Dispatcher 优先级饿死 + DataIDs 快照过期自愈 + 翻页写库移后台，见 3.42）；演员详情页名字旁新增一键复制按钮；翻译图标字号调小 |
+| 5.4.1.25（Jvedio29.33） | 2026-08-21 | 翻译图标字号 9 → 10（用户微调） |
+| 5.4.1.26（Jvedio29.34） | 2026-08-21 | 翻译图标改仿 Google Translate 布局：「文」左上角、「/」居中、「T」右下角，字号均调至 12 |
+| 5.4.1.27（Jvedio29.35） | 2026-08-21 | 翻译图标字号 12 → 10（12 时文/T 在 30x30 内重叠，维持 10） |
+| 5.4.1.28（Jvedio29.36） | 2026-08-21 | 撤销角落布局（10 号仍重叠）：翻译图标恢复横排「文/T」居中布局（v5.4.1.25 样式，10 号） |
 
 > 这些发布说明与本地 diff 吻合，可互相印证。5.4.0.5 的 Release Body 已于 2026-08-09 更新为「下载指引 + 相对原版 5.4 的改进总结 + 原记录」三段式，源码也已同步 commit（见 1.2、第五章）。
 
@@ -664,6 +673,60 @@ SQL 全部改为 `LEFT JOIN` + `IsNull` 判定，不再混用 `INNER JOIN` + 取
 - **验证**：写独立 net472 测试程序加载新 DLL，用用户保存的真实 `SSNI-560.html` 反射调用 `Parse()`——`Publisher = S1 NO.1 STYLE` 正确刮出，导演/片商/日期/时长/系列/评分/类别/演员全部正常。依赖校验：新 DLL 引用的 `CommonNet.dll` 与部署目录 SHA1 一致。
 
 **经验**：遇到「二进制插件缺字段」时，「反编译还原为源码 + 最小增量改 + 重编译」比二进制补丁安全得多——既有二进制补丁只改字符串标签，加新字段/新逻辑几乎不可行；反编译后先用独立测试程序以真实页面样本验证，再替换部署，避免动线上插件零验证。
+
+---
+
+### 3.41 批量翻译修复：集合已修改崩溃 + 翻译任务页（2026-08-21，开发中）
+
+**现象**（用户报告）：多选模式批量翻译标题时只翻译一两部就停止；单选与详情页正常。之前（3.33 之前）批量正常但单选无反应，修复单选后批量又坏。
+
+**根因**（运行日志实证，`E:\Jvedio-5.3.1\data\Daxoel\log\2026-08-21.log`）：
+```
+15:37:39.155 [I] 翻译标题 (微软翻译 (Bing)): 34     ← 批量开始
+15:37:43.416 [E] 集合已修改；可能无法执行枚举操作。   ← 仅 4 秒后（约第 2 部翻译完）
+```
+`VideoList.TranslateMovie` 用 `Task.Run` 在后台线程 `foreach (Video video in videos)` 枚举 **活的** `vieModel.SelectedVideo`（`List<Video>` 引用），而 UI 线程上任何对选中列表的修改（点击卡片切换选中、右键菜单 `HandleMenuSelected` 重新加入等）都会让枚举器抛 `InvalidOperationException`——被 try/catch 静默吞掉（只记日志），批量因此在前一两部后悄悄终止。单选恰好不会撞上改动窗口，所以看起来"单选正常批量坏"。
+
+**修复（任务化重构，两个新文件）**：
+- 新建 [TranslateTask.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Translation/TranslateTask.cs)：`AbstractTask` 子类，一部影片一个任务——翻译 `Title` → 写 `TitleCN`，成功置 `Result`（供列表刷新）、`RanToCompletion`；失败/取消置 `Canceled`，`StatusText` 显式覆盖（`FinalizeWithCancel` 会把 StatusText 重置为共享字典的英文 "Cancel"，必须事后补写）。`Equals/GetHashCode` 按 `DataID`（与 DownLoadTask/ScreenShotTask 同款，管理器按 DataID 去重）。
+- 新建 [TranslateTaskManager.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Tasks/TranslateTaskManager.cs)：`BaseManager` 子类，`TaskDispatcher<TranslateTask>` 串行执行（`TaskCount=1` 防限流、`TaskDelay=500` 沿用原防限流间隔），提供 `RestartAllFailed`（按 TASK_COUNT 分批重启取消任务，与 DownloadManager 同款）。
+- [VideoList.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/VideoList.xaml.cs) `TranslateMovie` 重构：**先 `videos.ToList()` 快照 + DataID 去重**（枚举只发生在 UI 线程点击瞬间，后台不再碰活列表——根除"集合已修改"），再逐部 `TranslateTaskManager.AddTask()` 入队；批量完成回调用 `HashSet<long>` 按 DataID 只计一次（**失败任务会同时触发 `onCanceled` 与 `onCompleted`，计数必须幂等**），完成后再 `BeginInvoke` 回 UI 刷新本页 `TitleCN` 显示；随后 `onOpenTranslateTask?.Invoke()` 自动切到翻译任务页。
+- [Window_Main.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Main.xaml) 状态栏（右下角下载/扫描/截图区）**截图按钮左边新增翻译按钮**：图标用汉字"文"+字母"T"（用户指定），hover 高亮同扫描按钮，运行中常亮提示；点击 `ShowTranslatePopup` 打开翻译任务页。
+- 任务页复用 [TaskList.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/Tasks/TaskList.xaml) 通用控件：[TabItemManager.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/ViewModels/TabItemManager.cs) `SetTaskList` 新增 `TaskType.Translate` 分支——**取消所有/重启所有/清除列表/单任务取消/重启/日志详情**全部与下载模块一致（接线 `TranslateTaskManager` 同款方法）。
+- `TaskType` 枚举加 `Translate`；`App.TranslateTaskManager` 注册；i18n 新增 `TranslateTask/TranslateWaiting/Translating`（三语言）。
+- 新文件已登记 [Jvedio.csproj](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Jvedio.csproj)。
+
+> **3.41 追加（同日，用户实测反馈，5.4.1.21 / Jvedio29.29）**：用户不希望翻译开始后**自动跳转**到翻译任务页（打断当前浏览），翻译本身已正常。**修复**：移除 `TranslateMovie` 末尾的 `onOpenTranslateTask?.Invoke()` 自动跳转（含 `VideoList.onOpenTranslateTask` 静态事件与其在 `VieModel_Main.InitBinding` 的订阅）——翻译任务页改为纯手动入口（右下角「文+T」按钮），进度查看不打扰当前页面。
+
+> **3.41 再追加（同日，5.4.1.22 / Jvedio29.30）**：用户反馈翻译图标丑。**修复**：参考翻译软件/网页（Google Translate 等）的通用设计——「文」「T」**等大**（均 12px Bold），中间以**斜杠「/」**分隔（T = Translation），颜色 `Window.Foreground`、透明底 + hover 高亮 `Window.StatusBar.Hover.Background` 与其他三个图标（截图/扫描/下载）完全一致。
+
+> **3.41 又追加（同日，5.4.1.23 / Jvedio29.31）**：用户反馈旧翻译任务未完成时无法添加新批量（10 部翻译中再选 10 部 → 无新任务），而同步信息模块支持运行中追加任务。**根因**：`TranslateMovie` 的 `_Translating` 防重入标志在整批完成前恒为 true，新批量直接 `return`——防重入管得过宽（整个会话级而非单任务级）。**修复**：彻底移除 `_Translating` 标志（含字段、赋值与完成回调复位）。任务管理器本就与下载模块同构、天然支持运行中入队：`TaskDispatcher.Enqueue` 仅把任务加入等待队列（IL 反编译确认无 Working 限制），`BeginWork` 已工作时直接返回（单飞），工作循环会在当前任务完成后自动接续队列中的新任务；`BaseManager.AddTask` 按 `TranslateTask.Equals(DataID)` 去重，同一影片重复提交不会重复翻译。**教训**：防重入标志的作用域要精确到「单个操作」，不能用它会话级阻塞合法的新请求；任务化架构下「运行中添加任务」是免费能力，前提是入队去重（DataID）到位。
+
+### 3.42 详情页翻页按钮失效修复 + 演员名复制按钮 + 翻译图标微调（2026-08-21，5.4.1.24 / Jvedio29.32）
+
+**三个小问题**：
+
+1. **翻译图标字体过大显示不全**：右下角「文/T」字号 12 → 9（与截图/扫描/下载图标视觉比例一致）。
+
+2. **演员详情页（筛选栏人形按钮展开的侧栏）名字旁新增复制按钮**：[ActorInfoView.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/ActorInfoView.xaml) 演员名 TextBox 右侧加复制图标按钮（`menuitem/copy.png`，HoverBorder 样式与相邻编辑/下载按钮一致），点击一键复制演员名并提示（`CopyActorName`）。
+
+3. **详情页左右翻页箭头"经常失效、重启后恢复"**——排查出四条静默失败路径，全部修复（[Window_Details.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Details.xaml.cs)）：
+   - **`LoadingData` 卡死**：`QueryCompleted` 异步委托里 `LoadImage` 任一步抛异常/挂起，结尾的 `LoadingData = false` 永远不执行 → 之后所有 `vieModel.Load()` 在 `if (LoadingData) return` 处静默退出 → 箭头"点击无反应"且重启前不可恢复。**修复**：委托体包 `try/catch/finally`，`LoadingData = false` 放 `finally`。
+   - **`DispatcherPriority.Background` 饿死**：`LoadImage` 的 3 处 `BeginInvoke(Background, ...)` 优先级低于输入/渲染，主窗口持续渲染/动画时操作永不被调度 → `await` 永不完成 → 同上卡死。**修复**：改 `DispatcherPriority.Normal`（高于 Input/Render，不会饿死）。
+   - **`DataIDs` 快照过期**：`DataIDs` 是打开详情页时的一次性快照；列表被刷新/筛选/换页后当前影片不在快照中 → 找不到 → `nextID=0` 静默返回。**修复**：`PreviousMovie/NextMovie` 重构为 `GetAdjacentDataID`——先重建一次快照再找，仍找不到回退**整库 DataID 顺序**，保证箭头永远可用。
+   - **翻页时 DB 写库阻塞 UI**：`RemoveNewAddTag`（翻页时删「新加入」标签）在 UI 线程同步 `ExecuteNonQuery`，翻译/刮削批量写库时（SQLite 写写互斥）最多被 `busy_timeout` 卡 30s，同样表现为"点击无反应"。**修复**：写库移 `Task.Run` 后台执行。
+
+**验证**：Release 编译通过（EXIT=0）；部署 `E:\Jvedio-5.3.1\Jvedio29.32.exe`。待用户实测：翻译中/筛选后/同步后箭头是否始终可用；演员名复制；图标显示比例。
+
+**教训**：`async void`/异步委托里「最后的复位语句」是脆弱模式——中间任意 await 异常/挂起都会让状态永久卡死，必须 `try/finally`；WPF 跨窗口共享 UI 线程时，`DispatcherPriority.Background` 的 await 在主界面持续渲染/动画下可能饿死，关键路径用 Normal；一次性快照（DataIDs）过期后要有「重建 + 兜底」两级自救，不能静默 return。
+
+**验证**：Release 编译通过（EXIT=0，仅预存在 MSB3270/MSB3177 警告）；待用户实测批量 30+ 部不再中断、任务页按钮可用。
+
+**经验**：
+- 后台线程绝不可枚举 UI 持有的活集合——要么快照拷贝（`ToList()`），要么把集合变更全部收敛到持有线程；「只翻译前一两部」+ 日志 `集合已修改；可能无法执行枚举操作。` 就是活列表枚举被并发的铁证。
+- 事件回调计数必须幂等：同一任务失败时 `onCanceled` 与 `onCompleted` 都会触发，用去重集合（HashSet by key）而非简单计数。
+- 任务化（每部影片一个 `AbstractTask`）顺便把「进度展示」变成免费的：任务页按行显示状态/进度，顶部总进度条 + 取消全部/重启失败/清除列表与下载模块同构，符合用户对「和下载模块类似」的要求。
+- `AbstractTask.Status` setter 会从**共享静态** `STATUS_TO_TEXT_DICT` 取文案（各任务类型互相覆盖），定制状态文案必须在设置 `Status` 之后再写 `StatusText`，否则被覆盖。
 
 ## 四、踩坑经验（重点）
 

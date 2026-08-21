@@ -61,6 +61,9 @@
     <sys:String x:Key="UiFontScaleTip">Adjust UI font size (takes effect immediately)</sys:String>
     <sys:String x:Key="TranslateSuccess">Translation succeeded</sys:String>
     <sys:String x:Key="TranslateFail">Translation failed, check translation settings</sys:String>
+    <sys:String x:Key="TranslateTask">Translation Task</sys:String>
+    <sys:String x:Key="TranslateWaiting">Waiting to translate</sys:String>
+    <sys:String x:Key="Translating">Translating</sys:String>
     <sys:String x:Key="ExportVideoData">Export Videos</sys:String>
     <sys:String x:Key="ExportActorList">Export Actors</sys:String>
     <sys:String x:Key="ExportSuccess">Exported</sys:String>

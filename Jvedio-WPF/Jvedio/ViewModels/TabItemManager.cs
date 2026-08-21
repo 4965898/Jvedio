@@ -373,13 +373,36 @@ namespace Jvedio.ViewModels
                         tList.ShowLog = true;
                     };
 
-                    taskList.onRestart += App.DownloadManager.Restart;
+taskList.onRestart += App.DownloadManager.Restart;
                     taskList.onRestartAll += App.DownloadManager.RestartAllFailed;
 
                     App.DownloadManager.onRunning += () => {
                         TaskList list = GetTaskListByType(type);
                         if (list != null)
                             list.AllTaskProgress = App.DownloadManager.Progress;
+                    };
+
+                    break;
+
+                case TaskType.Translate:
+                    taskList.TaskStatusList = App.TranslateTaskManager.CurrentTasks;
+                    taskList.onRemoveAll += () => App.TranslateTaskManager.RemoveTask(TaskStatus.Canceled | TaskStatus.RanToCompletion);
+                    taskList.onRemoveCancel += () => App.TranslateTaskManager.RemoveTask(TaskStatus.Canceled);
+                    taskList.onRemoveComplete += () => App.TranslateTaskManager.RemoveTask(TaskStatus.RanToCompletion);
+                    taskList.onCancel += App.TranslateTaskManager.CancelTask;
+                    taskList.onCancelAll += App.TranslateTaskManager.CancelAll;
+                    taskList.onRestart += App.TranslateTaskManager.Restart;
+                    taskList.onRestartAll += App.TranslateTaskManager.RestartAllFailed;
+                    taskList.onShowDetail += (tList, id) => {
+                        string logs = App.TranslateTaskManager.GetTaskLogs(id);
+                        tList.SetLogs(logs);
+                        tList.ShowLog = true;
+                    };
+
+                    App.TranslateTaskManager.onRunning += () => {
+                        TaskList list = GetTaskListByType(type);
+                        if (list != null)
+                            list.AllTaskProgress = App.TranslateTaskManager.Progress;
                     };
 
                     break;

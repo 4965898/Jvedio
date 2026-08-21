@@ -116,6 +116,14 @@ namespace Jvedio.Core.UserControls
                 FileHelper.TryOpenSelectPath(CurrentActorInfo.GetImagePath());
         }
 
+        private void CopyActorName(object sender, MouseButtonEventArgs e)
+        {
+            if (CurrentActorInfo == null || string.IsNullOrEmpty(CurrentActorInfo.ActorName))
+                return;
+            ClipBoard.TrySetDataObject(CurrentActorInfo.ActorName);
+            MessageNotify.Success($"{LangManager.GetValueByKey("Message_Copied")} {CurrentActorInfo.ActorName}");
+        }
+
         // todo 演员信息下载
         private void BeginDownLoadActress(object sender, MouseButtonEventArgs e)
         {

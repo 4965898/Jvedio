@@ -896,6 +896,48 @@
                         </Border>
 
                     </Grid>
+                    <!--  翻译任务（文+T 图标），点击打开翻译任务页  -->
+                    <Border
+                        Name="msgTranslate"
+                        Width="30"
+                        Height="30"
+                        Margin="0"
+                        MouseLeftButtonUp="ShowTranslatePopup"
+                        ToolTip="{DynamicResource TranslateTask}">
+                        <Border.Style>
+                            <Style BasedOn="{StaticResource FlatBorderStyle}" TargetType="Border">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource Window.StatusBar.Hover.Background}" />
+                                    </Trigger>
+                                    <DataTrigger Binding="{Binding Running, Source={x:Static local:App.TranslateTaskManager}}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource Window.StatusBar.Hover.Background}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal">
+                            <TextBlock
+                                FontSize="10"
+                                FontWeight="Bold"
+                                Foreground="{DynamicResource Window.Foreground}"
+                                Text="文" />
+                            <TextBlock
+                                FontSize="10"
+                                FontWeight="Bold"
+                                Foreground="{DynamicResource Window.Foreground}"
+                                Text="/" />
+                            <TextBlock
+                                FontSize="10"
+                                FontWeight="Bold"
+                                Foreground="{DynamicResource Window.Foreground}"
+                                Text="T" />
+                        </StackPanel>
+                    </Border>
                     <super:PathMsg
                         MouseLeftButtonUp="ShowScreenShotTab"
                         MsgCount="{Binding RunningCount, Source={x:Static local:App.ScreenShotManager}, Mode=OneWay}"

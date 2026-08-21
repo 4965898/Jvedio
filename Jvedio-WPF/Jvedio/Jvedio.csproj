@@ -427,7 +427,9 @@
     <Compile Include="Core\Tasks\DownloadManager.cs" />
     <Compile Include="Core\Tasks\ImageIndexManager.cs" />
     <Compile Include="Core\Tasks\DataIndexManager.cs" />
+    <Compile Include="Core\Tasks\TranslateTaskManager.cs" />
     <Compile Include="Core\Translation\TranslateManager.cs" />
+    <Compile Include="Core\Translation\TranslateTask.cs" />
     <Compile Include="Mapper\Common\AssociationMapper.cs" />
     <Compile Include="Mapper\Common\ActorMapper.cs" />
     <Compile Include="Mapper\Common\AIFaceMapper.cs" />

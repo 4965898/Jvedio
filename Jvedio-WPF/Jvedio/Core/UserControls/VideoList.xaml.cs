@@ -1814,52 +1814,68 @@ namespace Jvedio.Core.UserControls
 
         private void TranslateMovie(object sender, RoutedEventArgs e)
         {
-            if (_Translating)
-                return;
+            // 无防重入标志：翻译任务管理器按 DataID 去重入队，
+            // 与下载/同步模块一致——旧任务未完成时可继续添加新任务，串行接续执行
             HandleMenuSelected(sender, 1);   // 单选=当前影片，多选=选中的影片
             List<Video> videos = vieModel?.SelectedVideo;
             if (videos == null || videos.Count == 0)
                 return;
-            _Translating = true;
+
+            // 先快照再处理：SelectedVideo 是活动列表，右键菜单/点击卡片等 UI 操作随时可能修改它，
+            // 直接在后台循环里枚举活列表会抛「集合已修改；可能无法执行枚举操作」，
+            // 导致批量翻译只翻译前一两部就静默停止（见 2026-08-21 运行日志）
+            List<Video> snapshot = videos.ToList();
+            HashSet<long> seen = new HashSet<long>();
+            List<Jvedio.Core.Translation.TranslateTask> tasks = new List<Jvedio.Core.Translation.TranslateTask>();
+            foreach (Video video in snapshot) {
+                if (video == null || video.DataID <= 0 || !seen.Add(video.DataID))
+                    continue;
+                if (string.IsNullOrEmpty(video.Title))
+                    continue;
+                tasks.Add(new Jvedio.Core.Translation.TranslateTask(video));
+            }
+            if (tasks.Count == 0)
+                return;
+
             string platform = Jvedio.Core.Translation.TranslateManager.PlatformName(
                 (Jvedio.Core.Translation.TranslatePlatform)ConfigManager.TranslationConfig.Platform);
-            MessageNotify.Info($"{LangManager.GetValueByKey("TranslateTitle")} ({platform}): {videos.Count}");
-            Task.Run(async () => {
-                int success = 0;
-                int failed = 0;
-                Dictionary<long, string> results = new Dictionary<long, string>();
-                try {
-                    foreach (Video video in videos) {
-                        if (string.IsNullOrEmpty(video.Title))
-                            continue;
-                        string result = await Jvedio.Core.Translation.TranslateManager.Translate(video.Title);
-                        if (!string.IsNullOrEmpty(result)) {
-                            metaDataMapper.UpdateFieldById("TitleCN", result, video.DataID);
-                            results[video.DataID] = result;
-                            success++;
-                        } else {
-                            failed++;
-                        }
-                        await Task.Delay(500); // 防限流
-                    }
-                } catch (Exception ex) {
-                    Logger.Error(ex);
+            MessageNotify.Info($"{LangManager.GetValueByKey("TranslateTitle")} ({platform}): {tasks.Count}");
+
+            // 批量完成回调：每个任务只计一次（失败任务会同时触发 onCanceled 与 onCompleted）
+            HashSet<long> doneIds = new HashSet<long>();
+            EventHandler done = null;
+            done = (s, ev) => {
+                if (!(s is Jvedio.Core.Translation.TranslateTask t) || t.DataID <= 0)
+                    return;
+                lock (doneIds) {
+                    if (!doneIds.Add(t.DataID))
+                        return;
                 }
+                if (doneIds.Count < tasks.Count)
+                    return;
                 App.Current.Dispatcher.BeginInvoke(new Action(() => {
-                    _Translating = false;
-                    MessageNotify.Success($"{LangManager.GetValueByKey("TranslateSuccess")} {success} / {videos.Count}" +
-                        (failed > 0 ? $", {LangManager.GetValueByKey("TranslateFail")} {failed}" : ""));
+                    int ok = tasks.Count(arg => arg.Success);
+                    int fail = tasks.Count - ok;
+                    MessageNotify.Success($"{LangManager.GetValueByKey("TranslateSuccess")} {ok} / {tasks.Count}" +
+                        (fail > 0 ? $", {LangManager.GetValueByKey("TranslateFail")} {fail}" : ""));
                     // 刷新列表标题（翻译结果）
-                    foreach (var kv in results) {
-                        var item = vieModel.CurrentVideoList.FirstOrDefault(arg => arg.DataID == kv.Key);
+                    foreach (Jvedio.Core.Translation.TranslateTask task in tasks) {
+                        var item = vieModel.CurrentVideoList.FirstOrDefault(arg => arg.DataID == task.DataID);
                         if (item != null)
-                            item.TitleCN = kv.Value;
+                            item.TitleCN = task.Result;
                     }
                 }));
-            });
+            };
+            try {
+                foreach (Jvedio.Core.Translation.TranslateTask task in tasks) {
+                    task.onCompleted += done;
+                    task.onCanceled += done;
+                    TranslateTaskManager.AddTask(task);
+                }
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
         }
-
-        private bool _Translating = false;
 
         private void GenerateSmallImage(object sender, RoutedEventArgs e)
         {

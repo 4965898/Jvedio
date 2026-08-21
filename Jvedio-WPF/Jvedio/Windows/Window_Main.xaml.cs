@@ -738,6 +738,12 @@ namespace Jvedio
                 .Add(Entity.Common.TabType.GeoTask, LangManager.GetValueByKey("ScreenShotTask"), TaskType.ScreenShot);
         }
 
+        public void ShowTranslatePopup(object sender, MouseButtonEventArgs e)
+        {
+            vieModel.TabItemManager
+                .Add(TabType.GeoTask, LangManager.GetValueByKey("TranslateTask"), TaskType.Translate);
+        }
+
         private void ShowMsgScanPopup(object sender, MouseButtonEventArgs e)
         {
             vieModel.TabItemManager

@@ -66,6 +66,9 @@
     <sys:String x:Key="UiFontScaleTip">调节界面字号大小（立即生效）</sys:String>
     <sys:String x:Key="TranslateSuccess">翻译成功</sys:String>
     <sys:String x:Key="TranslateFail">翻译失败，请检查翻译设置</sys:String>
+    <sys:String x:Key="TranslateTask">翻译任务</sys:String>
+    <sys:String x:Key="TranslateWaiting">等待翻译</sys:String>
+    <sys:String x:Key="Translating">翻译中</sys:String>
     <sys:String x:Key="ExportVideoData">导出影片数据</sys:String>
     <sys:String x:Key="ExportActorList">导出演员列表</sys:String>
     <sys:String x:Key="ExportSuccess">导出成功，共</sys:String>

@@ -31,6 +31,7 @@ namespace Jvedio
         public static ScreenShotManager ScreenShotManager { get; private set; }
         public static ScanManager ScanManager { get; private set; }
         public static DownloadManager DownloadManager { get; private set; }
+        public static TranslateTaskManager TranslateTaskManager { get; private set; }
 
 
         public EventWaitHandle ProgramStarted { get; set; }
@@ -73,6 +74,7 @@ namespace Jvedio
             ScreenShotManager = ScreenShotManager.CreateInstance();
             ScanManager = ScanManager.CreateInstance();
             DownloadManager = DownloadManager.CreateInstance();
+            TranslateTaskManager = TranslateTaskManager.CreateInstance();
 
             // 触发类型初始化：订阅刮削/截图事件，累计阈值后后台静默重建图片索引
             ImageIndexManager.Init();

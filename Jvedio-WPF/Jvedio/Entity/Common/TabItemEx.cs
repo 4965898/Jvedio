@@ -24,7 +24,8 @@ namespace Jvedio.Entity.Common
     {
         ScreenShot,
         Download,
-        Scan
+        Scan,
+        Translate
     }
 
 

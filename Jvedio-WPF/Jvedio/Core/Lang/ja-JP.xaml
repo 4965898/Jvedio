@@ -51,6 +51,9 @@
     <sys:String x:Key="UiFontScaleTip">UIフォントサイズを調整（即時反映）</sys:String>
     <sys:String x:Key="TranslateSuccess">翻訳成功</sys:String>
     <sys:String x:Key="TranslateFail">翻訳失敗、翻訳設定を確認してください</sys:String>
+    <sys:String x:Key="TranslateTask">翻訳タスク</sys:String>
+    <sys:String x:Key="TranslateWaiting">翻訳待ち</sys:String>
+    <sys:String x:Key="Translating">翻訳中</sys:String>
     <sys:String x:Key="ExportVideoData">動画データをエクスポート</sys:String>
     <sys:String x:Key="ExportActorList">女優リストをエクスポート</sys:String>
     <sys:String x:Key="ExportSuccess">エクスポート完了、合計</sys:String>
