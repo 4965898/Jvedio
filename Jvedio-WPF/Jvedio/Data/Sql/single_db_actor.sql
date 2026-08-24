@@ -1,4 +1,4 @@
-﻿
+
 -- 【演员】
 -- Gender:0-未知，1-女 2-男
 -- 演员基本信息
@@ -7,6 +7,7 @@ BEGIN;
 create table actor_info(
     ActorID INTEGER PRIMARY KEY autoincrement,
     ActorName VARCHAR(500),
+    ActorNameEN VARCHAR(500),
 
     Country VARCHAR(500),
     Nation VARCHAR(500),

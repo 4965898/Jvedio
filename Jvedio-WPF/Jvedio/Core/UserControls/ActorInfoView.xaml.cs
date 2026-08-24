@@ -1,4 +1,6 @@
-﻿using Jvedio.Entity;
+using Jvedio.Core.Crawler;
+using Jvedio.Core.Utils;
+using Jvedio.Entity;
 using SuperControls.Style;
 using SuperUtils.IO;
 using System;
@@ -45,6 +47,7 @@ namespace Jvedio.Core.UserControls
                 RaisePropertyChanged();
                 RefreshBirthdayUI();
                 RefreshAge();
+                LoadActorOnlineJumpButtons();
             }
         }
 
@@ -82,6 +85,31 @@ namespace Jvedio.Core.UserControls
             DisplayAge = !string.IsNullOrEmpty(bd) && DateTime.TryParse(bd, out DateTime _)
                 ? ActorInfo.CalculateAge(bd)
                 : CurrentActorInfo.Age;
+        }
+
+        /// <summary>
+        /// 在线搜索：按当前演员名生成各站搜索跳转按钮（位置：爱好下方，样式同影片详情页在线观看按钮）。
+        /// 与影片详情页共用 OnlineSites.Sites 站点列表与「选项-网络」自定义网址（联动）。
+        /// </summary>
+        private void LoadActorOnlineJumpButtons()
+        {
+            if (actorOnlineJumpPanel == null)
+                return;
+            actorOnlineJumpPanel.Children.Clear();
+            string name = CurrentActorInfo?.ActorName;
+            if (string.IsNullOrEmpty(name))
+                return;
+            string encodedName = Uri.EscapeDataString(name);
+            foreach (OnlineSite site in OnlineSites.Sites) {
+                string url = site.GetSearchUrl(encodedName);
+                Button button = new Button() {
+                    Content = site.Name,
+                    Style = (Style)FindResource("OnlineJumpButton"),
+                    ToolTip = url,
+                };
+                button.Click += (s, e) => FileHelper.TryOpenUrl(url);
+                actorOnlineJumpPanel.Children.Add(button);
+            }
         }
 
         private void BirthdayDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
@@ -122,6 +150,31 @@ namespace Jvedio.Core.UserControls
                 return;
             ClipBoard.TrySetDataObject(CurrentActorInfo.ActorName);
             MessageNotify.Success($"{LangManager.GetValueByKey("Message_Copied")} {CurrentActorInfo.ActorName}");
+        }
+
+        private void CopyActorNameEN(object sender, MouseButtonEventArgs e)
+        {
+            if (CurrentActorInfo == null || string.IsNullOrEmpty(CurrentActorInfo.ActorNameEN))
+                return;
+            ClipBoard.TrySetDataObject(CurrentActorInfo.ActorNameEN);
+            MessageNotify.Success($"{LangManager.GetValueByKey("Message_Copied")} {CurrentActorInfo.ActorNameEN}");
+        }
+
+        /// <summary>
+        /// 转换当前演员英文名：假名→罗马字兜底（结果含汉字/假名残留则提示手动填写）
+        /// </summary>
+        private void ConvertCurrentActorNameEN(object sender, MouseButtonEventArgs e)
+        {
+            if (CurrentActorInfo == null || string.IsNullOrEmpty(CurrentActorInfo.ActorName))
+                return;
+            string en = RomajiConverter.Convert(CurrentActorInfo.ActorName);
+            if (string.IsNullOrEmpty(en) || !RomajiConverter.IsPureAscii(en) || en.Equals(CurrentActorInfo.ActorName)) {
+                MessageNotify.Warning("无法自动转换（含汉字读音），请在编辑页手动填写英文名");
+                return;
+            }
+            CurrentActorInfo.ActorNameEN = en;
+            actorMapper.UpdateFieldById("ActorNameEN", en, CurrentActorInfo.ActorID);
+            MessageNotify.Success($"英文名：{en}");
         }
 
         // todo 演员信息下载

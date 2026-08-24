@@ -149,9 +149,9 @@ namespace Jvedio
                 Button button = new Button() {
                     Content = site.Name,
                     Style = (Style)FindResource("OnlineJumpButton"),
-                    ToolTip = site.GetUrl(code),
+                    ToolTip = site.GetMovieUrl(code),
                 };
-                string url = site.GetUrl(code);
+                string url = site.GetMovieUrl(code);
                 button.Click += (s, e) => FileHelper.TryOpenUrl(url);
                 onlineJumpPanel.Children.Add(button);
             }

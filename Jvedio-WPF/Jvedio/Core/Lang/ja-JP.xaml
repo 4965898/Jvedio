@@ -1,4 +1,4 @@
-﻿<ResourceDictionary
+<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:sys="clr-namespace:System;assembly=mscorlib">
@@ -27,10 +27,26 @@
     <sys:String x:Key="PleaseSetExistsIndex">[Options-Library]で再生インデックスを確立してください！</sys:String>
     <sys:String x:Key="CrawlAllWarning">ライブラリ全体を登ると、IPがブロックされる可能性があります。注意して使用してください。必要なリソースを同期してみてください</sys:String>
     <sys:String x:Key="CrawlerServerHint">左側には、サポートされている情報スクレーパーがあります。右側のスクラッチに対応するURLを埋める必要があります。JvedioはWebサイトのアドレスを提供しません！</sys:String>
+    <sys:String x:Key="HasThumbnail">サムネイルあり</sys:String>
+    <sys:String x:Key="NoThumbnail">サムネイルなし</sys:String>
+    <sys:String x:Key="ActorInfo">女優情報</sys:String>
+    <sys:String x:Key="HasActor">女優あり</sys:String>
+    <sys:String x:Key="NoActor">女優なし</sys:String>
+    <sys:String x:Key="Thumbnail">サムネイル</sys:String>
+    <sys:String x:Key="Poster">ポスター</sys:String>
+    <sys:String x:Key="AllPicture">すべての画像</sys:String>
+    <sys:String x:Key="HasPoster">ポスターあり</sys:String>
+    <sys:String x:Key="NoPoster">ポスターなし</sys:String>
+    <sys:String x:Key="RecentView">最近見た</sys:String>
+    <sys:String x:Key="Actors">女優</sys:String>
+    <sys:String x:Key="Menu_DeletePosterOnly">ポスターのみ削除</sys:String>
+    <sys:String x:Key="Menu_DeleteThumbnailOnly">サムネイルのみ削除</sys:String>
+    <sys:String x:Key="Menu_DeletePosterAndThumbnail">ポスター+サムネイルを削除</sys:String>
     <sys:String x:Key="TaskInterrupted">前回未完了（再開できます）</sys:String>
     <sys:String x:Key="CloudflareChallenge">サイトがCloudflare人材認証ページ（Just a moment...）を返しました。ソフトウェアの問題ではありません。先にブラウザで認証を完了し、最新のCookieとUser-Agentをリクエストヘッダーに貼り付けてください（Cookieは期限切れになるため、都度取得が必要です）</sys:String>
     <sys:String x:Key="OnlineJump">オンライン視聴</sys:String>
-    <sys:String x:Key="OnlineJumpTip">オンライン視聴サイトのURLをカスタマイズできます（空欄はデフォルトURLを使用）。入力ルール：完全なURLを入力してください。{{code}}は番号のプレースホルダーで、必須です（ジャンプ時に番号へ自動置換）。例：デフォルトは https://javdb.com/search?q={{code}}、ミラーサイト利用時は https://ミラードメイン/search?q={{code}} を入力。「デフォルトを入力」で組み込みテンプレートを入力欄に表示して編集できます。</sys:String>
+    <sys:String x:Key="ActorOnlineSearch">オンライン検索</sys:String>
+    <sys:String x:Key="OnlineJumpTip">オンライン視聴/検索ジャンプサイトのルートURL（ドメイン）をカスタマイズできます（空欄はデフォルトURLを使用）。動画詳細ページと女優詳細ページでこのルートURLを共有します：動画ページは動画ページURL（番号使用）、女優ページは検索ページURL（女優名使用）へジャンプし、パスは組み込みです。例：デフォルトは https://javbus.com、ミラーサイト利用時は https://ミラードメイン を入力。「デフォルトを入力」で組み込みルートURLを入力欄に表示して編集できます。</sys:String>
     <sys:String x:Key="FillDefault">デフォルトを入力</sys:String>
     <sys:String x:Key="ResetDefault">デフォルトに戻す</sys:String>
     <sys:String x:Key="Translation">翻訳</sys:String>
@@ -62,6 +78,8 @@
     <sys:String x:Key="ExportLibraryAll">このライブラリの全動画をエクスポート</sys:String>
     <sys:String x:Key="ExportLibraryTip">CSV / Excel / JSON 対応、現在のライブラリの全動画データをエクスポート</sys:String>
     <sys:String x:Key="Actress_ShoeSize">靴のサイズ</sys:String>
+    <sys:String x:Key="ActorNameEN">英語名</sys:String>
+    <sys:String x:Key="ConvertActorNameEN">英語名に変換</sys:String>
     <sys:String x:Key="ExportNormal">通常エクスポート（CSV / Excel / JSON）</sys:String>
     <sys:String x:Key="ExportNfo">NFO としてエクスポート</sys:String>
     <sys:String x:Key="ExportLibraryAllNfo">このライブラリの全動画を NFO としてエクスポート</sys:String>

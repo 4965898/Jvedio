@@ -1,4 +1,4 @@
-﻿<ResourceDictionary
+<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:sys="clr-namespace:System;assembly=mscorlib">
@@ -10,6 +10,7 @@
     <sys:String x:Key="JvedioIsRunning">Jvedio is already running!</sys:String>
     <sys:String x:Key="FlowOut">FlowOut</sys:String>
     <sys:String x:Key="About_Outline">Local Video Management</sys:String>
+    <sys:String x:Key="OfficialWebsite">Official Website</sys:String>
 
     <sys:String x:Key="ThanksUseJvedio">Welcome to JVEDIO</sys:String>
     <sys:String x:Key="EnterVID">Enter the video recognition code, and return to the car</sys:String>
@@ -34,13 +35,19 @@
     <sys:String x:Key="NoActor">No actor</sys:String>
     <sys:String x:Key="Thumbnail">Thumbnail</sys:String>
     <sys:String x:Key="Poster">Poster</sys:String>
+    <sys:String x:Key="AllPicture">All Pictures</sys:String>
+    <sys:String x:Key="HasPoster">Has Poster</sys:String>
+    <sys:String x:Key="NoPoster">No Poster</sys:String>
+    <sys:String x:Key="RecentView">Recent Viewed</sys:String>
+    <sys:String x:Key="Actors">Actors</sys:String>
     <sys:String x:Key="Menu_DeletePosterOnly">Delete Poster Only</sys:String>
     <sys:String x:Key="Menu_DeleteThumbnailOnly">Delete Thumbnail Only</sys:String>
     <sys:String x:Key="Menu_DeletePosterAndThumbnail">Delete Poster + Thumbnail</sys:String>
     <sys:String x:Key="TaskInterrupted">Unfinished from last session (restart to continue)</sys:String>
     <sys:String x:Key="CloudflareChallenge">Site returned a Cloudflare verification page (Just a moment...). Not a software issue. Complete the challenge in your browser first, then paste the latest Cookie and User-Agent into the request headers (Cookies expire and must be refreshed)</sys:String>
     <sys:String x:Key="OnlineJump">Watch Online</sys:String>
-    <sys:String x:Key="OnlineJumpTip">Customize online watch site URLs (leave empty for built-in defaults). Rule: enter the full URL, {{code}} is the video code placeholder and must be kept - it is replaced with the code when jumping. Example: default is https://javdb.com/search?q={{code}}, for a mirror site enter https://mirror-domain/search?q={{code}}. Click "Use Default" to fill the built-in template for editing.</sys:String>
+    <sys:String x:Key="ActorOnlineSearch">Search Online</sys:String>
+    <sys:String x:Key="OnlineJumpTip">Customize the site root URL (domain) for online watch/search jump buttons (leave empty for built-in defaults). The movie detail page and actor detail page share this root URL: the movie page jumps to the video page (using the code), the actor page jumps to the search page (using the actor name); paths are built-in. Example: default is https://javbus.com, for a mirror site enter https://mirror-domain. Click "Use Default" to fill the built-in root URL for editing.</sys:String>
     <sys:String x:Key="FillDefault">Use Default</sys:String>
     <sys:String x:Key="ResetDefault">Restore Defaults</sys:String>
     <sys:String x:Key="Translation">Translation</sys:String>
@@ -72,6 +79,8 @@
     <sys:String x:Key="ExportLibraryAll">Export All Videos in This Library</sys:String>
     <sys:String x:Key="ExportLibraryTip">Supports CSV / Excel / JSON, exports all videos of the current library</sys:String>
     <sys:String x:Key="Actress_ShoeSize">Shoe Size</sys:String>
+    <sys:String x:Key="ActorNameEN">English Name</sys:String>
+    <sys:String x:Key="ConvertActorNameEN">Convert to English Name</sys:String>
     <sys:String x:Key="ExportNormal">Normal Export (CSV / Excel / JSON)</sys:String>
     <sys:String x:Key="ExportNfo">Export as NFO</sys:String>
     <sys:String x:Key="ExportLibraryAllNfo">Export All Videos in This Library as NFO</sys:String>

@@ -1,4 +1,4 @@
-﻿<super:BaseWindow
+<super:BaseWindow
     x:Class="Jvedio.Window_Settings"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -1045,7 +1045,7 @@
                                                         <TextBox
                                                             Width="420"
                                                             Margin="5,0"
-                                                            ToolTip="{Binding UrlTemplate}"
+                                                            ToolTip="{Binding BaseUrl}"
                                                             Text="{Binding UrlOverride, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
                                                         <Button
                                                             Margin="5,0,0,0"
@@ -1066,7 +1066,7 @@
                                                         HorizontalScrollBarVisibility="Hidden"
                                                         IsReadOnly="True"
                                                         Loaded="OnlineSiteDefaultUrl_Loaded"
-                                                        Tag="{Binding UrlTemplate}"
+                                                        Tag="{Binding BaseUrl}"
                                                         VerticalScrollBarVisibility="Hidden" />
                                                 </Grid>
                                             </DataTemplate>

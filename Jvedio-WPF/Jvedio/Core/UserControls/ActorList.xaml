@@ -1,4 +1,4 @@
-﻿<UserControl
+<UserControl
     x:Class="Jvedio.Core.UserControls.ActorList"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -147,6 +147,7 @@
                                         Header="{DynamicResource SyncInfo}"
                                         IsEnabled="False" />
                                     <Separator />
+                                    <MenuItem Click="ConvertActorNameEN" Header="{DynamicResource ConvertActorNameEN}" />
                                     <MenuItem Click="ExportActorList" Header="{DynamicResource ExportActorList}" />
                                 </ContextMenu>
                             </Border.ContextMenu>
@@ -351,6 +352,7 @@
                                         Header="{DynamicResource SyncInfo}"
                                         IsEnabled="False" />
                                     <Separator />
+                                    <MenuItem Click="ConvertActorNameEN" Header="{DynamicResource ConvertActorNameEN}" />
                                     <MenuItem Click="ExportActorList" Header="{DynamicResource ExportActorList}" />
                                 </ContextMenu>
                             </Border.ContextMenu>

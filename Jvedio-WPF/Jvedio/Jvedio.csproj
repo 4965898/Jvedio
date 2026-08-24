@@ -452,6 +452,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Utils\Common\Converter.cs" />
+    <Compile Include="Core\Utils\RomajiConverter.cs" />
     <Compile Include="Core\Media\Gif.cs" />
     <Compile Include="Core\Media\GifImage.cs" />
     <Compile Include="Core\FFmpeg\ScreenShot.cs" />

@@ -334,6 +334,9 @@ namespace Jvedio.Crawler
                             Info.Add("ActorNames", actress);
                         if (!Info.ContainsKey("ActressImageUrl"))
                             Info.Add("ActressImageUrl", ActorIdToUrl(actressId));
+                        // JavDB 演员页 URL 的 slug 即官方罗马字（如 mikami-yua），与 ActorNames 一一对应
+                        if (!Info.ContainsKey("ActorNameEN"))
+                            Info.Add("ActorNameEN", actressId);
                     }
                 }
             }

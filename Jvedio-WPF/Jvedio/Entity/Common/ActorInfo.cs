@@ -1,4 +1,4 @@
-﻿
+
 using Jvedio.Core.Enums;
 using Jvedio.Core.Global;
 using Jvedio.Core.Media;
@@ -40,6 +40,18 @@ namespace Jvedio.Entity
             get { return _ActorName; }
             set {
                 _ActorName = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 英文名（罗马字），如 三上悠亜 → Mikami Yua；刮削时从 JavDB 演员 slug 提取，或假名转罗马字兜底
+        /// </summary>
+        private string _ActorNameEN = string.Empty;
+        public string ActorNameEN {
+            get { return _ActorNameEN; }
+            set {
+                _ActorNameEN = value;
                 RaisePropertyChanged();
             }
         }

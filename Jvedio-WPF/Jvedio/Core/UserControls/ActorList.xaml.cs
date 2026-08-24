@@ -1,4 +1,5 @@
-﻿using Jvedio.Entity;
+using Jvedio.Core.Utils;
+using Jvedio.Entity;
 using SuperControls.Style;
 using SuperControls.Style.Windows;
 using SuperUtils.Framework.ORM.Utils;
@@ -728,6 +729,34 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
 
                 Select();
             }
+        }
+
+        /// <summary>
+        /// 批量转换英文名：对 ActorNameEN 为空的演员，用假名→罗马字算法兜底转换（结果含汉字/假名残留则跳过）
+        /// </summary>
+        private async void ConvertActorNameEN(object sender, RoutedEventArgs e)
+        {
+            int converted = 0;
+            await Task.Run(() => {
+                List<Dictionary<string, object>> list = actorMapper.Select(
+                    "select ActorID, ActorName from actor_info where ActorNameEN is null or ActorNameEN = ''");
+                if (list == null)
+                    return;
+                foreach (Dictionary<string, object> row in list) {
+                    if (!row.TryGetValue("ActorID", out object idObj) || !row.TryGetValue("ActorName", out object nameObj))
+                        continue;
+                    string actorName = nameObj?.ToString();
+                    if (string.IsNullOrEmpty(actorName))
+                        continue;
+                    string en = RomajiConverter.Convert(actorName);
+                    if (string.IsNullOrEmpty(en) || !RomajiConverter.IsPureAscii(en) || en.Equals(actorName))
+                        continue;
+                    actorMapper.UpdateFieldById("ActorNameEN", en, Convert.ToInt64(idObj));
+                    converted++;
+                }
+            });
+            Select();
+            MessageNotify.Success($"英文名转换完成：成功 {converted} 个");
         }
 
         // todo 演员信息下载

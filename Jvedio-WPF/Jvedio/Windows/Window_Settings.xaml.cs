@@ -1151,9 +1151,9 @@ namespace Jvedio
 
         private void FillDefaultOnlineSite(object sender, RoutedEventArgs e)
         {
-            // 把内置默认网址模板填入输入框，用户可直接在此基础上修改（如换镜像域名）
+            // 把内置默认根地址填入输入框，用户可直接在此基础上修改（如换镜像域名）
             if ((sender as Button)?.Tag is OnlineSite site)
-                site.UrlOverride = site.UrlTemplate;
+                site.UrlOverride = site.BaseUrl;
             RefreshOnlineSitesList();
         }
 

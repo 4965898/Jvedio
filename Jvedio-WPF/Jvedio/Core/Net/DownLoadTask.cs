@@ -1,5 +1,6 @@
 using Jvedio.Core.Enums;
 using Jvedio.Core.Exceptions;
+using Jvedio.Core.Utils;
 using Jvedio.Entity;
 using SuperControls.Style;
 using SuperUtils.Common;
@@ -231,7 +232,7 @@ namespace Jvedio.Core.Net
             return false;
         }
 
-        public void SaveActorNames(object names, Video video)
+        public void SaveActorNames(object names, Video video, object enNames = null)
         {
             if (names is List<string> actorNames && actorNames.Count > 0) {
                 int actorCount = actorNames.Count;
@@ -242,7 +243,10 @@ namespace Jvedio.Core.Net
                     if (actorInfo == null || actorInfo.ActorID <= 0) {
                         actorInfo = new ActorInfo();
                         actorInfo.ActorName = actorName;
+                        SetActorNameEN(actorInfo, enNames, i);
                         actorMapper.Insert(actorInfo);
+                    } else {
+                        SetActorNameEN(actorInfo, enNames, i);
                     }
                     // 保存信息
                     string sql = $"insert or ignore into metadata_to_actor (ActorID,DataID) values ({actorInfo.ActorID},{video.DataID})";
@@ -252,10 +256,26 @@ namespace Jvedio.Core.Net
             }
         }
 
+        /// <summary>
+        /// 从刮削返回的罗马字 slug 列表（与 ActorNames 一一对应）填充 ActorNameEN；已存在则不覆盖
+        /// </summary>
+        private void SetActorNameEN(ActorInfo actorInfo, object enNames, int index)
+        {
+            if (enNames is List<string> enList && index < enList.Count && !string.IsNullOrEmpty(enList[index])) {
+                string en = RomajiConverter.SlugToDisplay(enList[index]);
+                if (string.IsNullOrEmpty(actorInfo.ActorNameEN) && !string.IsNullOrEmpty(en)) {
+                    actorInfo.ActorNameEN = en;
+                    if (actorInfo.ActorID > 0)
+                        actorMapper.UpdateFieldById("ActorNameEN", en, actorInfo.ActorID);
+                }
+            }
+        }
+
         public async Task<bool> DownloadActors(Video video, Dictionary<string, object> dict, VideoDownLoader downLoader, RequestHeader header)
         {
             object names = GetInfoFromExist("ActorNames", video, dict);
             object urls = GetInfoFromExist("ActressImageUrl", video, dict);
+            object enNames = GetInfoFromExist("ActorNameEN", video, dict);
 
             if (names == null)
                 return false;
@@ -274,7 +294,7 @@ namespace Jvedio.Core.Net
             }
 
             if (urls == null || !downloadActorImage) {
-                SaveActorNames(names, video);
+                SaveActorNames(names, video, enNames);
                 return true;
             }
 
@@ -295,7 +315,10 @@ namespace Jvedio.Core.Net
                             actorInfo = new ActorInfo();
                             actorInfo.ActorName = actorName;
                             actorInfo.ImageUrl = url;
+                            SetActorNameEN(actorInfo, enNames, i);
                             actorMapper.Insert(actorInfo);
+                        } else {
+                            SetActorNameEN(actorInfo, enNames, i);
                         }
 
                         string sql = $"insert or ignore into metadata_to_actor (ActorID,DataID) values ({actorInfo.ActorID},{video.DataID})";
@@ -331,7 +354,7 @@ namespace Jvedio.Core.Net
                     return true;
                 } else {
                     Logger.Warning($"actorNames.Count({actorNames?.Count}) != ActressImageUrl.Count({ActressImageUrl?.Count}), fallback to SaveActorNames");
-                    SaveActorNames(names, video);
+                    SaveActorNames(names, video, enNames);
                     return true;
                 }
             } else {

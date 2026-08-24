@@ -40,12 +40,12 @@ namespace Jvedio.Core.Export
         };
 
         private static readonly string[] ACTOR_HEADERS = {
-            "ActorID", "演员名", "出演数", "国家", "出生地", "生日", "身高(CM)", "体重(KG)",
+            "ActorID", "演员名", "英文名", "出演数", "国家", "出生地", "生日", "身高(CM)", "体重(KG)",
             "罩杯", "胸围", "腰围", "臀围", "鞋码", "评分", "WebUrl"
         };
 
         private static readonly string[] ACTOR_KEYS = {
-            "ActorID", "ActorName", "Count", "Country", "BirthPlace", "Birthday", "Height", "Weight",
+            "ActorID", "ActorName", "ActorNameEN", "Count", "Country", "BirthPlace", "Birthday", "Height", "Weight",
             "Cup", "Chest", "Waist", "Hipline", "ShoeSize", "Grade", "WebUrl"
         };
 

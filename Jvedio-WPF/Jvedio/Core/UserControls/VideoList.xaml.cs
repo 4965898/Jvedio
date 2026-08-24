@@ -1530,7 +1530,7 @@ namespace Jvedio.Core.UserControls
                             MenuItem menu = new MenuItem() {
                                 Header = site.Name,
                             };
-                            string url = site.GetUrl(code);
+                            string url = site.GetMovieUrl(code);
                             menu.Click += (s, ev) => FileHelper.TryOpenUrl(url);
                             jumpMenu.Items.Add(menu);
                         }

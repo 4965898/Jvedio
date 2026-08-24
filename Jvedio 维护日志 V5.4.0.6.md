@@ -62,7 +62,12 @@
 | 5.4.1.25（Jvedio29.33） | 2026-08-21 | 翻译图标字号 9 → 10（用户微调） |
 | 5.4.1.26（Jvedio29.34） | 2026-08-21 | 翻译图标改仿 Google Translate 布局：「文」左上角、「/」居中、「T」右下角，字号均调至 12 |
 | 5.4.1.27（Jvedio29.35） | 2026-08-21 | 翻译图标字号 12 → 10（12 时文/T 在 30x30 内重叠，维持 10） |
-| 5.4.1.28（Jvedio29.36） | 2026-08-21 | 撤销角落布局（10 号仍重叠）：翻译图标恢复横排「文/T」居中布局（v5.4.1.25 样式，10 号） |
+| 5.4.1.28（Jvedio29.36） | 2026-08-21 | 撤销翻译图标角落布局（10 号仍重叠）：翻译图标恢复横排「文/T」居中布局（v5.4.1.25 样式，10 号） |
+| 5.4.1.29（Jvedio29.37） | 2026-08-24 | 演员详情页新增「在线搜索」跳转按钮（见 3.43） |
+| 5.4.1.30（Jvedio29.38） | 2026-08-24 | 在线观看/在线搜索重构为「根地址联动」（见 3.44） |
+| 5.4.1.31（Jvedio29.39） | 2026-08-24 | 修正 4 个站点搜索路径 + 修复演员页按钮不换行（见 3.45） |
+| 5.4.1.32（Jvedio29.40） | 2026-08-24 | 新增演员英文名（罗马字）功能（见 3.46） |
+| 5.4.1.33（Jvedio29.41） | 2026-08-24 | 英文名始终显示 + 详情页「EN」转换按钮（见 3.47） |
 
 > 这些发布说明与本地 diff 吻合，可互相印证。5.4.0.5 的 Release Body 已于 2026-08-09 更新为「下载指引 + 相对原版 5.4 的改进总结 + 原记录」三段式，源码也已同步 commit（见 1.2、第五章）。
 
@@ -727,6 +732,77 @@ SQL 全部改为 `LEFT JOIN` + `IsNull` 判定，不再混用 `INNER JOIN` + 取
 - 事件回调计数必须幂等：同一任务失败时 `onCanceled` 与 `onCompleted` 都会触发，用去重集合（HashSet by key）而非简单计数。
 - 任务化（每部影片一个 `AbstractTask`）顺便把「进度展示」变成免费的：任务页按行显示状态/进度，顶部总进度条 + 取消全部/重启失败/清除列表与下载模块同构，符合用户对「和下载模块类似」的要求。
 - `AbstractTask.Status` setter 会从**共享静态** `STATUS_TO_TEXT_DICT` 取文案（各任务类型互相覆盖），定制状态文案必须在设置 `Status` 之后再写 `StatusText`，否则被覆盖。
+
+### 3.43 演员详情页「在线搜索」跳转按钮（2026-08-24，5.4.1.29 / Jvedio29.37）
+
+**需求**：演员详情页（筛选栏人形按钮展开的侧栏）在「爱好」下方新增跳转按钮，点击按**演员名**搜索——JavDB、JavBus、JAVLib 前三、MISSAV 第四，外观参考影片详情页已有的在线观看按钮组。
+
+**实现**（初版，后被 3.44 重构）：
+- [ActorInfoView.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/ActorInfoView.xaml)：复制影片详情页 `OnlineJumpButton` 绿底白字圆角样式到本控件 Resources；爱好行下方新增「在线搜索：」标题行 + `actorOnlineJumpPanel` WrapPanel。
+- [ActorInfoView.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/ActorInfoView.xaml.cs)：新增 `LoadActorOnlineJumpButtons()`——按 `CurrentActorInfo.ActorName` 生成按钮，演员名 `Uri.EscapeDataString` 编码（日文/空格名可正常搜索），点击 `FileHelper.TryOpenUrl`；在 `CurrentActorInfo` setter 中调用（切换演员自动刷新）。
+- i18n 新增 `ActorOnlineSearch`（在线搜索 / Search Online / オンライン検索，三语言同步）。
+
+### 3.44 在线观看/在线搜索重构为「根地址联动」（2026-08-24，5.4.1.30 / Jvedio29.38）
+
+**需求**（用户提出）：3.43 只做了 4 个按钮且与影片页不联动。用户希望①演员页移植影片页全部 27 个站点、按影片页顺序；②与影片页**联动**——在「选项-网络」填一次网址，两页共用。但影片页跳影片地址（用番号）、演员页跳搜索地址（用演员名），URL 模板本质不同，直接共用会互相破坏。
+
+**用户 idea（采纳）**：**根地址（域名）共用且联动，影片路径与搜索路径各自独立**。镜像站与原站网页结构一致，只需替换域名即可两页同时生效。
+
+**实现**（[OnlineSites.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Crawler/OnlineSites.cs) 重构 + 3 处调用 + 设置页）：
+- `OnlineSite` 拆为 `BaseUrl`（根地址/域名）+ `MoviePath`（影片页路径模板）+ `SearchPath`（搜索页路径模板），新增 `GetMovieUrl(code)` / `GetSearchUrl(code)`；`UrlOverride` 语义从「完整网址模板」改为「根地址」，`GetBaseUrl()` 兼容旧配置（旧完整网址只取协议+域名部分，自动迁移）。
+- 27 个站点全部补齐 `SearchPath`：搜索型站点（JavDB/123av/Supjav 等 18 个）两路径相同；影片页型站点（JavBus `search/`、JAVLib `vl_search.php`、MISSAV `search/`、FANZA `searchstr`、Jable/HAYAV/evojav `search/`、JAVMENU `?s=`、javgo `zh/search/`）补搜索路径。
+- 调用方：影片详情页 [Window_Details.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Details.xaml.cs) 与右键菜单 [VideoList.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/VideoList.xaml.cs) 改 `GetMovieUrl`；演员页 [ActorInfoView.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/ActorInfoView.xaml.cs) 改 `GetSearchUrl` 并遍历 `OnlineSites.Sites`（全部 27 个、影片页顺序）。
+- 设置页 [Window_Settings.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Settings.xaml)：输入框/默认网址示例改绑 `BaseUrl`，「填默认」填 `BaseUrl`；`OnlineJumpTip` 三语重写为「填根地址（域名），两页共用，路径内置」。
+
+**验证**：Release 编译通过（EXIT=0，仅预存在 MSB3270/MSB3177 警告）；部署 `E:\Jvedio-5.3.1\Jvedio29.38.exe`（v5.4.1.30）。
+
+**经验**：同一批站点两种跳转语义（影片页=番号、演员页=名字）时，正确抽象是「根地址共用 + 路径按用途拆分」，而不是「两套完整 URL 各自维护」——前者天然联动（换镜像站一处生效），后者必然漂移；旧配置迁移用「完整网址 → 提取协议+域名」即可无损兼容。
+
+### 3.45 修正 4 个站点搜索路径 + 修复演员页按钮不换行（2026-08-24，5.4.1.31 / Jvedio29.39）
+
+**用户实测反馈两个问题**：
+
+1. **4 个站点搜索路径不对**（用户给出实际搜索页 URL）：
+   - 123AV：`zh/search` 路由不存在 → 改 `cn/search?keyword={{code}}`
+   - JAVMENU：不是 `?s=` → 改 `zh/search?wd={{code}}`
+   - Jav.Guru：不是 `?s=` → 改 `jav-actress-list/?taxonomy_search={{code}}`
+   - JAVLib：不是 `vl_search.php` → 改 `cn/searchstar.php?keyword={{code}}`（用户给的 URL 带 `searchid=10673233`，是会话级参数，硬编码会失效，故去掉）
+
+2. **演员页按钮全部排成一行，面板被拉宽到约 2100px，覆盖影片信息**：
+   - **根因**：演员面板所在列是 `Width="auto"`（[VideoList.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/VideoList.xaml) Grid.Column=1），auto 列先以**无限宽度**测量内容 → WrapPanel 在无限宽下把所有按钮排成一行 → 期望宽度=27 个按钮总宽 → 列被撑到 2100px。影片详情页不炸是因为它在固定宽度窗口的 `*` 列里，WrapPanel 拿到受限宽度自然换行。
+   - **修复**：[ActorInfoView.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/ActorInfoView.xaml) 的 `actorOnlineJumpPanel` 加 `MaxWidth="280"`——WrapPanel 测量时被硬性限制在 280px，自动换行成 3-4 个一行，面板宽度收敛到 ~280px，不再覆盖影片列表。
+
+**验证**：Release 编译通过（EXIT=0，仅预存在 MSB3270/MSB3177 警告）；部署 `E:\Jvedio-5.3.1\Jvedio29.39.exe`（v5.4.1.31）。
+
+**经验**：WrapPanel 放进 `auto` 宽度列时不会换行——auto 列以无限宽测量，WrapPanel 永远排一行；必须给 WrapPanel 显式 `MaxWidth`（或把列改成固定/`*` 宽度）才能触发换行。这是 WPF 布局的经典坑。
+
+### 3.46 新增演员英文名（罗马字）功能（2026-08-24，5.4.1.32 / Jvedio29.40）
+
+**需求**：演员名多为日文/中文，希望转换为罗马字（可视为英文单词、被网站收录）。评估后确认：JavDB 演员页 URL 的 slug 就是官方罗马字（如 `mikami-yua`），且 Db2 爬虫**已经在提取**（`id.Split('/').LastOrDefault()`，只是只用来拼头像 URL 没存下来）——这是最高准确率的数据源；假名→罗马字是确定性转换（Hepburn），纯 C# 可实现；汉字读音不唯一是唯一难点，靠 slug + 词典兜底。
+
+**实现**（用户确认：新增 ActorNameEN 字段、刮削时自动 + 手动批量、搜索按钮仍用原名、详情页英文名在名字下方带复制按钮）：
+- **数据库**：`actor_info` 加 `ActorNameEN VARCHAR(500)`（[single_db_actor.sql](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Data/Sql/single_db_actor.sql) 新库 + [Sqlite.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/DataBase/Tables/Sqlite.cs) SqlCommands 老库迁移 + [ActorInfo.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Entity/Common/ActorInfo.cs) 实体属性三处同步）。
+- **刮削自动提取**：[Db2/DbCrawler/Crawler.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Crawler/Db2/DbCrawler/Crawler.cs) 把 `actressId`（即罗马字 slug）作为 `ActorNameEN` 键返回；[DownLoadTask.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Net/DownLoadTask.cs) `SaveActorNames/DownloadActors` 新增 `SetActorNameEN`（slug→显示名，已存在不覆盖）。
+- **兜底算法**：新增 [RomajiConverter.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Utils/RomajiConverter.cs)（已登记 csproj）——`SlugToDisplay`（mikami-yua → Mikami Yua）+ `Convert`（假名→罗马字 Hepburn，含拗音/促音/长音，汉字原样保留）+ `IsPureAscii`（判断是否完整罗马字）。
+- **手动批量**：[ActorList.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/ActorList.xaml) 两个右键菜单加「转换英文名」→ [ActorList.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/ActorList.xaml.cs) `ConvertActorNameEN`：后台查 `ActorNameEN` 为空的演员，跑 `Convert`，结果纯 ASCII 才写库，完成后提示成功数。
+- **详情页**：[ActorInfoView.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/ActorInfoView.xaml) 名字下方新增英文名行（样式与名字一致：Bold/GlobalFontSize/Window.Foreground，带复制按钮 `CopyActorNameEN`，空则隐藏，位于三个操作按钮上方）。
+- **编辑页**：[Window_EditActor.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_EditActor.xaml) 名字下方新增英文名 SearchBox（可手动改）。
+- **导出**：[ExportHelper.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Export/ExportHelper.cs) 演员导出加「英文名」列。
+- i18n 新增 `ActorNameEN` / `ConvertActorNameEN`（三语言同步）。
+
+**验证**：Release 编译通过（EXIT=0，仅预存在 MSB3270/MSB3177 警告）；部署 `E:\Jvedio-5.3.1\Jvedio29.40.exe`（v5.4.1.32）。
+
+**经验**：做「名字转写」类功能时先查刮削源是否已带目标格式（JavDB slug 就是罗马字，且爬虫已在提取）——复用现成数据比自研算法准确得多；算法只作兜底（假名确定性转换），汉字读音词典留作后续（冷门演员靠手动编辑）。
+
+### 3.47 英文名始终显示 + 详情页「EN」转换按钮（2026-08-24，5.4.1.33 / Jvedio29.41）
+
+**用户反馈两个问题**：
+1. **英文名为空时不应隐藏**——用户希望时刻显示（空就空着，方便知道有这行）。**修复**：[ActorInfoView.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/ActorInfoView.xaml) 移除英文名行的 `DataTrigger` 空值折叠。
+2. **找不到「转换英文名」按钮**——批量转换在演员列表右键菜单（ActorList.xaml 两处都有），但用户是在演员详情页（侧栏）操作，那里没有入口。**修复**：详情页操作按钮行（编辑/下载/其他）新增「EN」按钮（`ConvertCurrentActorNameEN`）——转换当前演员：假名可转则自动填 `ActorNameEN` 并写库，含汉字读音无法转则提示手动填写。
+
+**验证**：Release 编译通过（EXIT=0，仅预存在 MSB3270/MSB3177 警告）；部署 `E:\Jvedio-5.3.1\Jvedio29.41.exe`（v5.4.1.33）。
+
+**经验**：功能入口要放在用户实际操作的界面（详情页），不能只放在逻辑上正确但用户不常去的界面（列表页）；「空值隐藏」类 UI 行为要确认用户预期——有的用户希望占位行始终可见。
 
 ## 四、踩坑经验（重点）
 
