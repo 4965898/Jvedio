@@ -25,6 +25,14 @@
     <sys:String x:Key="PleaseSetImageIndex">请在【选项-库】中建立图片索引！</sys:String>
     <sys:String x:Key="AutoRebuildImageIndex">刮削获得图片后自动重建索引的累计条数(0为关闭)</sys:String>
     <sys:String x:Key="PleaseSetExistsIndex">请在【选项-库】中建立播放索引！</sys:String>
+    <sys:String x:Key="VerifyingFileStatus">正在按当前磁盘状态校验文件，请稍候…</sys:String>
+    <sys:String x:Key="HasSubtitle">有无字幕</sys:String>
+    <sys:String x:Key="SubtitlePath">字幕地址</sys:String>
+    <sys:String x:Key="Yes">有</sys:String>
+    <sys:String x:Key="No">无</sys:String>
+    <sys:String x:Key="SubtitleInfo">字幕</sys:String>
+    <sys:String x:Key="HasSub">有字幕</sys:String>
+    <sys:String x:Key="NoSub">无字幕</sys:String>
     <sys:String x:Key="CrawlAllWarning">全库爬取可能会导致你的IP被封，请谨慎使用，尽量同步仅需要的资源</sys:String>
     <sys:String x:Key="CrawlerServerHint">左侧是支持的信息刮削器，右侧需要自行填入刮削器对应的网址，Jvedio 不提供任何网站地址！</sys:String>
     <sys:String x:Key="AllPicture">所有图片</sys:String>

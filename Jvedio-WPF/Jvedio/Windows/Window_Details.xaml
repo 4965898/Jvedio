@@ -1,4 +1,4 @@
-﻿<Window
+<Window
     x:Class="Jvedio.Window_Details"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -1529,6 +1529,24 @@
                                                     Margin="0"
                                                     Style="{StaticResource ViewTextBox}"
                                                     Text="{Binding VideoInfo.FileSize}" />
+                                            </StackPanel>
+
+                                            <StackPanel Margin="0,5" Orientation="Horizontal">
+                                                <TextBlock Style="{StaticResource BaseTextBlock}" Text="{DynamicResource HasSubtitle}" />
+                                                <TextBlock Style="{StaticResource BaseTextBlock}" Text="：" />
+                                                <TextBox
+                                                    Margin="0"
+                                                    Style="{StaticResource ViewTextBox}"
+                                                    Text="{Binding VideoInfo.HasSubtitle}" />
+                                            </StackPanel>
+
+                                            <StackPanel Margin="0,5" Orientation="Horizontal">
+                                                <TextBlock Style="{StaticResource BaseTextBlock}" Text="{DynamicResource SubtitlePath}" />
+                                                <TextBlock Style="{StaticResource BaseTextBlock}" Text="：" />
+                                                <TextBox
+                                                    Margin="0"
+                                                    Style="{StaticResource ViewTextBox}"
+                                                    Text="{Binding VideoInfo.SubtitlePath}" />
                                             </StackPanel>
 
                                             <TextBlock

@@ -1,4 +1,4 @@
-﻿using Google.Protobuf.WellKnownTypes;
+using Google.Protobuf.WellKnownTypes;
 using Jvedio.Core.Enums;
 using Jvedio.Core.Global;
 using Jvedio.Core.Media;
@@ -1124,7 +1124,47 @@ namespace Jvedio.Entity
                 videoInfo.FileName = System.IO.Path.GetFileNameWithoutExtension(videoPath);
             }
 
+            // 字幕：根据是否存在外挂 SRT 文件判断
+            if (File.Exists(videoPath)) {
+                string srtPath = FindSrtFile(videoPath);
+                if (srtPath != null) {
+                    videoInfo.SubtitlePath = srtPath;
+                    videoInfo.HasSubtitle = SuperControls.Style.LangManager.GetValueByKey("Yes");
+                } else {
+                    videoInfo.HasSubtitle = SuperControls.Style.LangManager.GetValueByKey("No");
+                }
+            }
+
             return videoInfo;
+        }
+
+        /// <summary>
+        /// 查找视频的外挂 SRT 字幕文件（同名 xxx.srt 或带语言后缀的 xxx.chs.srt / xxx.zh.srt 等），找不到返回 null
+        /// </summary>
+        public static string FindSrtFile(string videoPath)
+        {
+            if (string.IsNullOrEmpty(videoPath) || !File.Exists(videoPath))
+                return null;
+
+            string srtPath = System.IO.Path.ChangeExtension(videoPath, ".srt");
+            if (File.Exists(srtPath))
+                return srtPath;
+
+            try {
+                string dir = System.IO.Path.GetDirectoryName(videoPath);
+                string name = System.IO.Path.GetFileNameWithoutExtension(videoPath);
+                if (string.IsNullOrEmpty(dir) || string.IsNullOrEmpty(name))
+                    return null;
+                foreach (string f in Directory.GetFiles(dir, "*.srt")) {
+                    string fn = System.IO.Path.GetFileNameWithoutExtension(f);
+                    if (fn.Equals(name, StringComparison.OrdinalIgnoreCase) ||
+                        fn.StartsWith(name + ".", StringComparison.OrdinalIgnoreCase))
+                        return f;
+                }
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+            return null;
         }
 
         /// <summary>

@@ -381,6 +381,25 @@
 
                         <DockPanel Style="{StaticResource LinePanelStyle}">
                             <StackPanel Orientation="Horizontal">
+                                <ToggleButton Style="{StaticResource SelectAllToggleButton}" Visibility="Hidden" />
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource SubtitleInfo}" />
+                            </StackPanel>
+                            <WrapPanel x:Name="subtitleExistWrapPanel" Orientation="Horizontal">
+                                <RadioButton
+                                    Click="SetSubtitleExist"
+                                    Content="{DynamicResource HasSub}"
+                                    GroupName="subtitleExistRadioButton"
+                                    Style="{StaticResource InfoRadioButton}" />
+                                <RadioButton
+                                    Click="SetSubtitleExist"
+                                    Content="{DynamicResource NoSub}"
+                                    GroupName="subtitleExistRadioButton"
+                                    Style="{StaticResource InfoRadioButton}" />
+                            </WrapPanel>
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
                                 <ToggleButton
                                     Click="SetAllSelected"
                                     Style="{StaticResource SelectAllToggleButton}"

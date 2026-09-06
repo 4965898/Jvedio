@@ -1,4 +1,5 @@
 using Jvedio.Core.CustomEventArgs;
+using Jvedio.Core.Tasks;
 using Jvedio.Entity;
 using Jvedio.Entity.CommonSQL;
 using Jvedio.Mapper;
@@ -616,8 +617,30 @@ namespace Jvedio.Core.UserControls
             ApplyFilter();
         }
 
-        private void SetPlayable(object sender, RoutedEventArgs e)
+        private async void SetPlayable(object sender, RoutedEventArgs e)
         {
+            // 「可播放/不可播放」筛选依赖资源存在性索引（metadata.PathExist），而索引只是
+            // 上次重建时的快照：文件被外部增删/移动、或建立索引时移动硬盘/网络盘未就绪，
+            // 都会让索引与磁盘实际状态相反（可播放筛出不可播放、不可播放筛出可播放）。
+            // 因此选中「不可播放/可播放」时，先按当前磁盘状态现场重建索引，再应用筛选。
+            if (sender is RadioButton button &&
+                playWrapPanel.Children.OfType<RadioButton>().ToList() is List<RadioButton> plays &&
+                plays.IndexOf(button) > 0) {
+
+                VideoList.onWaiting?.Invoke(LangManager.GetValueByKey("VerifyingFileStatus"), true);
+                bool ok = false;
+                try {
+                    ok = await DataIndexManager.RebuildAsync();
+                } finally {
+                    VideoList.onWaiting?.Invoke("", false);
+                }
+                if (ok && !ConfigManager.Settings.PlayableIndexCreated) {
+                    // 现场重建成功，索引已可用，无需用户再手动到【选项-库】建立
+                    ConfigManager.Settings.PlayableIndexCreated = true;
+                    ConfigManager.Settings.Save();
+                }
+            }
+
             if (!ConfigManager.Settings.PlayableIndexCreated) {
                 MessageNotify.Error(LangManager.GetValueByKey("PleaseSetExistsIndex"));
                 return;
@@ -629,6 +652,7 @@ namespace Jvedio.Core.UserControls
         private RadioButton _lastCheckedPosterRadio = null;
         private RadioButton _lastCheckedThumbRadio = null;
         private RadioButton _lastCheckedActorRadio = null;
+        private RadioButton _lastCheckedSubRadio = null;
 
         private void SetPosterExist(object sender, RoutedEventArgs e)
         {
@@ -674,6 +698,27 @@ namespace Jvedio.Core.UserControls
             ApplyFilter();
         }
 
+        private async void SetSubtitleExist(object sender, RoutedEventArgs e)
+        {
+            // 与「可播放」同理：字幕索引（metadata.SubtitleExist）只是上次重建时的快照，
+            // 点击「有字幕/无字幕」时先按当前磁盘状态现场重建，再应用筛选
+            RadioButton clicked = sender as RadioButton;
+            if (clicked == _lastCheckedSubRadio) {
+                clicked.IsChecked = false;
+                _lastCheckedSubRadio = null;
+            } else {
+                _lastCheckedSubRadio = clicked;
+            }
+
+            VideoList.onWaiting?.Invoke(LangManager.GetValueByKey("VerifyingFileStatus"), true);
+            try {
+                await DataIndexManager.RebuildAsync();
+            } finally {
+                VideoList.onWaiting?.Invoke("", false);
+            }
+            ApplyFilter();
+        }
+
         
         private void ResetToDefault()
         {
@@ -694,6 +739,9 @@ namespace Jvedio.Core.UserControls
             var actorRadios = actorExistWrapPanel.Children.OfType<RadioButton>().ToList();
             actorRadios.ForEach(rb => rb.IsChecked = false);
             _lastCheckedActorRadio = null;
+            var subRadios = subtitleExistWrapPanel.Children.OfType<RadioButton>().ToList();
+            subRadios.ForEach(rb => rb.IsChecked = false);
+            _lastCheckedSubRadio = null;
 
             rateSlider.MinValue = rateSlider.Minimum;
             rateSlider.MaxValue = rateSlider.Maximum;
@@ -840,6 +888,16 @@ namespace Jvedio.Core.UserControls
                     wrapper.Ge("mta.ActorID", 1);
                 else
                     wrapper.IsNull("mta.ActorID");
+            }
+
+            // 有无字幕（根据外挂 SRT 文件建立的索引）
+            int subSel = -1;
+            var subRadios = subtitleExistWrapPanel.Children.OfType<RadioButton>().ToList();
+            for (int i = 0; i < subRadios.Count; i++) {
+                if ((bool)subRadios[i].IsChecked) { subSel = i; break; }
+            }
+            if (subSel >= 0) {
+                wrapper.Eq("metadata.SubtitleExist", subSel == 0 ? 1 : 0);
             }
 
             // 时长

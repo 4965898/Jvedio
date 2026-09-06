@@ -25,6 +25,14 @@
     <sys:String x:Key="PleaseSetImageIndex">Please establish picture indexes in [Options-Library]!</sys:String>
     <sys:String x:Key="AutoRebuildImageIndex">Cumulative count to auto rebuild picture index after scraping (0 to disable)</sys:String>
     <sys:String x:Key="PleaseSetExistsIndex">Please establish a playback index in [Options-Library]!</sys:String>
+    <sys:String x:Key="VerifyingFileStatus">Verifying files against current disk status, please wait…</sys:String>
+    <sys:String x:Key="HasSubtitle">Subtitles</sys:String>
+    <sys:String x:Key="SubtitlePath">Subtitle Path</sys:String>
+    <sys:String x:Key="Yes">Yes</sys:String>
+    <sys:String x:Key="No">No</sys:String>
+    <sys:String x:Key="SubtitleInfo">Subtitles</sys:String>
+    <sys:String x:Key="HasSub">With Subtitles</sys:String>
+    <sys:String x:Key="NoSub">Without Subtitles</sys:String>
     <sys:String x:Key="CrawlAllWarning">The climbing of the whole library may cause your IP to be blocked, please use it with caution, try to synchronize the resources only required</sys:String>
     <sys:String x:Key="CrawlerServerHint">On the left is the supported information scraper. You need to fill in the URL corresponding to the scratch on the right. JVEDIO does not provide any website address!</sys:String>
     

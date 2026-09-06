@@ -68,6 +68,9 @@
 | 5.4.1.31（Jvedio29.39） | 2026-08-24 | 修正 4 个站点搜索路径 + 修复演员页按钮不换行（见 3.45） |
 | 5.4.1.32（Jvedio29.40） | 2026-08-24 | 新增演员英文名（罗马字）功能（见 3.46） |
 | 5.4.1.33（Jvedio29.41） | 2026-08-24 | 英文名始终显示 + 详情页「EN」转换按钮（见 3.47） |
+| 5.4.1.34（Jvedio29.42） | 2026-09-07 | 修复「可播放/不可播放」筛选结果与实际相反：筛选前按当前磁盘状态现场重建索引（见 3.48） |
+| 5.4.1.35（Jvedio29.43） | 2026-09-07 | 视频信息新增「有无字幕」「字幕地址」字段（见 3.49） |
+| 5.4.1.36（Jvedio29.44） | 2026-09-07 | 筛选器新增「字幕」筛选项（有字幕/无字幕，见 3.50） |
 
 > 这些发布说明与本地 diff 吻合，可互相印证。5.4.0.5 的 Release Body 已于 2026-08-09 更新为「下载指引 + 相对原版 5.4 的改进总结 + 原记录」三段式，源码也已同步 commit（见 1.2、第五章）。
 
@@ -803,6 +806,45 @@ SQL 全部改为 `LEFT JOIN` + `IsNull` 判定，不再混用 `INNER JOIN` + 取
 **验证**：Release 编译通过（EXIT=0，仅预存在 MSB3270/MSB3177 警告）；部署 `E:\Jvedio-5.3.1\Jvedio29.41.exe`（v5.4.1.33）。
 
 **经验**：功能入口要放在用户实际操作的界面（详情页），不能只放在逻辑上正确但用户不常去的界面（列表页）；「空值隐藏」类 UI 行为要确认用户预期——有的用户希望占位行始终可见。
+
+### 3.48 修复「可播放/不可播放」筛选结果与实际相反（2026-09-07，5.4.1.34 / Jvedio29.42）
+
+**用户反馈**（3.40 自动维护上线后仍出现）：筛选「可播放」结果里有不可播放的影片，筛「不可播放」结果里反而有能播放的。
+
+**排查**（逐一排除，全部正确）：UI 单选映射（All=0/UnPlayable=1/Playable=2 → `idx-1`）、三语文案（反编译 SuperControls.Style.dll 确认 Playable=可播放、UnPlayable=不可播放）、SQL 组装（`wrapper.Eq("metadata.PathExist", idx-1)`）、ORM 字典键大小写（SQLite 返回列名与 SQL 书写一致，实测验证）。
+
+**根因**：筛选查的是 `metadata.PathExist` 索引**快照**，播放用的是 `File.Exists(path)` **实时判断**——两者数据源天然不同步。3.40 的自动维护只覆盖「应用自己引发的变更」（扫描/删除/移动），三种场景仍会过时：①会话期间文件被**外部**增删/移动（重启前不会被发现）；②建立索引或启动重建时**移动硬盘/网络盘未就绪**（File.Exists 全 false，整库被标不可播放，盘挂上后完全反向）；③启动后台重建尚未跑完就点了筛选。新旧状态混杂 → 两个方向都错。
+
+**修复**（[Filter.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/Filter.xaml.cs) `SetPlayable`）：点击「不可播放/可播放」时，先 `DataIndexManager.RebuildAsync()` 按当前磁盘状态**现场重建**（复用主窗口 Waiting 遮罩显示「正在校验文件」），完成后再 ApplyFilter——结果与点击那一刻的磁盘一致；选「全部」不受影响。附带：现场重建成功后自动置 `PlayableIndexCreated=true` 并保存，升级用户不再需要手动建立播放索引。新增 `RebuildAsync()`（Task.Run 包装 RebuildOnce，异常返回 false）。
+
+**经验**：「索引加速查询」的架构必须回答「索引何时失效」；对文件存在性这类**随时可变**的判断，与其穷举同步时机（永远漏外部变更），不如把重建做便宜（轻量查询+分块事务）然后在**用户操作时现场重建**——把「快照」变成「请求时的一致性」。遮罩提示不可省略，否则用户会以为点了两下没反应。
+
+### 3.49 视频信息新增「有无字幕」「字幕地址」（2026-09-07，5.4.1.35 / Jvedio29.43）
+
+**需求**（用户提出）：视频信息面板（视频格式/时长/帧率/…/文件大小）末尾加「有无字幕」「字幕地址」，按是否存在 SRT 文件判断。
+
+**实现**：
+- [VideoInfo.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Entity/Common/VideoInfo.cs) 新增 `HasSubtitle`（本地化「有/无」）/`SubtitlePath` 两个 string 属性。
+- [Video.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Entity/Data/Video.cs) `GetMediaInfo()` 末尾检测：先试 `Path.ChangeExtension(path, ".srt")` 同名，再扫目录 `*.srt` 匹配「同名或 视频名+`.` 前缀」（兼容 `xxx.chs.srt`/`xxx.zh.srt`；前缀+`.` 判断不会误匹配 `xxx2.srt`）。检测逻辑提取为公共静态 `FindSrtFile()`（3.50 复用）。
+- [Window_Details.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Details.xaml) 文件大小之后加两行（样式与其他字段一致）；`CopyVideoInfo` 遍历面板取值，新字段**自动**包含。
+- 三语键：`HasSubtitle`/`SubtitlePath`/`Yes`/`No`。注意 Yes/No 不在 SuperControls.Style.dll 内（反编译确认），放 Jvedio 自己的语言字典即可（后合并的字典优先）。
+- 视频文件不存在时两字段留空（与其他 MediaInfo 字段行为一致）；不写库，打开详情页实时读取，增删 SRT 后重开即刷新。
+
+**经验**：`ChangeExtension` 对「无扩展名路径」的行为（直接追加）与「.srt 结尾」的场景要先想清楚；语言键放哪个字典要先确认不存在（反编译 DLL 查重），否则 `GetValueByKey` 返回的是键名本身。
+
+### 3.50 筛选器新增「字幕」筛选项（2026-09-07，5.4.1.36 / Jvedio29.44）
+
+**需求**（用户提出）：筛选器加「有字幕」筛选，位置在演员信息之下、时长之上。
+
+**实现**（完全复用「可播放」的索引架构，见 3.40/3.48）：
+- **存储**：`metadata` 新增 `SubtitleExist` 列（[Sqlite.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/DataBase/Tables/Sqlite.cs) ALTER TABLE，老库启动自动补列，重复执行抛 duplicate column 被 catch 忽略——与既有 ALTER 一致）。
+- **重建**：[DataIndexManager.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Tasks/DataIndexManager.cs) `RebuildOnce()` 一次磁盘遍历同时维护 PathExist 与 SubtitleExist（两条索引一份 I/O）。字幕检测用**目录级缓存**：每目录只扫一次 `*.srt`，把「文件名」和「去最后一个语言后缀的名」（`abc.chs`→同时收 `abc.chs` 与 `abc`）放进 HashSet，视频名匹配降为 O(1)；与 `FindSrtFile` 判断规则一致（视频存在但无 SRT→0；视频不存在→也记 0，状态无意义）。
+- **增量**：`MarkPathMissing`（删文件）同步清零字幕；`MarkPathExists`（移动/改路径）按新路径重查 `FindSrtFile`。
+- **筛选**：[Filter.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/Filter.xaml) 演员信息后插入字幕面板（有字幕/无字幕）；[Filter.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/Filter.xaml.cs) `SetSubtitleExist` 沿用演员信息的**可取消**交互（再点同一项=取消）+ 3.48 的现场重建（遮罩→RebuildAsync→ApplyFilter）；`ApplyFilter()` 加 `wrapper.Eq("metadata.SubtitleExist", subSel==0?1:0)`；`ResetToDefault` 清空。
+- **i18n**：`SubtitleInfo`/`HasSub`/`NoSub` 三语。
+- 老库升级**零操作**：启动后台重建即填好索引。
+
+**经验**：新筛选项若是「存在性」语义，先看 PathExist 的成套方案（列+重建+增量+现场重建）能不能整体套用——本次约 200 行改动里真正的「新逻辑」只有目录缓存和前缀匹配；「去后缀进集合」的技巧把 O(视频数×目录内SRT数) 的匹配压成 O(1) Contains，批量扫描时收益明显。
 
 ## 四、踩坑经验（重点）
 

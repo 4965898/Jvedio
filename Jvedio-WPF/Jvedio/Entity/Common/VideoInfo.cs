@@ -1,4 +1,4 @@
-﻿namespace Jvedio.Entity
+namespace Jvedio.Entity
 {
     /// <summary>
     /// 视频信息
@@ -84,6 +84,16 @@
         public string Extension { get; set; }
 
         public string FileName { get; set; }
+
+        /// <summary>
+        /// 有无字幕（根据是否存在外挂 SRT 文件判断，值为本地化的「有/无」）
+        /// </summary>
+        public string HasSubtitle { get; set; }
+
+        /// <summary>
+        /// 字幕地址（同名 SRT 文件路径，不存在则为空）
+        /// </summary>
+        public string SubtitlePath { get; set; }
         #endregion
         public VideoInfo()
         {

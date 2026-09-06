@@ -9,6 +9,7 @@ namespace Jvedio.Core.DataBase.Tables
             public static List<string> SqlCommands { get; set; } = new List<string>()
             {
                 "ALTER TABLE metadata ADD COLUMN PathExist INT DEFAULT 0;",
+                "ALTER TABLE metadata ADD COLUMN SubtitleExist INT DEFAULT 0;",
                 "ALTER TABLE actor_info ADD COLUMN ImageUrl TEXT;",
                 "ALTER TABLE common_search_history ADD COLUMN TypeMode INT DEFAULT 0;",
                 "ALTER TABLE metadata ADD COLUMN TitleCN TEXT DEFAULT '';",
