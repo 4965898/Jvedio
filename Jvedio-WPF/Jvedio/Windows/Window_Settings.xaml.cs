@@ -1096,7 +1096,7 @@ namespace Jvedio
                 translateField2Panel == null || translateField3Panel == null || translateModelPanel == null ||
                 translateModelInput == null || translateUrlInput == null || translateTestResult == null)
                 return;
-            if (translatePlatformComboBox.SelectedItem is not TranslatePlatformDef def)
+            if (!(translatePlatformComboBox.SelectedItem is TranslatePlatformDef def))
                 return;
             // 先保存「上一个平台」的输入框内容（此时 SelectedItem 已是新平台），再加载新平台配置
             SaveCurrentTranslateSetting();
@@ -1108,7 +1108,7 @@ namespace Jvedio
 
         private void UpdateTranslateLabels()
         {
-            if (translatePlatformComboBox.SelectedItem is not TranslatePlatformDef def)
+            if (!(translatePlatformComboBox.SelectedItem is TranslatePlatformDef def))
                 return;
             translateField1Label.Text = string.IsNullOrEmpty(def.Field1Label) ? "—" : def.Field1Label;
             translateField2Label.Text = string.IsNullOrEmpty(def.Field2Label) ? "—" : def.Field2Label;
@@ -1370,6 +1370,23 @@ namespace Jvedio
                 case 3: return Jvedio.Core.Export.ExportHelper.ExportFormat.Json;
                 default: return Jvedio.Core.Export.ExportHelper.ExportFormat.Csv;
             }
+        }
+
+        /// <summary>
+        /// 建立视频时长索引（metadata_video.FileDuration，秒）：
+        /// 后台全量读取本地视频真实时长（分段取各段之和）；已有重建在运行时忽略本次点击。
+        /// 打开详情页也会惰性写入（Video.UpdateFileDurationIndex）。
+        /// </summary>
+        private void BuildFileDurationIndex(object sender, RoutedEventArgs e)
+        {
+            Jvedio.Core.Tasks.DurationIndexManager.RebuildAsync().ContinueWith(t => {
+                Dispatcher.BeginInvoke(new Action(() => {
+                    if (t.Result)
+                        SuperControls.Style.MessageCard.Success(LangManager.GetValueByKey("FileDurationIndexDone"));
+                    else
+                        SuperControls.Style.MessageCard.Warning(LangManager.GetValueByKey("FileDurationIndexRunning"));
+                }));
+            });
         }
 
         private async void CreatePlayableIndex(object sender, RoutedEventArgs e)

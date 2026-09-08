@@ -38,6 +38,13 @@
     <sys:String x:Key="AllPicture">所有图片</sys:String>
     <sys:String x:Key="RecentView">最近浏览</sys:String>
     <sys:String x:Key="Actors">演员</sys:String>
+    <sys:String x:Key="Series">系列</sys:String>
+    <sys:String x:Key="DragToSort">拖动排序</sys:String>
+    <sys:String x:Key="MovieDuration">影片时长</sys:String>
+    <sys:String x:Key="VideoDuration">视频时长</sys:String>
+    <sys:String x:Key="BuildFileDurationIndex">建立视频时长索引（读取本地视频真实长度）</sys:String>
+    <sys:String x:Key="FileDurationIndexDone">视频时长索引建立完成</sys:String>
+    <sys:String x:Key="FileDurationIndexRunning">视频时长索引正在建立中，请稍候</sys:String>
     <sys:String x:Key="HasPoster">有海报图</sys:String>
     <sys:String x:Key="NoPoster">无海报图</sys:String>
     <sys:String x:Key="HasThumbnail">有缩略图</sys:String>

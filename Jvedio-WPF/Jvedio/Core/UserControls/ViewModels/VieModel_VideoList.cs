@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.CustomEventArgs;
+using Jvedio.Core.CustomEventArgs;
 using Jvedio.Core.Enums;
 using Jvedio.Entity;
 using Jvedio.Entity.CommonSQL;
@@ -84,6 +84,7 @@ namespace Jvedio.Core.UserControls.ViewModels
             "metadata.Rating",
             "metadata_video.Duration",
             "ACTOR_FIRST_NAME",
+            "metadata_video.FileDuration",
         };
 
         public static string[] SelectFields =
@@ -552,6 +553,11 @@ namespace Jvedio.Core.UserControls.ViewModels
 
 
 
+        /// <summary>
+        /// 搜索分词分隔符（空格/Tab/全角空格），模仿 Everything：多个词按 AND 匹配
+        /// </summary>
+        private static readonly char[] SearchTokenSeparators = new char[] { ' ', '\t', '　' };
+
         public SelectWrapper<Video> GetSearchWrapper(SearchField searchType)
         {
             SelectWrapper<Video> wrapper = new SelectWrapper<Video>();
@@ -560,24 +566,59 @@ namespace Jvedio.Core.UserControls.ViewModels
             string formatSearch = SearchText.ToProperSql().Trim();
             if (string.IsNullOrEmpty(formatSearch))
                 return null;
-            string searchContent = formatSearch;
+
+            // 空格分词：如「ESM 016」等价于同时包含 ESM 和 016（命中库内 ESM-016）
+            string[] tokens = formatSearch.Split(SearchTokenSeparators, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length == 0)
+                return null;
 
             switch (searchType) {
                 case SearchField.VID:
-
-                    string vid = JvedioLib.Security.Identify.GetVID(formatSearch);
-                    if (string.IsNullOrEmpty(vid))
-                        searchContent = formatSearch;
-                    else
-                        searchContent = vid;
-                    wrapper.Like("VID", searchContent);
+                    foreach (string token in tokens) {
+                        string vid = JvedioLib.Security.Identify.GetVID(token);
+                        string content = string.IsNullOrEmpty(vid) ? token : vid;
+                        // 无分隔符的紧凑番号（如 ESM016）拆为前缀+数字，使「ESM016」也能命中「ESM-016」
+                        string prefix, number;
+                        if (TrySplitCompactVid(content, out prefix, out number)) {
+                            wrapper.Like("VID", prefix);
+                            wrapper.Like("VID", number);
+                        } else {
+                            wrapper.Like("VID", content);
+                        }
+                    }
                     break;
                 default:
-                    wrapper.Like(searchType.ToString(), searchContent);
+                    foreach (string token in tokens)
+                        wrapper.Like(searchType.ToString(), token);
                     break;
             }
 
             return wrapper;
+        }
+
+        /// <summary>
+        /// 判断无分隔符的紧凑番号（字母段≥2位 + 数字段≥2位，如 ESM016），拆出字母前缀与数字段
+        /// </summary>
+        private static bool TrySplitCompactVid(string content, out string prefix, out string number)
+        {
+            prefix = null;
+            number = null;
+            if (string.IsNullOrEmpty(content) || content.Length < 4)
+                return false;
+            int i = 0;
+            while (i < content.Length && char.IsLetter(content[i]))
+                i++;
+            if (i < 2 || i >= content.Length)
+                return false;
+            for (int j = i; j < content.Length; j++) {
+                if (!char.IsDigit(content[j]))
+                    return false;
+            }
+            if (content.Length - i < 2)
+                return false;
+            prefix = content.Substring(0, i);
+            number = content.Substring(i);
+            return true;
         }
 
 
@@ -704,6 +745,58 @@ namespace Jvedio.Core.UserControls.ViewModels
             _RenderTask = RenderAsync(version);
         }
 
+        /// <summary>
+        /// 获取当前结果集的全部影片（含筛选面板/搜索/页签/侧边栏多重条件，不分页）
+        /// 用于空白处右键「全部资源」批量操作——「全部」指当前展示的资源，而非物理全库
+        /// </summary>
+        public List<Video> GetAllCurrentVideos()
+        {
+            // 组装逻辑与 Select() 完全一致（仅去掉分页与排序，字段换精简版）
+            SelectWrapper<Video> wrapper = Video.InitWrapper();
+
+            string sql = VideoMapper.SQL_BASE;
+
+            if (ExtraWrapper != null) {
+                wrapper.Join(ExtraWrapper);
+                if (!string.IsNullOrEmpty(ExtraWrapper.ExtraSql))
+                    sql += ExtraWrapper.ExtraSql;
+            }
+
+            if (SearchWrapper != null) {
+                wrapper.Join(SearchWrapper);
+                if (!string.IsNullOrEmpty(SearchWrapper.ExtraSql))
+                    sql += SearchWrapper.ExtraSql;
+            }
+
+            if (FilterWrapper != null) {
+                wrapper.Join(FilterWrapper);
+                if (!string.IsNullOrEmpty(FilterSQL))
+                    sql += FilterSQL;
+            }
+
+            SearchField searchType = (SearchField)SearchSelectedIndex;
+            if (Searching) {
+                if (searchType == SearchField.ActorName)
+                    sql += VideoMapper.SQL_JOIN_ACTOR;
+                else if (searchType == SearchField.LabelName)
+                    sql += VideoMapper.SQL_JOIN_LABEL;
+            } else if (!string.IsNullOrEmpty(ClickFilterType)) {
+                if (ClickFilterType == "Label") {
+                    sql += VideoMapper.SQL_JOIN_LABEL;
+                } else if (ClickFilterType == "Actor") {
+                    sql += VideoMapper.SQL_JOIN_ACTOR;
+                }
+            }
+
+            string select = "SELECT DISTINCT metadata.DataID, MVID, VID, metadata.Grade, metadata.Title, Path, Hash ";
+            string select_sql = select + sql + wrapper.ToWhere(false);
+
+            List<Dictionary<string, object>> list = metaDataMapper.Select(select_sql);
+            if (list == null || list.Count == 0)
+                return new List<Video>();
+            return metaDataMapper.ToEntity<Video>(list, typeof(Video).GetProperties(), false);
+        }
+
         public void SetSortOrder<T>(IWrapper<T> wrapper, bool random = false)
         {
             if (wrapper == null)
@@ -725,8 +818,10 @@ namespace Jvedio.Core.UserControls.ViewModels
                         wrapper.Desc(merged);
                     else
                         wrapper.Asc(merged);
-                } else if (sortField.IndexOf("VID", StringComparison.OrdinalIgnoreCase) >= 0) {
+                } else if (sortField == "metadata_video.VID") {
                     // 识别码排序：按「字母前缀 + 数字后缀」两段排，避免 LUXU-119 → LUXU-1190 → LUXU-120 的字符串序
+                    // 注意：必须精确匹配——IndexOf("VID") 会误命中 metadata_video.Duration（"video" 含 "vid"），
+                    // 导致时长排序走识别码分支（历史 bug：时长按字符串字典序排，90 后面是 9）
                     // 注意：wrapper.Asc/Desc 是覆盖语义（后调覆盖先调），多字段排序必须合并为单个表达式
                     // 前缀：第一个 '-' 之前；数字：最后一个 '-' 之后（兼容 FC2-PPV-123456 双连字符），数字零填充 15 位再拼接
                     string prefix = $"CASE WHEN {sortField} LIKE '%-%' THEN SUBSTR({sortField},1,INSTR({sortField},'-')-1) ELSE {sortField} END";
@@ -744,6 +839,22 @@ namespace Jvedio.Core.UserControls.ViewModels
                     // 「最近播放(已同步)」被挤到末尾（hitchao/Jvedio#362/#437）
                     // 注意：wrapper.Asc/Desc 是覆盖语义（后调覆盖先调），多键必须合并为单个表达式（逗号分隔）
                     string merged = $"CASE WHEN {sortField} IS NULL OR {sortField}='' THEN 1 ELSE 0 END, {sortField} COLLATE NOCASE";
+                    if (SortDescending)
+                        wrapper.Desc(merged);
+                    else
+                        wrapper.Asc(merged);
+                } else if (sortField == "metadata_video.Duration") {
+                    // 影片时长（刮削元数据）排序：CAST 整数化（SQLite 类型亲和性下 INT 列可能混有历史字符串值，
+                    // 直接 ORDER BY 会按「数字在前、文本按字典序」混合排序，结果乱序）；
+                    // 0（未知时长）恒排末尾——CASE 键不带方向，与 Title/Actor 排序的空值处理同理，升降序均正确
+                    string merged = $"CASE WHEN CAST({sortField} AS INTEGER) <= 0 THEN 1 ELSE 0 END, CAST({sortField} AS INTEGER)";
+                    if (SortDescending)
+                        wrapper.Desc(merged);
+                    else
+                        wrapper.Asc(merged);
+                } else if (sortField == "metadata_video.FileDuration") {
+                    // 视频时长（本地文件真实长度，秒）：0（未建索引/读不到）恒排末尾，手法同上
+                    string merged = $"CASE WHEN CAST({sortField} AS INTEGER) <= 0 THEN 1 ELSE 0 END, CAST({sortField} AS INTEGER)";
                     if (SortDescending)
                         wrapper.Desc(merged);
                     else
@@ -986,7 +1097,9 @@ namespace Jvedio.Core.UserControls.ViewModels
 
         private void SetGenreCandidate(string field, List<Dictionary<string, object>> list, ref List<string> result)
         {
-            string search = SearchText.ToProperSql().ToLower();
+            // 与 GetSearchWrapper 一致：空格分词后全部命中才作为候选
+            string[] tokens = SearchText.ToProperSql().ToLower()
+                .Split(SearchTokenSeparators, StringSplitOptions.RemoveEmptyEntries);
             HashSet<string> set = new HashSet<string>();
             foreach (Dictionary<string, object> dict in list) {
                 if (!dict.ContainsKey(field))
@@ -1004,7 +1117,10 @@ namespace Jvedio.Core.UserControls.ViewModels
                 }
             }
 
-            result = set.Where(arg => arg.ToLower().IndexOf(search) >= 0).ToList()
+            result = set.Where(arg => {
+                string lower = arg.ToLower();
+                return tokens.All(t => lower.IndexOf(t) >= 0);
+            }).ToList()
                 .Take(SEARCH_CANDIDATE_MAX_COUNT).ToList();
         }
 

@@ -108,6 +108,12 @@ Users : [User Guide](https://github.com/hitchao/Jvedio/wiki/02_Beginning)
 | 5.4.1.34 (Jvedio29.42) | 2026-09-07 | Fixed the "Playable/Not Playable" filter returning inverted results: the index is only a snapshot of the last rebuild (files externally added/removed/moved during the session, or the removable/network drive not ready when the index was built, make it stale). Clicking "Not Playable/Playable" now rebuilds the index on the spot against the current disk state (with a "verifying files" overlay) before filtering; a successful on-the-spot rebuild automatically marks the index as created, so upgrading users no longer need to manually build the playability index |
 | 5.4.1.35 (Jvedio29.43) | 2026-09-07 | Video info adds "Subtitles" and "Subtitle Path" fields (after file size): detected from external SRT files, supporting both same-name xxx.srt and language-suffixed xxx.chs.srt / xxx.zh.srt naming; the "Copy video info" button automatically includes the new fields |
 | 5.4.1.36 (Jvedio29.44) | 2026-09-07 | New "Subtitles" filter (below actor info, above duration; With/Without, click again to cancel): metadata adds a SubtitleExist column, rebuilt in the background together with the resource-existence index on startup/after scans (directory-level caching for speed), rebuilt on the spot when clicked to guarantee results match the disk; incrementally synced on file deletion/move; no manual action needed after upgrading |
+| 5.4.1.37 (Jvedio29.45) | 2026-09-08 | Search box now supports space-separated keywords (Everything-style AND matching, applies to all search fields): typing "ESM 016" or "ESM016" both match hyphenated IDs like "ESM-016" (compact IDs auto-split); fixed the search popup "Tag" tab actually searching the Series field (renamed to "Series" with i18n for all three languages); blank-area right-click "All Data" menu now adds: tag all videos and advanced functions (translate title / screenshot / GIF / rename / strip leading zeros / three image-deletion options, each with a count confirmation) |
+| 5.4.1.38 (Jvedio29.46) | 2026-09-08 | Tag list in the filter panel now supports drag-and-drop reordering: each tag has a six-dot grip handle on the left, hold and drag up/down to reorder with instant persistence (new tags are appended at the end); "All Data" batch operations semantics corrected to "the currently displayed result set" (including filter/search conditions, matching the pagination total, not the physical whole library) |
+| 5.4.1.39 (Jvedio29.47) | 2026-09-08 | Video info "Subtitle Path" supports drag-to-pan: when the long path doesn't fit on one line, hold and drag left/right to reveal the hidden part (tooltip shows the full path on hover; short paths keep normal text selection) |
+| 5.4.1.40 (Jvedio29.48) | 2026-09-08 | Fixed subtitle path drag not working (layout cause: unconstrained TextBox width meant the content never overflowed; now fills the remaining width); drag direction adjusted: drag right to reveal the hidden part, drag left to return to the beginning |
+| 5.4.1.41 (Jvedio29.49) | 2026-09-08 | Subtitle path now uses standard text-box interaction: click shows the I-beam cursor, drag to select with a light-blue highlight, auto-scrolls at the edge to reveal everything, right-click to copy; fixed the "Duration" sort being wrong (legacy string values caused mixed-type misordering; now integer-sorted with unknown durations always last) |
+| 5.4.1.42 (Jvedio29.50) | 2026-09-08 | Dual-track duration sorting: fixed the root cause of duration always sorting as strings (the "video" in the column name contains the substring "vid", hijacking the sort branch); the old "Duration" renamed to "Movie Duration" (scraped metadata); new "Video Duration" sort — by the real length of local video files (multi-part videos sum all parts), with a "Build Video Duration Index" button under Options-Index for background rebuild; opening the details page also records it lazily; unreadable files sort last as unknown |
 
 
 # Software Characteristics
@@ -159,6 +165,9 @@ Including the following plug -in
 
 ## Rich search function
 
+- Multi-field search: ID, title, path, actor, label, genre, series, studio, director
+- Space-separated keywords (AND matching, Everything-style): "ESM 016" or "ESM016" both find "ESM-016"
+
 [<img src="https://s1.ax1x.com/2022/10/07/x8MxOS.png" alt="x8MxOS.png" style="zoom:80%;" />](https://imgse.com/i/x8MxOS)
 
 ## New actor information
@@ -188,6 +197,8 @@ Including the following plug -in
 - The rich right -click function
 
 [<img src="https://s1.ax1x.com/2022/10/07/x8Qhhn.png" alt="x8Qhhn.png" style="zoom:80%;" />](https://imgse.com/i/x8Qhhn)
+
+- Blank-area right-click "All Data" batch operations: add tag, translate title, screenshot/GIF, rename files, strip leading zeros from IDs, delete images, sync info, export video data (each with a count confirmation)
 
 - Smart classification
 

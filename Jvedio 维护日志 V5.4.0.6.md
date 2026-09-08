@@ -71,6 +71,12 @@
 | 5.4.1.34（Jvedio29.42） | 2026-09-07 | 修复「可播放/不可播放」筛选结果与实际相反：筛选前按当前磁盘状态现场重建索引（见 3.48） |
 | 5.4.1.35（Jvedio29.43） | 2026-09-07 | 视频信息新增「有无字幕」「字幕地址」字段（见 3.49） |
 | 5.4.1.36（Jvedio29.44） | 2026-09-07 | 筛选器新增「字幕」筛选项（有字幕/无字幕，见 3.50） |
+| 5.4.1.37（Jvedio29.45） | 2026-09-08 | 搜索框空格分词（模仿 Everything）+ VID 紧凑番号拆分 + 修复 Tag 页签实际搜 Series（见 3.51）；空白处右键「全部资源」新增添加标记/扩展功能全库版（见 3.52） |
+| 5.4.1.38（Jvedio29.46） | 2026-09-08 | 筛选面板标记列表支持拖拽排序：每行左侧新增六点拖拽手柄，按住上下拖动即重排并持久化（见 3.53） |
+| 5.4.1.39（Jvedio29.47） | 2026-09-08 | 视频信息「字幕地址」支持拖拽平移查看：长路径单行显示不全时，按住左右拖动即可查看被遮挡部分（见 3.54） |
+| 5.4.1.40（Jvedio29.48） | 2026-09-08 | 修复字幕地址拖拽完全无效（布局根因：水平 StackPanel 内 TextBox 宽度不受限、内容永不溢出，改 DockPanel 填充布局）；拖拽方向按用户习惯调整：向右拖查看被遮挡部分、向左拖回到开头（见 3.54 修订） |
+| 5.4.1.41（Jvedio29.49） | 2026-09-08 | 字幕地址改为标准文本框行为：I 型光标、拖选出淡蓝选区、拖到边缘自动滚动（用户按此习惯二次反馈后弃用自定义平移，见 3.54 二次修订）；修复「时长」排序错误：Duration 列混有历史字符串值时乱序，改 CAST 整数排序 + 0 值恒排末尾（见 3.55） |
+| 5.4.1.42（Jvedio29.50） | 2026-09-08 | 时长排序双轨制：修复排序分支 VID 子串误匹配（"video" 含 "vid" 致时长永远走识别码字符串排序——上一版 CAST 修复从未生效的真正根因）；原「时长」更名「影片时长」（刮削元数据）；新增「视频时长」排序（本地文件真实长度）：metadata_video 新增 FileDuration 列（秒），打开详情页惰性写入 + 选项-索引「建立视频时长索引」后台全量重建（分段取各段之和，读不到记 0 排末尾）（见 3.56） |
 
 > 这些发布说明与本地 diff 吻合，可互相印证。5.4.0.5 的 Release Body 已于 2026-08-09 更新为「下载指引 + 相对原版 5.4 的改进总结 + 原记录」三段式，源码也已同步 commit（见 1.2、第五章）。
 
@@ -845,6 +851,103 @@ SQL 全部改为 `LEFT JOIN` + `IsNull` 判定，不再混用 `INNER JOIN` + 取
 - 老库升级**零操作**：启动后台重建即填好索引。
 
 **经验**：新筛选项若是「存在性」语义，先看 PathExist 的成套方案（列+重建+增量+现场重建）能不能整体套用——本次约 200 行改动里真正的「新逻辑」只有目录缓存和前缀匹配；「去后缀进集合」的技巧把 O(视频数×目录内SRT数) 的匹配压成 O(1) Contains，批量扫描时收益明显。
+
+### 3.51 搜索框空格分词（模仿 Everything）+ VID 紧凑番号拆分（2026-09-08，5.4.1.37 / Jvedio29.45）
+
+**需求**（用户提出）：搜「ESM 016」或「ESM016」搜不到「ESM-016」，必须完整输入连字符形式；希望模仿 Everything 的空格搜索逻辑。
+
+**根因**：`GetSearchWrapper` 把整个搜索串作为**一个** LIKE 参数（`VID like '%ESM 016%'`），空格只是普通字符，整体子串不匹配即落空；且 VID 搜索虽先过 `GetVID()` 提取番号，但「ESM016」这类无分隔符输入提取不出带连字符的形式。
+
+**可行性调研**（动手前反射实测 `SuperUtils.dll` 的 `SelectWrapper`）：多次 `Like()` 自动以 AND 拼接（`where VID like '%ESM%' and VID like '%016%'`）——空格分词**天然可行**；但 `NotLike` 不存在、`Or()`/`LeftBracket()` 有 bug（实测抛 `where condition is not equal to data of [and/or]`）、`ExtraSql` 是拼在 FROM 后而非 WHERE——排除/正则/OR 分组**无法**通过 wrapper 表达。`ToProperSql` 会删除 `'` 和 `%`（防注入）。据此与用户确认：**只做空格分词**（AND 子串匹配），不做排除/正则/OR。
+
+**实现**：
+- [VieModel_VideoList.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/ViewModels/VieModel_VideoList.cs) `GetSearchWrapper`：按空格/Tab/全角空格分词，每个 token 一个 `Like`（wrapper 自动 AND）；所有搜索字段（标题/演员/类别…）同步获得分词能力。
+- **VID 紧凑番号拆分**（新增 `TrySplitCompactVid`）：token 形如「字母段≥2位+纯数字段≥2位」（如 `ESM016`）且无其他字符时，拆为 `Like("VID","ESM") + Like("VID","016")`，使 `ESM016`、`ESM 016`、`ESM-016` 三种输入全部命中库内 `ESM-016`。保守边界：字母段<2（`T28`）、数字段<2（`FC2`）、含连字符（`FC2-123456`）都不拆，走原逻辑——避免把 FC2 这类前缀误拆致全 FC 系误命中。
+- `SetGenreCandidate`（类别联想）同步改为多 token 全命中（`tokens.All(t => lower.IndexOf(t) >= 0)`）。
+- **顺手修复既有 bug**：搜索弹层第 7 个页签 Header 显示「Tag」（`DynamicResource Tag`），但 `SearchField` 枚举无 Tag 项、按索引 6 实际搜的是 `Series` 字段——[VideoList.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/VideoList.xaml) 页签改为 `DynamicResource Series`，三语文件新增 `Series` 键（系列/Series/シリーズ；键不在 SuperControls.Style.dll 内，放 Jvedio 自己的字典即可，后合并优先）。
+
+**兼容性**：单 token 输入解析后仍是一个条件，行为与旧版完全一致；只有含空格的输入才获得新语义。性能无回归——`LIKE '%x%'` 本就全表扫描，多 token 只是同行多几次判断。
+
+**经验**：改造依赖库（SuperUtils.dll 无源码）前先反射实测 API 行为再定方案，避免按文档想象设计出跑不通的功能；「AND 分词」恰好落在 wrapper 现有能力内，是最小改动换最大体验的一档。同文件多处编辑必须**串行**执行（并行 Edit 互相覆盖，本次踩过：两处 `is not`→`!(...)` 并行改，一处的修改被另一处基于旧快照的写回覆盖）。
+
+### 3.52 空白处右键「全部资源」新增添加标记/扩展功能全库版（2026-09-08，5.4.1.37 / Jvedio29.45）
+
+**需求**（用户提出）：仓库空白处右键的「全部资源」只有生成截图/同步信息/导出三项，太少；希望把普通右键菜单的「添加标记」和整个「扩展功能」也复制过来，可对全库批量操作；生成截图本就在扩展功能中，合并。
+
+**实现**（[VideoList.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/VideoList.xaml) 空白处 ContextMenu + [VideoList.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/VideoList.xaml.cs) 新增 region「全部资源」）：
+- **菜单结构**：全部资源 → 添加标记（子菜单，ContextMenu `Opened` 时动态填充 `TagStamp.TagStamps`）+ 扩展功能（翻译标题/生成截图[合并自原顶层项]/生成GIF/重命名文件/清除零/仅删海报/仅删缩略图/删两者）+ 同步信息 + 导出影片数据。
+- **首版踩坑（用户反馈不可用后修复）**：最初把填充逻辑挂在标记项的 `SubmenuOpened` 事件上——但 WPF 的 MenuItem **无子项时根本不出现子菜单**，事件永不触发（需要子项才有子菜单、需要子菜单打开才填充子项，死锁）；且 `AllTagMenuItems` 嵌套在「全部资源」二级菜单内，顶层遍历也找不到。修复：填充改到 ContextMenu 的 `Opened` 事件 + `FindMenuItemByName` 递归查找（对齐普通菜单在 `ContextMenu_ContextMenuOpening` 填充 `TagMenuItems` 的既有模式）。
+- **语义修正（用户反馈后第二版）**：首版把「全部资源」实现为物理全库（`Video.GetAllByDBID`）；用户指出原菜单语义是**当前展示的结果集**——经过筛选面板/搜索/页签/侧边栏多重筛选后剩下的资源（刚进库未筛选时才等于全库）。修正：`VieModel_VideoList` 新增 `GetAllCurrentVideos()`，查询组装与 `Select()` 完全一致（ExtraWrapper/SearchWrapper/FilterWrapper+FilterSQL/Searching 与 ClickFilterType 的 JOIN 分支原样照抄），仅去掉分页与排序、Select 字段换精简版（DataID/MVID/VID/Grade/Title/Path/Hash）；`GetCurrentVideosConfirm`（原 GetAllVideosConfirm）、`AddTagToAll`（改为按结果集 DataID 分批 500 条 insert or replace，不再用 insert-select 全库 SQL）、`GenerateAllScreenShot`、`DownloadAllVideo` 全部切换到该方法。确认框数量即当前结果集数量，与页面分页总数一致。
+- **添加标记（全库）**：`AddTagToAll` 打标后 `onInitTagStamps` 刷新筛选器、`RefreshTagStamps` 刷新当前页显示。子菜单项不设勾选态（批量状态下勾选语义不明），点击即添加。
+- **统一确认防呆**：新增 `GetAllVideosConfirm(action)`——取全库数量并弹「{操作} N 个资源，是否继续？」，取消/空库返回 null；翻译/GIF/重命名/清零/三种删图全部走它（对齐既有 生成截图/同步信息 的确认交互）。
+- **复用而非复制**：`TranslateMovie` 抽出 `TranslateVideos(List<Video>)` 供选中版/全库版共用（保留快照防「集合已修改」的经验，见 3.41）；三个删图 handler 抽出 `DeleteImageForVideo(v, delSmall, delBig)` 共用（行为与旧版逐行等价）；`RenameAllFile` 直接调核心 `RenameFile(List,logger,ref dict)`（其内部按 DataID 重取全量数据，天然不依赖选中态）。
+- **配套**：[Video.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Entity/Data/Video.cs) `GetAllByDBID` 的 SelectFields 补 `Path`/`Hash`（删图需按 RelativeToData 模式取图片路径、GetImagePath 的 Hash 兜底；仅两个既有调用方，多取两列无害且利于截图任务取输入文件）。
+- **刻意不放入**：「数据关联」——其语义是把多个条目**合并关联为一个影片**（对话框以第一个为目标、其余为待关联），对全库执行等于把整个库合并成一个条目，危险且无意义，未复制（用户如确有需要再议）。
+
+**经验**：把「选中操作」升级为「全库操作」时，先审视每个功能的语义是否随批量改变（数据关联即反例）；危险/耗时操作必须带数量确认框；能抽公共核心的就抽（删图/翻译），选中版与全库版共用一份实现，避免双份维护。
+
+### 3.53 标记列表拖拽排序（2026-09-08，5.4.1.38 / Jvedio29.46）
+
+**需求**（用户提出）：筛选面板「标记」列表的标签支持点击拖动上下排序，左侧放三个竖排点作为拖拽手柄（市面软件通用样式）。
+
+**现状**：`common_tagstamp` 表**没有排序列**，展示顺序 = `SelectList()` 返回顺序（实际按 TagID 自增序，即创建顺序），无任何排序入口。
+
+**实现**：
+- **存储**：`common_tagstamp` 新增 `SortOrder INT DEFAULT -1`（[Sqlite.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/DataBase/Tables/Sqlite.cs) ALTER 迁移 + [app_datas.sql](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Data/Sql/app_datas.sql) 建表同步，重复执行抛 duplicate column 被 catch 忽略——与既有迁移一致）；[TagStamp.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Entity/CommonSQL/TagStamp.cs) 加 `SortOrder` 属性（默认 -1，**新建标记自动排到末尾**）。
+- **读取**：`GetAllTagStamp()` 内存排序——`SortOrder>=0` 在前按序号排，`-1`（未排序/新建）在后按 TagID 排。**兼容性**：老库全部 -1 → 退化为纯 TagID 序 = 升级前后顺序不变。
+- **UI**（[Filter.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/Filter.xaml)）：ItemTemplate 外包一层 Grid，左列 18px 放六点手柄（2 列×3 行 2.5px Ellipse，`Window.Foreground` 半透明，`Cursor=Hand`，ToolTip「拖动排序」），右列原 `PathCheckButton`；整行 `AllowDrop`。
+- **拖拽**（[Filter.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/Filter.xaml.cs) region「标记拖拽排序」）：手柄 `MouseLeftButtonDown` 直接 `DragDrop.DoDragDrop`（手柄专用于拖动，无需位移阈值）；行 `Drop` = 移到目标行之前；ItemsControl `Drop`（空白处）= 移到末尾；`ReorderTag` 移动**同一实例**（勾选/计数状态保留，无需重载列表）；`PersistTagOrder` 一个事务批量 `update ... set SortOrder=i`，随后同步全局缓存 `TagStamp.TagStamps`（右键标记菜单、InitTagStamp 等消费方顺序一致）。
+- **i18n**：`DragToSort` 三语。
+
+**经验**：① WPF 原生 `DragDrop.DoDragDrop` 对 ItemsControl 重排足够（不必引第三方库）：DataObject 自定义格式字符串传 TagID，行级 Drop + Handled=true 阻断冒泡，ItemsControl 级 Drop 兜底「移到末尾」；② 排序列默认值取 **-1 而非 0**：0 会与「拖过一次后的首位」冲突（新标记插进头部），-1+「负值排最后」让新建标记永远追加到末尾；③ 拖拽重排只动 ObservableCollection + 批量写库，不触发列表重载——重载会丢 Selected 状态（exist:false 不入库）。
+
+### 3.54 视频信息「字幕地址」拖拽平移查看（2026-09-08，5.4.1.39 / Jvedio29.47）
+
+**需求**（用户提出）：视频信息面板的「字幕地址」是长路径，固定宽度下显示不全；希望像常见软件那样，按住文字左右拖拽即可平移查看被遮挡的部分。
+
+**实现**（[Window_Details.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Details.xaml) 字幕地址行 + [Window_Details.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Windows/Window_Details.xaml.cs) region「字幕地址拖拽平移」）：
+- TextBox 改单行不换行：`TextWrapping="NoWrap"` + `HorizontalScrollBarVisibility="Hidden"`（Hidden 仍可编程滚动，Disabled 不行）——长路径不再截断，而是成为可平移的单行内容；顺带加 `ToolTip`（悬停即可看全路径，不拖也能看）。
+- 拖拽三件套：`PreviewMouseLeftButtonDown` 记录起点与当前 `HorizontalOffset`（仅当 `ExtentWidth > ViewportWidth` 即内容真的溢出时才启用）；`PreviewMouseMove` 位移超过 `SystemParameters.MinimumHorizontalDragDistance`（系统拖拽阈值）后进入平移，`ScrollToHorizontalOffset(startOffset - dx)`，`e.Handled=true` 吞掉默认拖选；`PreviewMouseLeftButtonUp` 若发生过平移则 `Handled=true` 吞掉松手点击（否则 caret 跳到点击处，且 IsReadOnly TextBox 会把选择行为残留）。
+- **未溢出时零干扰**：短路径保持原有点选 caret/双击选词/右键复制行为（CanPan=false 时事件直接放行）。
+- 鼠标移出控件（`MouseLeave`）复位标志——移出后松手不会触发 Up，不复位会导致下次 Move 在未按下时误入平移分支。
+
+**经验**：TextBox 实现拖拽平移的三个关键：① 只在内容溢出时拦截鼠标（`ExtentWidth > ViewportWidth`），否则破坏正常文本选择；② 平移用「按下时刻的 `HorizontalOffset` 减位移增量」而不是累计增量，避免与 TextBox 内部滚动的竞态；③ 松手事件要 `Handled` 吞掉，否则平移结束后会触发一次 caret 定位/选择，视觉上「跳一下」。`MinimumHorizontalDragDistance` 阈值前不拦截，天然保留了「点击=定位 caret」的原语义。
+
+**修订（5.4.1.40，用户反馈首版完全无效后修复）**：① **布局根因**——字幕行原来是水平 StackPanel，其子元素测量时宽度不受限（TextBox 想多宽有多宽），内容**永远不会在 TextBox 内部溢出**（`ExtentWidth == ViewportWidth`），所谓「显示不全」是祖先容器裁剪的视觉效果——CanPan 恒为 false，拖拽逻辑从未启用。修复：该行改 DockPanel，标签+冒号 Dock 左，TextBox 作为末子元素**填充剩余宽度**，长路径产生真实内部溢出，拖拽才生效。② **方向**按用户习惯取「滚动条滑块」模型：向右拖=offset 增大=查看右侧被遮挡部分，向左拖=回到开头（`startOffset + dx`；首版实现的是「抓住内容」模型 `-dx`，与用户预期相反）。③ 平移开始时 `CaptureMouse()`、松手 `ReleaseMouseCapture()`——否则光标拖出 30px 高的输入框后 Move 事件不再路由到 TextBox，平移冻结在边界处。
+
+**教训**：WPF 里「控件内容显示不全」有两种成因——**内部溢出**（ExtentWidth > ViewportWidth，控件自身滚动）与**祖先裁剪**（控件实际比可见区域大）。基于 `ExtentWidth/ViewportWidth` 的逻辑只对前者有效；水平 StackPanel 的子元素宽度不受限，属于后者的重灾区。做「滚动/平移/截断省略」类功能前，先确认布局真的让控件宽度受限（DockPanel/Grid 星列/MaxWidth），否则一切滚动 API 都是空转。方向语义没有对错（「抓内容」vs「滚动条滑块」两种心智模型都常见），按用户明确表达的预期实现即可。
+
+**二次修订（5.4.1.41）**：用户二次反馈——期望的其实不是自定义平移，而是**标准文本框行为**：单击出现 I 型光标 → 拖动框选出淡蓝色选区 → 拖到边缘时视图自动滚动看全（选区持续扩展）。弃用全部自定义拖拽代码（region 整体删除），保留 5.4.1.40 的 DockPanel 布局修复 + NoWrap + Hidden 滚动条——WPF TextBox（含 IsReadOnly）原生自带该行为：I-beam 光标、SystemColors 淡蓝选区、`TextEditorSelection` 的拖选越界 auto-scroll timer。教训：**做交互前先问清/试原生控件行为**，用户描述的「以往软件的样子」往往就是原生控件默认行为，自己造轮子反而把原生能力（选择/复制）吞掉了。三次迭代才到位，前两次都在错误的问题定义上打转。
+
+### 3.55 修复「时长」排序错误（2026-09-08，5.4.1.41 / Jvedio29.49）
+
+**现象**（用户反馈）：排序菜单选「时长」，结果乱序。
+
+**排查**：排序菜单索引 ↔ `SortDict` 逐项对齐无误；反射实测 wrapper `Asc("metadata_video.Duration")` 生成 `ORDER BY metadata_video.Duration ASC` 无误；entity `Video.Duration` 为 int、NFO 导入 ParseType.Int。**根因**：`metadata_video.Duration` 建表为 `INT DEFAULT 0`，但 SQLite 类型亲和性不阻止字符串写入——历史刮削/导入路径可能落过字符串值；`ORDER BY` 对混合类型列按「数字 < 文本」分组、文本组内按字典序排（"118" < "45" < "9"），整体乱序。同时升序时时长 0（未扫描/未知）的影片挤到最前，观感也是「排错了」。
+
+**修复**（[VieModel_VideoList.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/ViewModels/VieModel_VideoList.cs) `SetSortOrder` 新增 Duration 分支）：
+```sql
+ORDER BY CASE WHEN CAST(metadata_video.Duration AS INTEGER) <= 0 THEN 1 ELSE 0 END, CAST(metadata_video.Duration AS INTEGER)
+```
+CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只作用于末键），0 值恒排末尾，升降序均正确——与 Title/Actor 排序的空值处理同一手法（见 3.23 注释）。
+
+**经验**：SQLite 弱类型是排序 bug 的高发源头——INT 列不保证存的都是整数，凡是依赖数值序的 ORDER BY/比较，`CAST(col AS INTEGER)` 应成为默认动作；「未知/零值」要不要排末尾，从用户视角（未知≠最短）而非数学视角（0 最小）决定。
+
+### 3.56 时长排序双轨制：影片时长 vs 视频时长（2026-09-08，5.4.1.42 / Jvedio29.50）
+
+**需求**（用户提出，两轮反馈收敛）：① 叠加筛选后按「时长」排序仍乱（90 分钟后是 9 分钟而非 89）——典型的字符串字典序；② 现有「时长」实为刮削的影片元数据，用户真正想排的是**本地视频文件的真实长度**，两者应拆开：原项更名「影片时长」，新增「视频时长」排序。
+
+**真正的根因（上一版 CAST 修复为何无效）**：`SetSortOrder` 的识别码分支判断是 `sortField.IndexOf("VID", OrdinalIgnoreCase) >= 0`——列名 **`metadata_video.Duration` 里的 "video" 恰好包含子串 "vid"**，时长排序永远先命中识别码分支，按字符串排（"80" > "8" > "79"）；我 5.4.1.41 加的 Duration CAST 分支写在后面，**从未执行**。修复：识别码判断改精确匹配 `sortField == "metadata_video.VID"`。
+
+**实现**：
+- **原「时长」→「影片时长」**：排序菜单改用新 i18n 键 `MovieDuration`（沿用 `metadata_video.Duration` 列，CAST 整数排序 + 0 恒排末尾）。`Duration` 键在 SuperControls.Style.dll 内（筛选面板/表格列等多处共用），不可改值，只能换键。
+- **新列 `metadata_video.FileDuration INT DEFAULT 0`**（秒，0=未知）：ALTER 迁移（重复执行抛 duplicate column 被 catch）+ [single_db_video.sql](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Data/Sql/single_db_video.sql) 建表同步。**不给 Video 实体加属性**——该实体横跨 metadata/metadata_video 两表，ORM 写路径脆弱（SubSection setter 副作用、两表字段拆分约定），全部读写走原生 SQL，零波及。
+- **读取**（[Video.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Entity/Data/Video.cs)）：`GetFileDurationSeconds(path)` 用 MediaInfo 取 `Duration` 参数（毫秒字符串，区别于详情页的 `Duration/String1` 格式化文本）；`GetFileDurationSeconds(video)` 分段视频取 SubSectionList 各段之和；`UpdateFileDurationIndex(video)` 原生 SQL 落库。
+- **填充（混合策略）**：① 惰性——详情页 `LoadVideoInfo`（后台线程内）顺手 `UpdateFileDurationIndex`；② 手动——[DurationIndexManager](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Tasks/DurationIndexManager.cs)（新增，仿 DataIndexManager）：选项-索引区新按钮「建立视频时长索引」，`Interlocked` 单飞（重复点击返回 false 提示进行中），全量 SELECT 后逐条 MediaInfo（文件不存在/读不到记 0），500 条一个分块小事务（避免巨型事务锁库，3.39 教训），完成 MessageCard 提示。
+- **排序**：SortDict **末尾追加** `metadata_video.FileDuration`（不能插中间——SortType 索引持久化在配置里，插入会串位所有老用户的已保存排序项）；SetSortOrder 新分支与影片时长同手法（CAST + 0 恒排末尾）。
+- **i18n**：`MovieDuration`/`VideoDuration`/`BuildFileDurationIndex`/`FileDurationIndexDone`/`FileDurationIndexRunning` 三语。
+
+**经验**：① **子串匹配是排序路由的天敌**——字段名含子串（Duration 含 "vid"）会让 if-else 链提前命中错误分支，这类「加了一个修复分支却不生效」的问题，回归验证时必须**用实际乱序数据测**而不是看代码觉得对；② 跨两表的 ORM 实体加列风险高时，原生 SQL 是零侵入替代；③ 持久化的枚举索引（SortType）**只能尾部追加**，中间插入等于静默篡改所有用户的存量配置。
 
 ## 四、踩坑经验（重点）
 

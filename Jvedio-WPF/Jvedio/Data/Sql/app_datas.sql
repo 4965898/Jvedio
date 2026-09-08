@@ -169,6 +169,7 @@ create table common_tagstamp (
     Background VARCHAR(100),
     TagName VARCHAR(200),
 
+    SortOrder INT DEFAULT -1,
     ExtraInfo TEXT,
     CreateDate VARCHAR(30) DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%S', 'NOW', 'localtime')),
     UpdateDate VARCHAR(30) DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%S', 'NOW', 'localtime'))

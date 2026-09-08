@@ -1540,14 +1540,26 @@
                                                     Text="{Binding VideoInfo.HasSubtitle}" />
                                             </StackPanel>
 
-                                            <StackPanel Margin="0,5" Orientation="Horizontal">
-                                                <TextBlock Style="{StaticResource BaseTextBlock}" Text="{DynamicResource SubtitlePath}" />
-                                                <TextBlock Style="{StaticResource BaseTextBlock}" Text="：" />
+                                            <!--  字幕行用 DockPanel：TextBox 填充剩余宽度，长路径产生内部溢出  -->
+                                            <DockPanel Margin="0,5">
+                                                <TextBlock
+                                                    DockPanel.Dock="Left"
+                                                    Style="{StaticResource BaseTextBlock}"
+                                                    Text="{DynamicResource SubtitlePath}" />
+                                                <TextBlock
+                                                    DockPanel.Dock="Left"
+                                                    Style="{StaticResource BaseTextBlock}"
+                                                    Text="：" />
+                                                <!--  原生文本框选择行为：I 型光标、拖选出淡蓝选区、拖到边缘自动滚动看全部；单行不换行 + 隐藏滚动条，悬停 ToolTip 看全路径  -->
                                                 <TextBox
                                                     Margin="0"
+                                                    HorizontalScrollBarVisibility="Hidden"
                                                     Style="{StaticResource ViewTextBox}"
-                                                    Text="{Binding VideoInfo.SubtitlePath}" />
-                                            </StackPanel>
+                                                    Text="{Binding VideoInfo.SubtitlePath}"
+                                                    TextWrapping="NoWrap"
+                                                    ToolTip="{Binding VideoInfo.SubtitlePath}"
+                                                    VerticalScrollBarVisibility="Disabled" />
+                                            </DockPanel>
 
                                             <TextBlock
                                                 Margin="0"

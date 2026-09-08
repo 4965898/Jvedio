@@ -19,6 +19,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using static Jvedio.MapperManager;
@@ -541,6 +542,111 @@ namespace Jvedio.Core.UserControls
             if (sender is TogglePanel panel && panel.IsLoaded && panel.IsExpanded)
                 InitTagStamp();
         }
+
+        #region "标记拖拽排序"
+
+        /// <summary>
+        /// 拖拽传递的数据格式：标记 TagID
+        /// </summary>
+        private const string TagReorderFormat = "JvedioTagReorder";
+
+        /// <summary>
+        /// 按下手柄启动拖拽（手柄专用于拖动，按下即开始，无需位移阈值判断）
+        /// </summary>
+        private void TagGrip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!(sender is FrameworkElement grip) || !(grip.DataContext is TagStamp stamp))
+                return;
+            DataObject data = new DataObject(TagReorderFormat, stamp.TagID);
+            DragDrop.DoDragDrop(grip, data, DragDropEffects.Move);
+            e.Handled = true;
+        }
+
+        private void TagRow_DragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(TagReorderFormat)) {
+                e.Effects = DragDropEffects.Move;
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// 放到某一行上：移动到目标行的位置（插到目标行之前）
+        /// </summary>
+        private void TagRow_Drop(object sender, DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(TagReorderFormat))
+                return;
+            if (!(sender is FrameworkElement row) || !(row.DataContext is TagStamp target))
+                return;
+            long tagID;
+            try {
+                tagID = (long)e.Data.GetData(TagReorderFormat);
+            } catch {
+                return;
+            }
+            ReorderTag(tagID, TagStamps.IndexOf(target));
+            e.Handled = true;
+        }
+
+        /// <summary>
+        /// 放到列表空白处：移动到末尾
+        /// </summary>
+        private void TagList_Drop(object sender, DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(TagReorderFormat))
+                return;
+            long tagID;
+            try {
+                tagID = (long)e.Data.GetData(TagReorderFormat);
+            } catch {
+                return;
+            }
+            ReorderTag(tagID, TagStamps.Count - 1);
+            e.Handled = true;
+        }
+
+        /// <summary>
+        /// 把标记移动到最终列表的 insertIndex 位置（移动的是同一实例，勾选/计数状态保留），并持久化排序
+        /// </summary>
+        private void ReorderTag(long tagID, int insertIndex)
+        {
+            TagStamp source = TagStamps.FirstOrDefault(arg => arg.TagID == tagID);
+            if (source == null)
+                return;
+            int oldIndex = TagStamps.IndexOf(source);
+            if (oldIndex < 0)
+                return;
+            if (insertIndex < 0)
+                insertIndex = TagStamps.Count - 1;
+            TagStamps.RemoveAt(oldIndex);
+            if (insertIndex > oldIndex)
+                insertIndex--;
+            insertIndex = Math.Max(0, Math.Min(insertIndex, TagStamps.Count));
+            TagStamps.Insert(insertIndex, source);
+            if (insertIndex != oldIndex)
+                PersistTagOrder();
+        }
+
+        /// <summary>
+        /// 把当前显示顺序写入 common_tagstamp.SortOrder（一个事务批量更新），并同步全局缓存顺序
+        /// </summary>
+        private void PersistTagOrder()
+        {
+            System.Text.StringBuilder builder = new System.Text.StringBuilder("begin;");
+            for (int i = 0; i < TagStamps.Count; i++)
+                builder.Append($"update common_tagstamp set SortOrder={i} where TagID={TagStamps[i].TagID};");
+            builder.Append("commit;");
+            try {
+                tagStampMapper.ExecuteNonQuery(builder.ToString());
+                // 同步全局缓存顺序（其他消费方如 InitTagStamp/右键标记菜单按此顺序展示）
+                TagStamp.TagStamps = TagStamps.ToList();
+            } catch (Exception ex) {
+                App.Logger.Error(ex);
+            }
+        }
+
+        #endregion
 
         private void Common_Expand(object sender, EventArgs e)
         {

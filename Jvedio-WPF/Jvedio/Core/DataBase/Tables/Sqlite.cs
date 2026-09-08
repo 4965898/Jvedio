@@ -15,6 +15,10 @@ namespace Jvedio.Core.DataBase.Tables
                 "ALTER TABLE metadata ADD COLUMN TitleCN TEXT DEFAULT '';",
                 "ALTER TABLE actor_info ADD COLUMN ShoeSize VARCHAR(100);",
                 "ALTER TABLE actor_info ADD COLUMN ActorNameEN VARCHAR(500);",
+                // 标记排序（-1=未排序，排在已排序标记之后；拖拽排序后全部编号 0..N）
+                "ALTER TABLE common_tagstamp ADD COLUMN SortOrder INT DEFAULT -1;",
+                // 视频真实时长（秒，0=未知；来源 MediaInfo，分段视频取各段之和），区别于刮削的影片时长 Duration
+                "ALTER TABLE metadata_video ADD COLUMN FileDuration INT DEFAULT 0;",
                 "INSERT or ignore into common_tagstamp (TagID,Foreground,Background,TagName) " +
                     "VALUES (10000,'255,255,255,255','255,165,0,255','新加入');",
                 // 未修正默认标签（hitchao/Jvedio#424：文件名 -U/-UC 自动标记）；老库迁移补 TagID=3

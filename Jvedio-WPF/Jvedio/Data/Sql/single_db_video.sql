@@ -1,4 +1,4 @@
-﻿-- 元数据管理
+-- 元数据管理
 
 -- 【公共表】
 
@@ -92,6 +92,7 @@ create table metadata_video(
     Plot TEXT,
     Outline TEXT,
     Duration INT DEFAULT 0,
+    FileDuration INT DEFAULT 0,
     SubSection TEXT,
     ImageUrls TEXT DEFAULT '',
     

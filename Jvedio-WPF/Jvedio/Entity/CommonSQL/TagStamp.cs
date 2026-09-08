@@ -1,4 +1,4 @@
-﻿using Jvedio.Mapper;
+using Jvedio.Mapper;
 using SuperUtils.Framework.ORM.Attributes;
 using SuperUtils.Framework.ORM.Enums;
 using SuperUtils.WPF.VisualTools;
@@ -58,6 +58,11 @@ namespace Jvedio.Entity.CommonSQL
 
         [TableId(IdType.AUTO)]
         public long TagID { get; set; }
+
+        /// <summary>
+        /// 排序号（-1=未排序，排在已排序标记之后；筛选面板拖拽排序后统一编号 0..N）
+        /// </summary>
+        public int SortOrder { get; set; } = -1;
 
         public string TagName { get; set; }
 

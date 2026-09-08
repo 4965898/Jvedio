@@ -47,6 +47,13 @@
     <sys:String x:Key="NoPoster">ポスターなし</sys:String>
     <sys:String x:Key="RecentView">最近見た</sys:String>
     <sys:String x:Key="Actors">女優</sys:String>
+    <sys:String x:Key="Series">シリーズ</sys:String>
+    <sys:String x:Key="DragToSort">ドラッグで並べ替え</sys:String>
+    <sys:String x:Key="MovieDuration">収録時間</sys:String>
+    <sys:String x:Key="VideoDuration">動画の長さ</sys:String>
+    <sys:String x:Key="BuildFileDurationIndex">動画の長さインデックスを作成（ローカルファイルの実際の長さを読み取る）</sys:String>
+    <sys:String x:Key="FileDurationIndexDone">動画の長さインデックス作成完了</sys:String>
+    <sys:String x:Key="FileDurationIndexRunning">動画の長さインデックス作成中です</sys:String>
     <sys:String x:Key="Menu_DeletePosterOnly">ポスターのみ削除</sys:String>
     <sys:String x:Key="Menu_DeleteThumbnailOnly">サムネイルのみ削除</sys:String>
     <sys:String x:Key="Menu_DeletePosterAndThumbnail">ポスター+サムネイルを削除</sys:String>

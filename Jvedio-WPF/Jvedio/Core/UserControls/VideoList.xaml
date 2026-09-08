@@ -254,7 +254,7 @@
                             <TabItem Header="{DynamicResource Actors}" />
                             <TabItem Header="{DynamicResource Label}" />
                             <TabItem Header="{DynamicResource Genre}" />
-                            <TabItem Header="{DynamicResource Tag}" />
+                            <TabItem Header="{DynamicResource Series}" />
                             <TabItem Header="{DynamicResource Studio}" />
                             <TabItem Header="{DynamicResource Director}" />
                         </TabControl>
@@ -393,8 +393,9 @@
                 <MenuItem Header="{DynamicResource ViewNumber}" IsCheckable="True" />
                 <MenuItem Header="{DynamicResource ReleaseDate}" IsCheckable="True" />
                 <MenuItem Header="{DynamicResource Rating}" IsCheckable="True" />
-                <MenuItem Header="{DynamicResource Duration}" IsCheckable="True" />
+                <MenuItem Header="{DynamicResource MovieDuration}" IsCheckable="True" />
                 <MenuItem Header="{DynamicResource Actors}" IsCheckable="True" />
+                <MenuItem Header="{DynamicResource VideoDuration}" IsCheckable="True" />
               </ContextMenu>
             </super:HoverPath.ContextMenu>
                 </super:HoverPath>
@@ -542,7 +543,7 @@
                     FocusVisualStyle="{x:Null}"
                     Visibility="{Binding DataContext.ShowTable, ElementName=videoList, Converter={StaticResource BoolToOppositeVisibilityConverter}}">
                     <super:SimplePanel.ContextMenu>
-                        <ContextMenu>
+                        <ContextMenu Opened="BlankContextMenu_Opened">
                             <MenuItem
                                 Click="SelectAll"
                                 FontWeight="Bold"
@@ -550,7 +551,20 @@
                             <Separator />
 
                             <MenuItem Header="{DynamicResource AllData}">
-                                <MenuItem Click="GenerateAllScreenShot" Header="{DynamicResource Menu_GenerateScreenShot}" />
+                                <MenuItem
+                                    Name="AllTagMenuItems"
+                                    Header="{DynamicResource AddTagStamp}" />
+                                <MenuItem Header="{DynamicResource Menu_Advance}">
+                                    <MenuItem Click="TranslateAllMovie" Header="{DynamicResource TranslateTitle}" />
+                                    <MenuItem Click="GenerateAllScreenShot" Header="{DynamicResource Menu_GenerateScreenShot}" />
+                                    <MenuItem Click="GenerateAllGif" Header="{DynamicResource Menu_GenerateGif}" />
+                                    <MenuItem Click="RenameAllFile" Header="{DynamicResource Menu_RenameFile}" />
+                                    <MenuItem Click="ReMoveAllZero" Header="{DynamicResource Menu_RemoveZero}" />
+                                    <Separator />
+                                    <MenuItem Click="DeleteAllPosterOnly" Header="{DynamicResource Menu_DeletePosterOnly}" />
+                                    <MenuItem Click="DeleteAllThumbnailOnly" Header="{DynamicResource Menu_DeleteThumbnailOnly}" />
+                                    <MenuItem Click="DeleteAllPosterAndThumbnail" Header="{DynamicResource Menu_DeletePosterAndThumbnail}" />
+                                </MenuItem>
                                 <MenuItem Click="DownloadAllVideo" Header="{DynamicResource SyncInfo}" />
                                 <MenuItem Header="{DynamicResource ExportVideoData}">
                                     <MenuItem Click="ExportAllVideoData" Header="{DynamicResource ExportNormal}" />

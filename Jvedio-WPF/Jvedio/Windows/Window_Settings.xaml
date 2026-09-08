@@ -2113,6 +2113,14 @@
                                         IsEnabled="{Binding IndexCreating, Converter={StaticResource OppositeBooleanConverter}}"
                                         Style="{StaticResource ButtonPrimary}" />
                                 </StackPanel>
+                                <!--  视频真实时长索引（FileDuration）：后台全量重建，配合详情页惰性写入  -->
+                                <Button
+                                    Margin="5"
+                                    HorizontalAlignment="Left"
+                                    Click="BuildFileDurationIndex"
+                                    Content="{DynamicResource BuildFileDurationIndex}"
+                                    FontSize="{DynamicResource GlobalFontSize}"
+                                    Style="{StaticResource ButtonPrimary}" />
                                 <StackPanel Margin="10" Orientation="Horizontal">
 
                                     <super:LoadingCircle

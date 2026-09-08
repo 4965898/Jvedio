@@ -48,6 +48,13 @@
     <sys:String x:Key="NoPoster">No Poster</sys:String>
     <sys:String x:Key="RecentView">Recent Viewed</sys:String>
     <sys:String x:Key="Actors">Actors</sys:String>
+    <sys:String x:Key="Series">Series</sys:String>
+    <sys:String x:Key="DragToSort">Drag to reorder</sys:String>
+    <sys:String x:Key="MovieDuration">Movie Duration</sys:String>
+    <sys:String x:Key="VideoDuration">Video Duration</sys:String>
+    <sys:String x:Key="BuildFileDurationIndex">Build Video Duration Index (read real file lengths)</sys:String>
+    <sys:String x:Key="FileDurationIndexDone">Video duration index built</sys:String>
+    <sys:String x:Key="FileDurationIndexRunning">Video duration index is being built, please wait</sys:String>
     <sys:String x:Key="Menu_DeletePosterOnly">Delete Poster Only</sys:String>
     <sys:String x:Key="Menu_DeleteThumbnailOnly">Delete Thumbnail Only</sys:String>
     <sys:String x:Key="Menu_DeletePosterAndThumbnail">Delete Poster + Thumbnail</sys:String>

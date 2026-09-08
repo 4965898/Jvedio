@@ -1359,7 +1359,7 @@ namespace Jvedio.Core.UserControls
                 return;
             }
 
-            List<Video> videos = Video.GetAllByDBID(ConfigManager.Main.CurrentDBId);
+            List<Video> videos = vieModel.GetAllCurrentVideos();
             if (videos == null || videos.Count == 0) {
                 MessageNotify.Error("数目为空");
                 return;
@@ -1377,7 +1377,7 @@ namespace Jvedio.Core.UserControls
 
         public void DownloadAllVideo(object sender, RoutedEventArgs e)
         {
-            List<Video> videos = Video.GetAllByDBID(ConfigManager.Main.CurrentDBId);
+            List<Video> videos = vieModel.GetAllCurrentVideos();
 
             if (videos == null || videos.Count == 0) {
                 MessageNotify.Error("数目为空");
@@ -1824,7 +1824,22 @@ namespace Jvedio.Core.UserControls
             // 先快照再处理：SelectedVideo 是活动列表，右键菜单/点击卡片等 UI 操作随时可能修改它，
             // 直接在后台循环里枚举活列表会抛「集合已修改；可能无法执行枚举操作」，
             // 导致批量翻译只翻译前一两部就静默停止（见 2026-08-21 运行日志）
-            List<Video> snapshot = videos.ToList();
+            TranslateVideos(videos.ToList());
+        }
+
+        /// <summary>
+        /// 全库翻译标题（空白处右键-全部资源）
+        /// </summary>
+        private void TranslateAllMovie(object sender, RoutedEventArgs e)
+        {
+            List<Video> videos = GetCurrentVideosConfirm(LangManager.GetValueByKey("TranslateTitle"));
+            if (videos == null)
+                return;
+            TranslateVideos(videos);
+        }
+
+        private void TranslateVideos(List<Video> snapshot)
+        {
             HashSet<long> seen = new HashSet<long>();
             List<Jvedio.Core.Translation.TranslateTask> tasks = new List<Jvedio.Core.Translation.TranslateTask>();
             foreach (Video video in snapshot) {
@@ -2132,22 +2147,8 @@ namespace Jvedio.Core.UserControls
             ObservableCollection<Video> videos = GetVideosByMenu(sender as MenuItem, 1);
             if (videos == null)
                 return;
-            for (int i = 0; i < vieModel.SelectedVideo.Count; i++) {
-                Video v = vieModel.SelectedVideo[i];
-                string big = v.GetBigImage();
-                if (File.Exists(big)) {
-                    try { File.Delete(big); } catch { }
-                    ImageCache.Remove(big);
-                }
-                v.BigImage = MetaData.DefaultBigImage;
-                bool smallExists = File.Exists(v.GetSmallImage());
-                bool bigExists = File.Exists(v.GetBigImage());
-                bool hasScreen = false;
-                string screenDir = v.GetScreenShot();
-                if (!string.IsNullOrEmpty(screenDir) && Directory.Exists(screenDir))
-                    hasScreen = Directory.EnumerateFiles(screenDir, "*.*", System.IO.SearchOption.TopDirectoryOnly).Any();
-                UpdateImageIndex(v.DataID, smallExists || hasScreen, bigExists || hasScreen);
-            }
+            for (int i = 0; i < vieModel.SelectedVideo.Count; i++)
+                DeleteImageForVideo(vieModel.SelectedVideo[i], false, true);
         }
 
         private void DeleteThumbnailOnly(object sender, RoutedEventArgs e)
@@ -2156,22 +2157,8 @@ namespace Jvedio.Core.UserControls
             ObservableCollection<Video> videos = GetVideosByMenu(sender as MenuItem, 1);
             if (videos == null)
                 return;
-            for (int i = 0; i < vieModel.SelectedVideo.Count; i++) {
-                Video v = vieModel.SelectedVideo[i];
-                string small = v.GetSmallImage();
-                if (File.Exists(small)) {
-                    try { File.Delete(small); } catch { }
-                    ImageCache.Remove(small);
-                }
-                v.SmallImage = MetaData.DefaultSmallImage;
-                bool smallExists = File.Exists(v.GetSmallImage());
-                bool bigExists = File.Exists(v.GetBigImage());
-                bool hasScreen = false;
-                string screenDir = v.GetScreenShot();
-                if (!string.IsNullOrEmpty(screenDir) && Directory.Exists(screenDir))
-                    hasScreen = Directory.EnumerateFiles(screenDir, "*.*", System.IO.SearchOption.TopDirectoryOnly).Any();
-                UpdateImageIndex(v.DataID, smallExists || hasScreen, bigExists || hasScreen);
-            }
+            for (int i = 0; i < vieModel.SelectedVideo.Count; i++)
+                DeleteImageForVideo(vieModel.SelectedVideo[i], true, false);
         }
 
         private void DeletePosterAndThumbnail(object sender, RoutedEventArgs e)
@@ -2180,29 +2167,240 @@ namespace Jvedio.Core.UserControls
             ObservableCollection<Video> videos = GetVideosByMenu(sender as MenuItem, 1);
             if (videos == null)
                 return;
-            for (int i = 0; i < vieModel.SelectedVideo.Count; i++) {
-                Video v = vieModel.SelectedVideo[i];
+            for (int i = 0; i < vieModel.SelectedVideo.Count; i++)
+                DeleteImageForVideo(vieModel.SelectedVideo[i], true, true);
+        }
+
+        /// <summary>
+        /// 删除单个视频的海报/缩略图并更新图片存在索引（选中与全库共用）
+        /// </summary>
+        private void DeleteImageForVideo(Video v, bool delSmall, bool delBig)
+        {
+            if (v == null)
+                return;
+            if (delSmall) {
                 string small = v.GetSmallImage();
-                string big = v.GetBigImage();
                 if (File.Exists(small)) {
                     try { File.Delete(small); } catch { }
                     ImageCache.Remove(small);
                 }
+                v.SmallImage = MetaData.DefaultSmallImage;
+            }
+            if (delBig) {
+                string big = v.GetBigImage();
                 if (File.Exists(big)) {
                     try { File.Delete(big); } catch { }
                     ImageCache.Remove(big);
                 }
-                v.SmallImage = MetaData.DefaultSmallImage;
                 v.BigImage = MetaData.DefaultBigImage;
-                bool smallExists = File.Exists(v.GetSmallImage());
-                bool bigExists = File.Exists(v.GetBigImage());
-                bool hasScreen = false;
-                string screenDir = v.GetScreenShot();
-                if (!string.IsNullOrEmpty(screenDir) && Directory.Exists(screenDir))
-                    hasScreen = Directory.EnumerateFiles(screenDir, "*.*", System.IO.SearchOption.TopDirectoryOnly).Any();
-                UpdateImageIndex(v.DataID, smallExists || hasScreen, bigExists || hasScreen);
             }
+            bool smallExists = File.Exists(v.GetSmallImage());
+            bool bigExists = File.Exists(v.GetBigImage());
+            bool hasScreen = false;
+            string screenDir = v.GetScreenShot();
+            if (!string.IsNullOrEmpty(screenDir) && Directory.Exists(screenDir))
+                hasScreen = Directory.EnumerateFiles(screenDir, "*.*", System.IO.SearchOption.TopDirectoryOnly).Any();
+            UpdateImageIndex(v.DataID, smallExists || hasScreen, bigExists || hasScreen);
         }
+
+        #region "全部资源（空白处右键）"
+
+        /// <summary>
+        /// 获取当前结果集的全部影片（含筛选/搜索条件，非物理全库）并弹确认框；结果为空或用户取消返回 null
+        /// </summary>
+        private List<Video> GetCurrentVideosConfirm(string action)
+        {
+            List<Video> videos = vieModel.GetAllCurrentVideos();
+            if (videos == null || videos.Count == 0) {
+                MessageNotify.Error("数目为空");
+                return null;
+            }
+            if (new MsgBox($"{action} {videos.Count} 个资源，是否继续？").ShowDialog() == false)
+                return null;
+            return videos;
+        }
+
+        /// <summary>
+        /// 空白处右键菜单打开时填充全库标记子菜单
+        /// （不能挂在 SubmenuOpened 上：MenuItem 无子项时不会出现子菜单，事件永远不会触发）
+        /// </summary>
+        private void BlankContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            if (!(sender is ContextMenu contextMenu))
+                return;
+            MenuItem tagMenu = FindMenuItemByName(contextMenu.Items, "AllTagMenuItems");
+            if (tagMenu == null)
+                return;
+            tagMenu.Items.Clear();
+            TagStamp.TagStamps.ForEach(arg => {
+                MenuItem menu = new MenuItem() { Header = arg.TagName };
+                long tagID = arg.TagID;
+                string tagName = arg.TagName;
+                menu.Click += (s, ev) => AddTagToAll(tagID, tagName);
+                tagMenu.Items.Add(menu);
+            });
+        }
+
+        /// <summary>
+        /// 递归查找指定名称的菜单项（AllTagMenuItems 嵌套在「全部资源」二级菜单内，顶层遍历找不到）
+        /// </summary>
+        private static MenuItem FindMenuItemByName(ItemCollection items, string name)
+        {
+            foreach (object obj in items) {
+                if (obj is MenuItem mi) {
+                    if (name.Equals(mi.Name))
+                        return mi;
+                    MenuItem child = FindMenuItemByName(mi.Items, name);
+                    if (child != null)
+                        return child;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 为当前结果集全部影片添加标记（含筛选/搜索条件，非物理全库）
+        /// </summary>
+        private void AddTagToAll(long tagID, string tagName)
+        {
+            if (tagID <= 0)
+                return;
+            List<Video> videos = GetCurrentVideosConfirm($"添加标记「{tagName}」");
+            if (videos == null)
+                return;
+
+            // 按当前结果集的 DataID 分批写入（单批多行 VALUES，避免超长 SQL）
+            const int BATCH_SIZE = 500;
+            for (int i = 0; i < videos.Count; i += BATCH_SIZE) {
+                IEnumerable<Video> batch = videos.Skip(i).Take(BATCH_SIZE);
+                string values = string.Join(",", batch.Select(v => $"({v.DataID},{tagID})"));
+                string sql = $"insert or replace into metadata_to_tagstamp (DataID,TagID) values {values}";
+                tagStampMapper.ExecuteNonQuery(sql);
+            }
+
+            onInitTagStamps?.Invoke();
+
+            // 刷新当前页各影片的标记显示
+            RefreshTagStamps(tagID);
+            MessageNotify.Success($"已为 {videos.Count} 个资源添加标记「{tagName}」");
+        }
+
+        /// <summary>
+        /// 全库生成 GIF（空白处右键-全部资源-扩展功能）
+        /// </summary>
+        public void GenerateAllGif(object sender, RoutedEventArgs e)
+        {
+            if (!File.Exists(ConfigManager.FFmpegConfig.Path)) {
+                MessageNotify.Error(SuperControls.Style.LangManager.GetValueByKey("Message_SetFFmpeg"));
+                return;
+            }
+            List<Video> videos = GetCurrentVideosConfirm("生成 GIF");
+            if (videos == null)
+                return;
+            foreach (Video video in videos)
+                ScreenShotTask.ScreenShotVideo(video, true);
+        }
+
+        /// <summary>
+        /// 全库重命名文件（空白处右键-全部资源-扩展功能）
+        /// </summary>
+        public void RenameAllFile(object sender, RoutedEventArgs e)
+        {
+            if (ConfigManager.RenameConfig.FormatString.IndexOf("{") < 0) {
+                MessageNotify.Error(SuperControls.Style.LangManager.GetValueByKey("Message_SetRenameRule"));
+                return;
+            }
+            List<Video> videos = GetCurrentVideosConfirm(LangManager.GetValueByKey("Menu_RenameFile"));
+            if (videos == null)
+                return;
+
+            List<string> logs = new List<string>();
+            TaskLogger logger = new TaskLogger(logs);
+            int totalCount = videos.Count;
+
+            Dictionary<long, List<string>> dict = new Dictionary<long, List<string>>();
+
+            // 核心 RenameFile 内部按 DataID 重取全量数据，Path 以核心取到的为准
+            int successCount = RenameFile(videos, logger, ref dict);
+
+            if (dict.Count > 0) {
+                ObservableCollection<Video> currentVideos = vieModel.CurrentVideoList;
+                UpdateVideo(dict, ref currentVideos);
+                MessageNotify.Success($"{SuperControls.Style.LangManager.GetValueByKey("Message_SuccessNum")} {successCount}/{totalCount} ");
+            } else {
+                MessageNotify.Info(LangManager.GetValueByKey("NoFileToRename"));
+            }
+
+            if (logs.Count > 0)
+                new Dialog_Logs(string.Join(Environment.NewLine, logs)).ShowDialog(App.Current.MainWindow);
+        }
+
+        /// <summary>
+        /// 全库清除 VID 前导零（空白处右键-全部资源-扩展功能）
+        /// </summary>
+        public void ReMoveAllZero(object sender, RoutedEventArgs e)
+        {
+            List<Video> videos = GetCurrentVideosConfirm(LangManager.GetValueByKey("Menu_RemoveZero"));
+            if (videos == null)
+                return;
+
+            int successNum = 0;
+            foreach (Video video in videos) {
+                string oldVID = video.VID.ToUpper();
+                if (oldVID.IndexOf("-") <= 0)
+                    continue;
+                string num = oldVID.Split('-').Last();
+                string eng = oldVID.Remove(oldVID.Length - num.Length, num.Length);
+                if (num.StartsWith("00")) {
+                    string newVID = eng + num.Remove(0, 2);
+                    video.VID = newVID;
+                    if (videoMapper.UpdateFieldById("VID", newVID, video.DataID)) {
+                        successNum++;
+                        vieModel.RefreshData(video.DataID);
+                    }
+                }
+            }
+
+            MessageCard.Info($"{SuperControls.Style.LangManager.GetValueByKey("Message_Success")} {successNum}/{videos.Count}");
+        }
+
+        /// <summary>
+        /// 全库删除海报图（空白处右键-全部资源-扩展功能）
+        /// </summary>
+        public void DeleteAllPosterOnly(object sender, RoutedEventArgs e)
+        {
+            List<Video> videos = GetCurrentVideosConfirm(LangManager.GetValueByKey("Menu_DeletePosterOnly"));
+            if (videos == null)
+                return;
+            foreach (Video v in videos)
+                DeleteImageForVideo(v, false, true);
+        }
+
+        /// <summary>
+        /// 全库删除缩略图（空白处右键-全部资源-扩展功能）
+        /// </summary>
+        public void DeleteAllThumbnailOnly(object sender, RoutedEventArgs e)
+        {
+            List<Video> videos = GetCurrentVideosConfirm(LangManager.GetValueByKey("Menu_DeleteThumbnailOnly"));
+            if (videos == null)
+                return;
+            foreach (Video v in videos)
+                DeleteImageForVideo(v, true, false);
+        }
+
+        /// <summary>
+        /// 全库删除海报图+缩略图（空白处右键-全部资源-扩展功能）
+        /// </summary>
+        public void DeleteAllPosterAndThumbnail(object sender, RoutedEventArgs e)
+        {
+            List<Video> videos = GetCurrentVideosConfirm(LangManager.GetValueByKey("Menu_DeletePosterAndThumbnail"));
+            if (videos == null)
+                return;
+            foreach (Video v in videos)
+                DeleteImageForVideo(v, true, true);
+        }
+
+        #endregion
 
     }
 }

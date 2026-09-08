@@ -1168,6 +1168,65 @@ namespace Jvedio.Entity
         }
 
         /// <summary>
+        /// 读取单个视频文件的真实时长（秒）。文件不存在或 MediaInfo 读不到返回 0（视为未知）
+        /// </summary>
+        public static long GetFileDurationSeconds(string videoPath)
+        {
+            if (string.IsNullOrEmpty(videoPath) || !File.Exists(videoPath))
+                return 0;
+            MediaInfo mI = null;
+            try {
+                mI = new MediaInfo();
+                mI.Open(videoPath);
+                // MediaInfo 的 "Duration" 参数返回毫秒数字符串（区别于 "Duration/String1" 的格式化文本）
+                string ms = mI.Get(StreamKind.General, 0, "Duration");
+                if (long.TryParse(ms, out long millis) && millis > 0)
+                    return (long)Math.Round(millis / 1000.0);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            } finally {
+                mI?.Close();
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// 视频真实时长（秒）：分段视频取各段之和；单文件直接读；无文件/读不到返回 0（视为未知）
+        /// </summary>
+        public static long GetFileDurationSeconds(Video video)
+        {
+            if (video == null)
+                return 0;
+            if (video.HasSubSection && video.SubSectionList != null && video.SubSectionList.Count > 0) {
+                long sum = 0;
+                foreach (var sub in video.SubSectionList) {
+                    if (sub == null)
+                        continue;
+                    sum += GetFileDurationSeconds(sub.Value);
+                }
+                return sum;
+            }
+            return GetFileDurationSeconds(video.Path);
+        }
+
+        /// <summary>
+        /// 惰性写入视频真实时长索引（metadata_video.FileDuration，秒，0=未知）：
+        /// 打开详情页时顺手落库，配合选项-库「建立视频时长索引」全量重建
+        /// </summary>
+        public static void UpdateFileDurationIndex(Video video)
+        {
+            if (video == null || video.DataID <= 0)
+                return;
+            try {
+                long seconds = GetFileDurationSeconds(video);
+                MapperManager.metaDataMapper.ExecuteNonQuery(
+                    $"update metadata_video set FileDuration={seconds} where DataID={video.DataID}");
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+        }
+
+        /// <summary>
         /// 保存信息到 NFO 文件
         /// </summary>
         /// <param name="video"></param>
@@ -1284,6 +1343,8 @@ namespace Jvedio.Entity
                 "VID",
                 "metadata.Grade",
                 "metadata.Title",
+                "Path",
+                "Hash",
             };
 
             wrapper.Select(SelectFields);

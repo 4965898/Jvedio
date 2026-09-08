@@ -1,6 +1,7 @@
-﻿using Jvedio.Entity.CommonSQL;
+using Jvedio.Entity.CommonSQL;
 using Jvedio.Mapper.BaseMapper;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Jvedio.Mapper
 {
@@ -19,7 +20,11 @@ namespace Jvedio.Mapper
 
         public List<TagStamp> GetAllTagStamp()
         {
-            return MapperManager.tagStampMapper.SelectList();
+            // 已排序（SortOrder>=0）的在前按序号排；未排序（-1，含新建）的在后按 TagID 排
+            return MapperManager.tagStampMapper.SelectList()
+                .OrderBy(arg => arg.SortOrder < 0 ? int.MaxValue : arg.SortOrder)
+                .ThenBy(arg => arg.TagID)
+                .ToList();
         }
     }
 }

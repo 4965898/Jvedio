@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.Media;
+using Jvedio.Core.Media;
 using Jvedio.Core.UserControls.ViewModels;
 using Jvedio.Entity;
 using Jvedio.Mapper;
@@ -211,6 +211,8 @@ namespace Jvedio.ViewModel
             await Task.Run(() => {
                 LoadingVideoInfo = true;
                 VideoInfo = Video.GetMediaInfo(CurrentVideo.Path);
+                // 惰性维护视频真实时长索引（FileDuration，秒）——排序「视频时长」依赖此列
+                Video.UpdateFileDurationIndex(CurrentVideo);
                 return true;
             });
             LoadingVideoInfo = false;

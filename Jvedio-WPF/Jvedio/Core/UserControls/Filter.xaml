@@ -186,7 +186,12 @@
                             IsSelected="False"
                             LineWidth="0"
                             Style="{StaticResource BaseTogglePanel}">
-                            <ItemsControl x:Name="TagStampItemsControl" Background="Transparent">
+                            <ItemsControl
+                                x:Name="TagStampItemsControl"
+                                AllowDrop="True"
+                                Background="Transparent"
+                                DragOver="TagRow_DragOver"
+                                Drop="TagList_Drop">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <StackPanel />
@@ -194,33 +199,116 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <super:PathCheckButton
-                                            Name="pathCheckButton"
-                                            Height="30"
-                                            Margin="0"
-                                            CheckedBrush="{DynamicResource Window.Side.Hover.Background}"
-                                            Click="PathCheckButton_Click"
-                                            CornerRadius="0"
-                                            Fill="{Binding BackgroundBrush}"
-                                            FontSize="{DynamicResource GlobalFontSize12}"
-                                            Foreground="{Binding ForegroundBrush}"
-                                            IsChecked="{Binding Selected, Mode=TwoWay}"
-                                            MainText="{Binding TagName}"
-                                            Path="M121.6 247.872h780.8c23.488 0 42.496 19.008 42.496 42.496v417.92a42.496 42.496 0 0 1-42.496 42.496H121.6a42.496 42.496 0 0 1-42.496-42.496v-417.92a42.496 42.496 0 0 1 42.496-42.496z"
-                                            PathHeight="20"
-                                            PathMargin="5 -5 5 0"
-                                            SubText="{Binding Count}"
-                                            Tag="{Binding TagID}">
-                                            <super:PathCheckButton.ContextMenu>
-                                                <ContextMenu>
-                                                    <MenuItem Click="EditTagStamp" Header="{DynamicResource Edit}" />
-                                                    <MenuItem
-                                                        super:CommonExt.HoverBackground="{DynamicResource Menu.Hover.Deep.Background}"
-                                                        Click="DeleteTagStamp"
-                                                        Header="{DynamicResource Delete}" />
-                                                </ContextMenu>
-                                            </super:PathCheckButton.ContextMenu>
-                                        </super:PathCheckButton>
+                                        <Grid AllowDrop="True" DragOver="TagRow_DragOver" Drop="TagRow_Drop">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="18" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <!--  拖拽排序手柄（六点竖排）  -->
+                                            <Grid
+                                                Grid.Column="0"
+                                                Width="12"
+                                                Height="16"
+                                                Margin="3,0,0,0"
+                                                HorizontalAlignment="Left"
+                                                VerticalAlignment="Center"
+                                                Background="Transparent"
+                                                Cursor="Hand"
+                                                MouseLeftButtonDown="TagGrip_MouseLeftButtonDown"
+                                                ToolTip="{DynamicResource DragToSort}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition />
+                                                    <ColumnDefinition />
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition />
+                                                    <RowDefinition />
+                                                    <RowDefinition />
+                                                </Grid.RowDefinitions>
+                                                <Ellipse
+                                                    Grid.Row="0"
+                                                    Grid.Column="0"
+                                                    Width="2.5"
+                                                    Height="2.5"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Fill="{DynamicResource Window.Foreground}"
+                                                    Opacity="0.45" />
+                                                <Ellipse
+                                                    Grid.Row="0"
+                                                    Grid.Column="1"
+                                                    Width="2.5"
+                                                    Height="2.5"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Fill="{DynamicResource Window.Foreground}"
+                                                    Opacity="0.45" />
+                                                <Ellipse
+                                                    Grid.Row="1"
+                                                    Grid.Column="0"
+                                                    Width="2.5"
+                                                    Height="2.5"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Fill="{DynamicResource Window.Foreground}"
+                                                    Opacity="0.45" />
+                                                <Ellipse
+                                                    Grid.Row="1"
+                                                    Grid.Column="1"
+                                                    Width="2.5"
+                                                    Height="2.5"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Fill="{DynamicResource Window.Foreground}"
+                                                    Opacity="0.45" />
+                                                <Ellipse
+                                                    Grid.Row="2"
+                                                    Grid.Column="0"
+                                                    Width="2.5"
+                                                    Height="2.5"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Fill="{DynamicResource Window.Foreground}"
+                                                    Opacity="0.45" />
+                                                <Ellipse
+                                                    Grid.Row="2"
+                                                    Grid.Column="1"
+                                                    Width="2.5"
+                                                    Height="2.5"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Fill="{DynamicResource Window.Foreground}"
+                                                    Opacity="0.45" />
+                                            </Grid>
+                                            <super:PathCheckButton
+                                                Name="pathCheckButton"
+                                                Grid.Column="1"
+                                                Height="30"
+                                                Margin="0"
+                                                CheckedBrush="{DynamicResource Window.Side.Hover.Background}"
+                                                Click="PathCheckButton_Click"
+                                                CornerRadius="0"
+                                                Fill="{Binding BackgroundBrush}"
+                                                FontSize="{DynamicResource GlobalFontSize12}"
+                                                Foreground="{Binding ForegroundBrush}"
+                                                IsChecked="{Binding Selected, Mode=TwoWay}"
+                                                MainText="{Binding TagName}"
+                                                Path="M121.6 247.872h780.8c23.488 0 42.496 19.008 42.496 42.496v417.92a42.496 42.496 0 0 1-42.496 42.496H121.6a42.496 42.496 0 0 1-42.496-42.496v-417.92a42.496 42.496 0 0 1 42.496-42.496z"
+                                                PathHeight="20"
+                                                PathMargin="5 -5 5 0"
+                                                SubText="{Binding Count}"
+                                                Tag="{Binding TagID}">
+                                                <super:PathCheckButton.ContextMenu>
+                                                    <ContextMenu>
+                                                        <MenuItem Click="EditTagStamp" Header="{DynamicResource Edit}" />
+                                                        <MenuItem
+                                                            super:CommonExt.HoverBackground="{DynamicResource Menu.Hover.Deep.Background}"
+                                                            Click="DeleteTagStamp"
+                                                            Header="{DynamicResource Delete}" />
+                                                    </ContextMenu>
+                                                </super:PathCheckButton.ContextMenu>
+                                            </super:PathCheckButton>
+                                        </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
