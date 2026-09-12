@@ -1,4 +1,4 @@
-﻿using Jvedio.Core.Exceptions;
+using Jvedio.Core.Exceptions;
 using Jvedio.Entity;
 using SuperControls.Style;
 using SuperUtils.CustomEventArgs;
@@ -63,6 +63,30 @@ namespace Jvedio.Core.FFmpeg
             Token = token;
         }
 
+        /// <summary>
+        /// 计算截图时间点，失败时现场诊断真实原因并抛出准确提示
+        /// （GetCutOffArray 对「时长读取失败」与「跳过区间过大」统一返回 null/空数组，
+        ///   原版直接抛 MediaCutOutOfRangeException，文案「超出视频总帧数」具有误导性）
+        /// </summary>
+        private string[] GetCutOffArrayOrThrow(string originPath)
+        {
+            string[] cutoffArray = MediaParse.GetCutOffArray(originPath,
+                ConfigManager.FFmpegConfig.ScreenShotNum,
+                ConfigManager.FFmpegConfig.ScreenShotIgnoreStart,
+                ConfigManager.FFmpegConfig.ScreenShotIgnoreEnd);
+
+            if (cutoffArray != null && cutoffArray.Length > 0)
+                return cutoffArray;
+
+            // 仅在失败路径上重读时长做诊断，不增加正常流程开销
+            long durationSec = Video.GetFileDurationSeconds(originPath);
+            if (durationSec <= 0)
+                throw new Exception(
+                    $"{LangManager.GetValueByKey("ScreenShotDurationUnreadable")}{Environment.NewLine}{originPath}");
+            throw new Exception(
+                $"{LangManager.GetValueByKey("ScreenShotSkipRangeTooLarge")}({durationSec / 60} min)");
+        }
+
 
         public async Task<string> AsyncScreenShot()
         {
@@ -73,14 +97,7 @@ namespace Jvedio.Core.FFmpeg
                 throw new NotFoundException(originPath);
 
             // 获得需要截图的视频进度
-            string[] cutoffArray =
-                MediaParse.GetCutOffArray(originPath,
-                ConfigManager.FFmpegConfig.ScreenShotNum,
-                ConfigManager.FFmpegConfig.ScreenShotIgnoreStart,
-                ConfigManager.FFmpegConfig.ScreenShotIgnoreEnd);
-
-            if (cutoffArray == null || cutoffArray.Length == 0)
-                throw new MediaCutOutOfRangeException();
+            string[] cutoffArray = GetCutOffArrayOrThrow(originPath);
 
             int threadNum = (int)ConfigManager.FFmpegConfig.ThreadNum; // 截图线程
             if (threadNum > MAX_THREAD_NUM || threadNum <= 0)
@@ -186,14 +203,7 @@ namespace Jvedio.Core.FFmpeg
                 throw new NotFoundException(originPath);
 
             // 获得需要截图的视频进度
-            string[] cutoffArray =
-                MediaParse.GetCutOffArray(originPath,
-                ConfigManager.FFmpegConfig.ScreenShotNum,
-                ConfigManager.FFmpegConfig.ScreenShotIgnoreStart,
-                ConfigManager.FFmpegConfig.ScreenShotIgnoreEnd);
-
-            if (cutoffArray.Length == 0)
-                throw new MediaCutOutOfRangeException();
+            string[] cutoffArray = GetCutOffArrayOrThrow(originPath);
 
             string saveFileName = CurrentVideo.GetGifPath();
             if (string.IsNullOrEmpty(saveFileName))

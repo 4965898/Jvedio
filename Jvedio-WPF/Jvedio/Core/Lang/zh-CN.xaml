@@ -16,6 +16,8 @@
     <sys:String x:Key="LikeAndSponsor">如果您喜欢Jvedio，可以使用以下方式赞助我~</sys:String>
     <sys:String x:Key="UseScreenIfNoImage">无封面时将已截取的图片作为封面</sys:String>
     <sys:String x:Key="ScreenShotAfterImport">导入资源后立即生成截图</sys:String>
+    <sys:String x:Key="ScreenShotDurationUnreadable">无法读取视频时长，文件可能已损坏或不是有效的视频文件</sys:String>
+    <sys:String x:Key="ScreenShotSkipRangeTooLarge">跳过开头+跳过结尾的时间不小于视频总时长，无法确定截图位置，请调整跳过设置。视频总时长</sys:String>
     <sys:String x:Key="LoadDataAfterScan">扫描完成后立即加载新影片</sys:String>
     <sys:String x:Key="DataExistsIndexAfterScan">对新影片建立资源存在索引</sys:String>
     <sys:String x:Key="ImageExistsIndexAfterScan">对新影片建立图片存在索引</sys:String>
@@ -102,4 +104,5 @@
     <sys:String x:Key="AgeUnit">岁</sys:String>
     <sys:String x:Key="Publisher">发行商</sys:String>
     <sys:String x:Key="Studio">制作商</sys:String>
+    <sys:String x:Key="FilterTags">筛选标签</sys:String>
 </ResourceDictionary>

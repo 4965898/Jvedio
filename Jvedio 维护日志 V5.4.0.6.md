@@ -1,7 +1,7 @@
 # Jvedio 维护日志 V5.4.0.6
 
 > 本文档沉淀自 2025-12 起对 Jvedio（WPF 本地视频管理软件）的接手维护与二次开发实践，供后续开发参考。
-> 最后更新：2026-08-16
+> 最后更新：2026-09-13
 
 ---
 
@@ -77,6 +77,12 @@
 | 5.4.1.40（Jvedio29.48） | 2026-09-08 | 修复字幕地址拖拽完全无效（布局根因：水平 StackPanel 内 TextBox 宽度不受限、内容永不溢出，改 DockPanel 填充布局）；拖拽方向按用户习惯调整：向右拖查看被遮挡部分、向左拖回到开头（见 3.54 修订） |
 | 5.4.1.41（Jvedio29.49） | 2026-09-08 | 字幕地址改为标准文本框行为：I 型光标、拖选出淡蓝选区、拖到边缘自动滚动（用户按此习惯二次反馈后弃用自定义平移，见 3.54 二次修订）；修复「时长」排序错误：Duration 列混有历史字符串值时乱序，改 CAST 整数排序 + 0 值恒排末尾（见 3.55） |
 | 5.4.1.42（Jvedio29.50） | 2026-09-08 | 时长排序双轨制：修复排序分支 VID 子串误匹配（"video" 含 "vid" 致时长永远走识别码字符串排序——上一版 CAST 修复从未生效的真正根因）；原「时长」更名「影片时长」（刮削元数据）；新增「视频时长」排序（本地文件真实长度）：metadata_video 新增 FileDuration 列（秒），打开详情页惰性写入 + 选项-索引「建立视频时长索引」后台全量重建（分段取各段之和，读不到记 0 排末尾）（见 3.56） |
+| 5.4.1.43（Jvedio29.51） | 2026-09-09 | 修复截图报「需要获取的截图数量超出了视频的总帧数」的误导性文案：真实根因是视频时长读取失败（多为损坏的空壳文件）/ 跳过区间过短，失败时现场诊断并给出准确提示 + 文件路径（见 3.57） |
+| 5.4.1.44（Jvedio29.52） | 2026-09-13 | 修复筛选器「类别」等四个标签面板全选按钮失效（直达面板引用替代脆弱树遍历 + 点击后立即应用筛选）；「类别」筛选器新增标签搜索框实时过滤（见 3.58） |
+| 5.4.1.45（Jvedio29.53） | 2026-09-13 | 类别标签搜索框改全字匹配（**当日被 5.4.1.46 回退**——系误解用户意图，用户指的是标签筛选命中的影片而非搜索框，见 3.58 修订） |
+| 5.4.1.46（Jvedio29.54） | 2026-09-13 | 修复「类别/系列/导演/制作商」标签筛选误命中：LIKE 子串匹配改为整标签匹配（Genre 为 \a 分隔多值列，勾「高」命中 5881 部含「高画质」等，修复后只命中 205 部）；类别搜索框回退子串匹配（见 3.58 修订二） |
+| 5.4.1.47（Jvedio29.55） | 2026-09-13 | 解锁系列面板标签区：原作者遗留 `ScrollViewer Height="0"` 把标签列表锁死（5309 个系列标签已加载但永不可见、无法勾选，系列筛选器 UI 完全不可用），删除 Height="0" 与其他标签面板对齐（见 3.59） |
+| 5.4.1.48（Jvedio29.56） | 2026-09-13 | 修复跨筛选组叠加变并集 + 年份筛选失效（均为原版遗留 bug）：① 单值筛选组的 `Eq/Like().LeftBracket().Or()` 模式因 wrapper Where 按值去重导致 Or=true 残留，组间 AND 变 OR（系列+类别应 5 部实际 206 部）；② 年份筛选读 `ReleaseYear` 列但全库为 0 从未填充，改 `substr(ReleaseDate,1,4)`（见 3.59） |
 
 > 这些发布说明与本地 diff 吻合，可互相印证。5.4.0.5 的 Release Body 已于 2026-08-09 更新为「下载指引 + 相对原版 5.4 的改进总结 + 原记录」三段式，源码也已同步 commit（见 1.2、第五章）。
 
@@ -948,6 +954,93 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 - **i18n**：`MovieDuration`/`VideoDuration`/`BuildFileDurationIndex`/`FileDurationIndexDone`/`FileDurationIndexRunning` 三语。
 
 **经验**：① **子串匹配是排序路由的天敌**——字段名含子串（Duration 含 "vid"）会让 if-else 链提前命中错误分支，这类「加了一个修复分支却不生效」的问题，回归验证时必须**用实际乱序数据测**而不是看代码觉得对；② 跨两表的 ORM 实体加列风险高时，原生 SQL 是零侵入替代；③ 持久化的枚举索引（SortType）**只能尾部追加**，中间插入等于静默篡改所有用户的存量配置。
+
+### 3.57 修复截图报「需要获取的截图数量超出了视频的总帧数」（2026-09-09，5.4.1.43 / Jvedio29.51）
+
+**现象**（用户提出）：生成截图时任务报 `需要获取的截图数量超出了视频的总帧数`，仅个别影片如此，其余正常。设置：截取图片总数 1、跳过开头 2 分钟、跳过结尾 7 分钟。
+
+**排查过程（证据链完整，值得复用）**：
+1. 该文案对应 `MediaCutOutOfRangeException`（反编译 `SuperControls.Style.dll` 内嵌 zh-CN 资源确认），抛出点在 [ScreenShot.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/FFmpeg/ScreenShot.cs) `AsyncScreenShot`：`GetCutOffArray` 返回 null/空数组即抛。
+2. 反编译 `SuperUtils.dll` 的 `MediaParse`：`GetCutOffArray` 内部先 `GetVideoDuration`（MediaInfo 读 `Duration/String3`，再 `Substring(0, LastIndexOf("."))` 去毫秒）→ **异常文案与真实失败条件完全脱节**：null 可能是文件不存在 / MediaInfo 读不到时长 / 时长 ≤ 0，空数组是有效区间（总时长 − 跳过头尾）不足 1。
+3. **用户当天日志实锤**（`data\Daxoel\log\2026-09-09.log` 19:28:14.775）：`[GetVideoDuration/36] 长度不能小于 0。参数名: length`——即 `Substring(0, -1)`，说明 **MediaInfo 对该文件返回的时长字符串是空的**（`LastIndexOf(".")` = -1），文件存在但容器不可解析。
+4. 全库实证扫描（7565 个 DB 路径逐个调 MediaInfo 读 `Duration/String3`，用 32 位 PowerShell + P/Invoke）：绝大多数返回 `HH:MM:SS.mmm`；**存在的文件里有 3 个返回空**：`J:\迅雷下载3\LegsJapan\ShinoAoi-20-1080p.mp4`、`NekoAino-1-1080p.mp4`、一个 IFO。二进制检查确认这两个 mp4 是**「空壳文件」**：204/426MB 体积里前 99.97% 全是零字节，仅文件末尾 65KB/208KB 有数据——下载器预分配了完整大小但下载失败/中断的残骸。另发现约 370 条 DB 路径已失效（文件被删/移动），这类走 `File.Exists` 前置检查抛 NotFoundException，与本 bug 无关。
+
+**根因**：**这几部影片本身就是损坏文件**（预分配空间的下载残骸），MediaInfo 读不出任何 General 信息（Format/Duration/CodecID 全空）。截图位置的计算依赖时长，读不到时长时代码直接抛出「超出总帧数」——文案完全误导了排查方向（用户以为是截图数/跳过设置的问题）。
+
+**修复**（[ScreenShot.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/FFmpeg/ScreenShot.cs)）：新增私有方法 `GetCutOffArrayOrThrow(originPath)`，`GetCutOffArray` 返回 null/空时**现场诊断真实原因**（仅失败路径才执行，不增加正常流程开销）：用 `Video.GetFileDurationSeconds`（3.56 已有，MediaInfo 读 `Duration` 毫秒参数）重读时长——读不到（=0）抛「无法读取视频时长，文件可能已损坏或不是有效的视频文件 + 完整文件路径」；读得到则抛「跳过开头+跳过结尾不小于视频总时长（N min），请调整跳过设置」。截图与 GIF 两条路径统一走该方法。
+
+**i18n**：`ScreenShotDurationUnreadable` / `ScreenShotSkipRangeTooLarge` 三语。
+
+**验证**：Debug 编译通过；Release 编译通过（BuildTools + ReferenceAssemblies.net472 + LangVersion=9.0），部署 `E:\Jvedio-5.3.1\Jvedio29.51.exe`（v5.4.1.43）。待用户实测：对损坏文件生成截图应报「无法读取视频时长 + 路径」。
+
+**经验**：① **异常文案必须覆盖其触发条件的全部分支**——`GetCutOffArray` 把「文件不可解析」「时长读不到」「区间不足」三类失败折叠成同一返回值，调用方用「超出总帧数」一词概括，排障时全靠猜；② 判读此类问题先翻**当天的应用日志**（本例 `[GetVideoDuration/36] 长度不能小于 0` 一行直接锁死根因），比看报错文案高效得多；③ 「仅个别文件出问题」类 bug，用 P/Invoke 依赖库 DLL 写个独立扫描脚本全库实证（本次 7565 个文件 ~8 分钟），把「猜测」变「点名」；④ 下载器预分配体积的空壳文件（前 99% 全零）是「文件在、大小对、内容无」的经典陷阱，`File.Exists` 和体积都防不住，只有解析容器才知道。
+
+### 3.58 筛选器「类别」全选按钮失效修复 + 类别标签搜索框（2026-09-13，5.4.1.44 / Jvedio29.52）
+
+**需求**（用户提出）：① 筛选器「类别」面板的全选按钮似乎失效；② 「类别」筛选器增加搜索框，快速筛选出所需标签。
+
+**排查**（证据链完整，方法论值得复用）：
+1. **静态审查**：`SetAllLabelChecked` 依赖 `GetWrapPanel` 按「按钮.Parent(DockPanel) → .Parent(StackPanel) → 最后一个 ScrollViewer → .Content(WrapPanel)」逐级向上找目标面板，任一环节与假设不符即**静默 return**——无日志、无反馈、无异常。
+2. **独立复现程序**（`build-output` 下 csc 直接编译的小程序）：加载真实 `SuperControls.Style.dll`（仓库版与部署版哈希不同、各自验证）+ 真实主题样式/模板，1:1 复刻「类别」面板结构——`InputHitTest` 四角与中心全部命中按钮；反射 `ButtonBase.OnClick`（等价真实点击链路）后全选/全不选 5/5、0/0 全部正常。**机制本身无缺陷**。
+3. **反编译用户实际运行的 exe**（`Jvedio29.50.exe` = v5.4.1.42，当日日志实锤）：Filter 代码与源码一致；进一步提取 exe 内嵌 `filter.baml` 转储 XAML 节点流，结构与源码逐节点吻合。
+4. **当日应用日志**：无任何筛选器异常记录——静默失效的旁证。
+5. **行为对比**（根因浮出）：「标记」面板的全选（`SetTagStampsSelected`）末尾**调用 `ApplyFilter()` 立即刷新列表**；而类别/系列/导演/制作商四个标签面板的全选（`SetAllLabelChecked`）**只改勾选态、不调用 ApplyFilter**，也不提示需点「应用」——用户点击后界面毫无反应，主观体验即「失效」。叠加 `GetWrapPanel` 的脆弱树遍历（防御性欠缺），构成完整病灶。
+
+**根因**：两层叠加——① 点击全选后无任何即时反馈（不应用筛选），与「标记」面板行为不一致；② 目标面板靠运行时逻辑树层级假设反推，失败时静默吞掉。
+
+**实现**（[Filter.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/Filter.xaml) / [Filter.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/Filter.xaml.cs)）：
+- **全选按钮直达面板**：四个全选按钮（类别/系列/导演/制作商）加 `Tag="{Binding ElementName=xxxWrapPanel}"`（同 XAML 命名域内 ElementName 绑定，稳定可靠），处理器改从 `Tag` 直取目标 WrapPanel（保留 `GetWrapPanel` 兜底），彻底摆脱树遍历。
+- **点击立即应用**：`SetAllLabelChecked` 末尾调用 `ApplyFilter()`，与「标记」面板全选行为对齐。
+- **类别搜索框**：启用原作者预留的隐藏 SearchBox 占位（原 `Visibility="Hidden"`），`TextChanged` 实时按关键词过滤（忽略大小写 Contains）：不匹配标签 `Visibility=Collapsed`，空关键词恢复全部；类别加载完成回调中按当前关键词重放一次（防加载期间新加标签漏过滤）；`ResetToDefault`（刷新）清空搜索框并复位四个全选按钮勾选态（原先刷新后按钮保留旧状态，与标签全不选的实态脱节）。
+- **所见即所选**：搜索过滤生效时，全选只勾选当前可见标签（`Visibility==Visible`），被折叠的标签勾选态不受影响——配合「搜索→定位→全选」工作流。
+- **i18n**：`FilterTags`（筛选标签 / Filter tags / タグを絞り込む）三语。
+
+**验证**（UIA 自动化端到端，脚本 `build-output/uia_test7.ps1` 可复用）：真实运行 `Jvedio29.52.exe`，以 `SetFocus` + 键盘空格触发全选按钮（等价真实 Click 事件链路）：搜索「巨乳」后点击全选 → 恰好只勾选 `[巨乳, 巨乳爆乳]` 两个匹配标签；清空搜索 → 540 个标签全部恢复显示、已勾选的 2 个保留；再次全选 → 全部归零；应用日志同步出现两条 `Select` 记录（ApplyFilter 确已触发）。
+
+**经验**：① 「按钮失效」类反馈先区分「事件没触发」与「触发了但无反馈」——本次机制完好，缺的是即时反馈；分支内静默 `return`（无日志）的代码会误导排查方向，宁可补一条 `Logger.Debug`；② 同类控件跨面板行为不一致（标记面板全选立即生效 vs 类别面板需手动点「应用」）本身就是 bug 信号，修交互问题时先横向对齐参照物；③ 对 WPF 自绘程序做端到端验证，鼠标坐标方案受**前台锁定 + 窗口位置 + 控件在内部滚动区外**三重干扰极不稳定（本次多轮失败），`UIA SetFocus` + 键盘事件走控件原生 Click 链路则一次跑通；④ `Visibility=Collapsed` 的元素**仍留在 UIA 树中**（visual tree 子元素不因 Collapsed 移除），UIA 枚举计数不能当可见性判据，要看实际交互结果；⑤ ElementName 绑定 Tag 是「按钮↔目标面板」解耦的最小手段，比逻辑树反推与命名按钮逐个判断都干净。
+
+**修订一（5.4.1.45，误判被回退）**：用户反馈「使用『高』能筛选出『高畫質』，似乎不是全字匹配的」，我误把「筛选」理解为**搜索框的标签过滤行为**，把 `ApplyGenreFilter` 从子串匹配改成了全字匹配。用户随即指出完全曲解——**指的是标签**：勾选「高」标签后，筛选结果（影片列表）里混进了「高畫質」的影片。5.4.1.46 当日回退搜索框为子串匹配（搜索框的定位就是模糊查找，子串合理）。
+
+**修订二（5.4.1.46，真正的修复：标签筛选整标签匹配）**：
+- **根因**：[Filter.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/Filter.xaml.cs) `ApplyFilter` 对类别/系列/导演/制作商四处用 `wrapper.Like(field, tag)` 生成 `Genre LIKE '%高%'`——**子串匹配**。而 `metadata.Genre` 是分隔符（`SuperUtils ConstValues.Separator` = `\a`/BEL/char 7）拼接的多值列（如 `高\a高畫質\a巨乳`），LIKE '%高%' 命中一切含「高」的标签。
+- **数据实证**（System.Data.SQLite 直查用户库，复刻应用条件 `metadata.DBId=1 AND DataType=0` + `JOIN metadata_video`）：子串「高」命中 **5881** 部，整标签「高」仅 **205** 部——**5676 部误命中**。
+- **修复**：新增 `AppendExactTagMatch(wrapper, field, tags)`——经典 CSV 整值匹配手法：`char(7)||Genre||char(7) LIKE '%\a高\a%'`（列两侧补分隔符，首/中/尾/单值标签判定一致；NULL 列自然不命中）；多标签沿用 wrapper 的 `LeftBracket/Or/RightBracket` OR 分组（反编译确认渲染为 `where ( cond1 or cond2 )`）。四处调用点全部替换，`Series/Director/Studio` 同病同治。
+- **wrapper 可行性论证**（反编译 `SuperUtils.dll` 的 `SelectWrapper`）：① `Like` 不在 `whereConditions` 字典，走 `field like '%value%'` 分支——**字段与值均原样插值**，`char(7)||Genre||char(7)` 表达式可安全传递；② Jvedio 全部调用点用 `ToWhere(false)`，`exist=false` 跳过实体属性名校验（否则非属性名字段会被静默丢弃）；③ `Or()` 标记**前一**条件的连接符、`LeftBracket/RightBracket` 附加在条件上，既有代码的 OR 分组模式实为正确用法。用 csc 编译的独立小程序（`build-output/WrapperTest`）打印 1/2/3 标签 + 混合 Eq 的生成 SQL 逐一确认后才动代码。
+- **验证**（UIA 端到端 `build-output/uia_test9.ps1` + DB 预计算交叉核对）：搜索「高」→ 10 个标签可见（含「高」「高畫質」，子串已恢复）；勾「高」+应用 → 分页 `100/205`（旧子串行为会是 5881）；勾「高」+「高畫質」→ `100/3205`（并集）；仅「高畫質」→ `100/3131`；清空 → `100/32642`——四个数字与应用查询条件下的 DB 预计算值**完全一致**。
+
+**教训**：① 用户反馈「XX 不准确」时，先确认 XX 到底指 UI 链路的哪一环（搜索框过滤？筛选 SQL？渲染？）——本次在错误的问题定义上白修了一版（5.4.1.45），用户一句「指的是标签」点破；需求含糊时宁可先问一句再动手；② CSV/分隔符拼接列的「整值匹配」是有标准手法的（两侧补分隔符再 LIKE），遇到多值列的筛选 bug 直接套用，不必发明轮子；③ 给无源码依赖库（SuperUtils）写非平凡查询前，反编译确认 SQL 生成语义 + 独立小程序打印生成 SQL，比在业务代码里试错可靠得多；④ 验证筛选类修复最有力的断言是「**UI 实测总数 == DB 预计算总数**」——本次 205/3205/3131/32642 四组全中，比人肉抽查快且无可辩驳。另：单实例程序做自动化验证前须先结束用户正运行的实例（结束前征得同意）。
+
+### 3.59 系列/导演/制作商筛选器体检：解锁系列面板 + 修复跨组叠加变并集 + 年份筛选失效（2026-09-13，5.4.1.47/48 / Jvedio29.55~29.56）
+
+**需求**（用户提出）：检查系列、导演、制作筛选器是否存在问题，是否存在不叠加其他筛选项、排序项的情况。
+
+**排查**（静态审查 wrapper 机制 → DB 预计算 → UIA 端到端三层验证）：
+
+1. **代码层**：反编译确认 `SelectWrapper.Join()` 即 `Wheres.AddRange()`——条件天然 AND 叠加；`OrderField` 独立存放、`Join` 不触碰——排序与筛选天然正交；`WhereConditionException` 仅在空 wrapper 上调 `Or()/Bracket()` 才抛。机制层面「能叠加」，但 UIA 实测揭穿三个真 bug。
+2. **UIA 结构勘察**（关键过程）：TogglePanel 的头部按钮与面板内容在 UIA ControlView 里被**拍平**（DockPanel/StackPanel 层级消失），面板头 Name 为空、无 InvokePattern，靠「Filter 主 ScrollViewer 直接子级中 X<715 且可 Toggle 的 Button 序」定位六个面板头（0标记 1其他 2类别 3系列 4导演 5制作商）；展开/加载逻辑挂在 expander.Click 上，UIA `Toggle()` 只翻 IsChecked 不触发 Click，须滚动到可视 + `SetFocus` + 空格键走真实点击链路。
+3. **DB 预计算**（交叉核对基准）：按应用真实条件（`DBId=1 AND DataType=0 JOIN metadata_video`）预计算各组合的理论值——系列 6、系列∩类别「高」 5、导演 86/∩10、制作商 98/∩14、2025 年 3372、全库 32642。
+
+**发现的三个 bug**：
+
+- **Bug1 系列面板被锁死（5.4.1.47 修复）**：[Filter.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/UserControls/Filter.xaml) 系列面板标签区 `<ScrollViewer Height="0">` 为**原作者遗留**（git 考证 2333953 即如此，推测因 5309 个系列标签渲染过重而禁用）——标签后台已加载、但高度恒 0 永不可见，无法勾选，**系列筛选器 UI 完全不可用**（叠加与否无从谈起）。修复：删 `Height="0"` 与其他标签面板对齐。
+- **Bug2 跨筛选组叠加变并集（5.4.1.48 修复，原版遗留）**：实测 系列+类别=206、导演+类别=281、制作商+类别=289——**全部精确等于并集公式** A+B−A∩B（206=205+6−5）。根因：原代码单值筛选组用 `wrapper.Eq/Like(field,v).LeftBracket().Or()` 模式，而 SuperUtils 的 `Where.Equals` 按 **(Field, Values, Condition) 去重**——组内只有一个条件时，末尾重复的 `Eq/Like(同值)` 被去重，`RightBracket` 落回首个条件，其 `Or=true` 残留；渲染出 `... and ( 组1 ) or ( 组2 )`，组间 AND 变 OR（优先级 `(前置 AND 组1) OR 组2` = 并集）。**单选一个标签/年份时必现**，但该组是最后一个条件时尾部 or 被 ToWhere 剥掉而「侥幸正确」——单组筛选测试永远测不出，跨组组合从未被测过。年份组同理中招（详见 Bug3 的「假阳性」）。修复：`AppendExactTagMatch` 与年份块均改为「count==1 时不加括号不加 Or，直接单条件」。
+- **Bug3 年份筛选完全失效（5.4.1.48 修复，原版遗留）**：年份筛选查 `metadata.ReleaseYear` 列——**全库 32643 行全为 0（从未填充过）**，勾任何年份实际匹配 0 部。更隐蔽的是 Bug2 让「年份+其他筛选」显示成其他组的并集结果（如 系列+2025 显示 6 部——实为 `系列 OR (ReleaseYear='2025' 命中 0)` = 系列，看着像交集，纯属泄漏 + 死列相互掩盖）。修复：改查 `substr(metadata.ReleaseDate,1,4)`（该列有真实数据：2025 年 3372 部）。
+- **排序叠加（验证通过，无 bug）**：`SetSortOrder` 只设置 `OrderField`，与 `Wheres` 正交；UIA 实测系列筛选 + 点「识别码」排序——6 部影片保持不变、顺序变完美 VID 序（因该排序项本已选中，点击按设计切换了方向显示为降序）。注意：`SortMenu_Click` 对已选中项点击=切换升降序，属设计行为。
+
+**验证**（UIA 端到端 `build-output/uia_test11.ps1` + `uia_test12.ps1`，DB 预计算交叉核对全部一致）：
+
+| 场景 | 修复前 | 修复后实测 | DB 预期 |
+|---|---|---|---|
+| 年份 2025 单独 | 0（死列） | 100/3372 | 3372 ✅ |
+| 系列单独（面板解锁后） | 无法勾选 | 6/6 | 6 ✅ |
+| 系列 + 类别「高」 | **206（并集）** | **5/5** | 5 ✅ |
+| 系列 + 年份 2025 | 6（泄漏假象） | 6/6 | 6 ✅（该系列全部为 2025 年） |
+| 导演单独 / +类别 | 86 / **281（并集）** | 86/86 / **10/10** | 86 / 10 ✅ |
+| 制作商单独 / +类别 | 98 / **289（并集）** | 98/98 / **14/14** | 98 / 14 ✅ |
+| 系列 + 识别码排序 | — | 6 部不变、完美 VID 序 | ✅ |
+| 清空恢复 | — | 100/32642 | 32642 ✅ |
+
+**经验**：① 「A+B−A∩B 精确等于并集」是判定 OR 泄漏的铁证——实测值与并集公式吻合度 100% 时不用再猜，直接反编译 wrapper 找 Or 标记的挂载点；② **去重型 ORM 是组间连接符泄漏的温床**——`Where.Equals` 不含 Or/Bracket 字段，去重后修饰符留在旧对象上；凡「条件对象可变状态（Or/括号）+ 集合去重」的组合都要审；③ 单组筛选测试有**结构性盲区**：泄漏的 Or 在「本组是最后一个条件」时被尾部剥除而侥幸正确，只有跨组组合才暴露——筛选类功能的最小验收用例必须是「两组各选一个值」；④ 「筛选结果看着合理」≠「筛选正确」——年份死列 + Or 泄漏相互掩盖出 6/6 的假阳性，本次靠「ReleaseYear 全 0」的直查数据才戳穿；UIA 勘察自绘 TogglePanel 要有「ControlView 拍平」的预期，面板定位走「主滚动容器直接子级序列」而非逻辑树；⑤ 原作者禁用某 UI（Height="0"）往往是性能妥协（5309 标签逐条 Dispatcher 加载），恢复时保留懒加载（点开面板才加载）已是现状，无需额外优化。
 
 ## 四、踩坑经验（重点）
 

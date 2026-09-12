@@ -382,7 +382,11 @@ namespace Jvedio.Core.UserControls
             foreach (string item in dataList)
                 foreach (string data in item.Split(SuperUtils.Values.ConstValues.Separator))
                     set.Add(data);
-            AddItem(set, wrapPanel, () => GenreLoad = LoadState.Loaded, (value) => GenreProgress = value);
+            AddItem(set, wrapPanel, () => {
+                GenreLoad = LoadState.Loaded;
+                // 加载完成后按当前关键词重新过滤一次（加载期间新加的标签默认全部可见）
+                ApplyGenreFilter();
+            }, (value) => GenreProgress = value);
         }
 
         private void LoadSingleData(WrapPanel wrapPanel, string field, Action before = null, Action complete = null, Action<int> onProgress = null)
@@ -872,6 +876,14 @@ namespace Jvedio.Core.UserControls
             var studioToggles = studioWrapPanel.Children.OfType<ToggleButton>().ToList();
             studioToggles.ForEach(t => t.IsChecked = false);
 
+            // 全选按钮复位 + 清空类别搜索（TextChanged 会自动恢复所有标签可见）
+            genreSelectAll.IsChecked = false;
+            seriesSelectAll.IsChecked = false;
+            directorSelectAll.IsChecked = false;
+            studioSelectAll.IsChecked = false;
+            if (genreSearchBox != null)
+                genreSearchBox.Text = string.Empty;
+
             ItemsControl itemsControl = TagStampItemsControl;
             for (int i = 0; i < itemsControl.Items.Count; i++) {
                 ContentPresenter presenter = (ContentPresenter)itemsControl.ItemContainerGenerator.ContainerFromItem(itemsControl.Items[i]);
@@ -1043,19 +1055,24 @@ namespace Jvedio.Core.UserControls
                 }
             }
 
-            // 年份
-
+            // 年份（ReleaseYear 列全库为 0 从未填充，改用 ReleaseDate 前四位；
+            // 单选年份不能走「Eq().LeftBracket().Or()」——wrapper 的 Where 按 值去重，
+            // 单值时第二个 Eq 被去重、RightBracket 落回首个条件，Or=true 残留会让本组
+            // 与其他筛选组之间变成 OR（并集）而非 AND（交集），跨组筛选结果错误）
             List<ToggleButton> yearList = yearWrapPanel.Children.OfType<ToggleButton>().Where(item => (bool)item.IsChecked).ToList();
             if (yearList.Count > 0 && yearList.Count != yearWrapPanel.Children.Count) {
-                field = "ReleaseYear";
+                field = "substr(metadata.ReleaseDate, 1, 4)";
                 int count = yearList.Count;
                 List<int> list = yearList.Select(item => int.Parse(item.Content.ToString())).ToList();
-                wrapper.Eq(field, list[0]).LeftBracket().Or();
-                for (int i = 1; i < count - 1; i++) {
-                    wrapper.Eq(field, list[i]).Or();
+                if (count == 1) {
+                    wrapper.Eq(field, list[0]);
+                } else {
+                    wrapper.Eq(field, list[0]).LeftBracket().Or();
+                    for (int i = 1; i < count - 1; i++) {
+                        wrapper.Eq(field, list[i]).Or();
+                    }
+                    wrapper.Eq(field, list[count - 1]).RightBracket();
                 }
-                wrapper.Eq(field, list[count - 1]).RightBracket();
-
             }
 
             // 月份
@@ -1072,56 +1089,32 @@ namespace Jvedio.Core.UserControls
 
             //}
 
-            // 类别
+            // 类别（整标签匹配：勾选「高」只命中标签恰好为「高」的影片，不会命中「高画质」）
             List<ToggleButton> genreList = genreWrapPanel.Children.OfType<ToggleButton>().Where(item => (bool)item.IsChecked).ToList();
             if (genreList.Count > 0 && genreList.Count != genreWrapPanel.Children.Count) {
-                field = "Genre";
-                int count = genreList.Count;
                 List<string> list = genreList.Select(item => item.Content.ToString()).ToList();
-                wrapper.Like(field, list[0]).LeftBracket().Or();
-                for (int i = 1; i < count - 1; i++) {
-                    wrapper.Like(field, list[i]).Or();
-                }
-                wrapper.Like(field, list[count - 1]).RightBracket();
+                AppendExactTagMatch(wrapper, "Genre", list);
             }
 
             // 系列
             List<ToggleButton> seriesList = seriesWrapPanel.Children.OfType<ToggleButton>().Where(item => (bool)item.IsChecked).ToList();
             if (seriesList.Count > 0 && seriesList.Count != seriesWrapPanel.Children.Count) {
-                field = "Series";
-                int count = seriesList.Count;
                 List<string> list = seriesList.Select(item => item.Content.ToString()).ToList();
-                wrapper.Like(field, list[0]).LeftBracket().Or();
-                for (int i = 1; i < count - 1; i++) {
-                    wrapper.Like(field, list[i]).Or();
-                }
-                wrapper.Like(field, list[count - 1]).RightBracket();
+                AppendExactTagMatch(wrapper, "Series", list);
             }
 
             // 导演
             List<ToggleButton> directorList = directorWrapPanel.Children.OfType<ToggleButton>().Where(item => (bool)item.IsChecked).ToList();
             if (directorList.Count > 0 && directorList.Count != directorWrapPanel.Children.Count) {
-                field = "Director";
-                int count = directorList.Count;
                 List<string> list = directorList.Select(item => item.Content.ToString()).ToList();
-                wrapper.Like(field, list[0]).LeftBracket().Or();
-                for (int i = 1; i < count - 1; i++) {
-                    wrapper.Like(field, list[i]).Or();
-                }
-                wrapper.Like(field, list[count - 1]).RightBracket();
+                AppendExactTagMatch(wrapper, "Director", list);
             }
 
-            // 系列
+            // 制作商
             List<ToggleButton> studioList = studioWrapPanel.Children.OfType<ToggleButton>().Where(item => (bool)item.IsChecked).ToList();
             if (studioList.Count > 0 && studioList.Count != studioWrapPanel.Children.Count) {
-                field = "Studio";
-                int count = studioList.Count;
                 List<string> list = studioList.Select(item => item.Content.ToString()).ToList();
-                wrapper.Like(field, list[0]).LeftBracket().Or();
-                for (int i = 1; i < count - 1; i++) {
-                    wrapper.Like(field, list[i]).Or();
-                }
-                wrapper.Like(field, list[count - 1]).RightBracket();
+                AppendExactTagMatch(wrapper, "Studio", list);
             }
 
             WrapperEventArg<Video> arg = new WrapperEventArg<Video>(wrapper);
@@ -1157,13 +1150,70 @@ namespace Jvedio.Core.UserControls
 
         private void SetAllLabelChecked(object sender, RoutedEventArgs e)
         {
-            if (sender is ToggleButton button &&
-                GetWrapPanel(button) is WrapPanel wrapPanel &&
-                wrapPanel.Children.OfType<ToggleButton>().ToList() is List<ToggleButton> list
-               ) {
-                bool isChecked = (bool)button.IsChecked;
-                list.ForEach(arg => arg.IsChecked = isChecked);
+            if (!(sender is ToggleButton button))
+                return;
+            // 目标面板优先从 Tag 取（XAML 里以 ElementName 绑定），不再依赖逻辑树层级遍历——
+            // 原实现按「父 DockPanel → 父 StackPanel → 最后一个 ScrollViewer」向上找面板，
+            // 一旦运行时树结构与假设不符就静默返回 null（无日志无反馈），全选表现为「失效」
+            WrapPanel wrapPanel = button.Tag as WrapPanel ?? GetWrapPanel(button);
+            if (wrapPanel == null)
+                return;
+            bool isChecked = (bool)button.IsChecked;
+            foreach (object child in wrapPanel.Children) {
+                // 搜索过滤生效时只勾选当前可见的标签（所见即所选）
+                if (child is ToggleButton item && item.Visibility == Visibility.Visible)
+                    item.IsChecked = isChecked;
             }
+            // 与「标记」面板全选一致：点击后立即应用筛选，给出可见反馈
+            ApplyFilter();
+        }
+
+        private void GenreSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ApplyGenreFilter();
+        }
+
+        /// <summary>
+        /// 按关键词实时过滤类别标签的可见性（空关键词 = 全部显示）
+        /// </summary>
+        private void ApplyGenreFilter()
+        {
+            if (genreSearchBox == null || genreWrapPanel == null)
+                return;
+            string keyword = genreSearchBox.Text?.Trim();
+            string lower = string.IsNullOrEmpty(keyword) ? null : keyword.ToLower();
+            foreach (object child in genreWrapPanel.Children) {
+                if (!(child is ToggleButton item))
+                    continue;
+                bool match = lower == null || (item.Content == null ? string.Empty : item.Content.ToString()).ToLower().Contains(lower);
+                item.Visibility = match ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        /// <summary>
+        /// 「整标签」匹配条件：Genre/Series/Director/Studio 等列为分隔符（\a）拼接的多值字符串，
+        /// 原实现 Genre LIKE '%高%' 是子串匹配——勾选「高」会把「高画质」「高挑」等一切含「高」的标签都命中。
+        /// 这里改为「列两侧补分隔符后再 LIKE '%\a高\a%'」，只命中完整的标签段；
+        /// 对单个标签（Genre='高'）、首位、中位、末位标签均正确（NULL 列不命中任何标签）。
+        /// 注意：单标签不能走「Like().LeftBracket().Or()」模式——wrapper 的 Where 按 值去重，
+        /// 第二次 Like 被去重后 RightBracket 落回首个条件，Or=true 残留会使本组与
+        /// 其他筛选组之间变成 OR（并集）而非 AND（交集）。
+        /// </summary>
+        private void AppendExactTagMatch(SelectWrapper<Video> wrapper, string field, List<string> tags)
+        {
+            char sep = SuperUtils.Values.ConstValues.Separator;
+            // 字段表达式两侧补分隔符：char(7)||Genre||char(7)，使首尾标签与中间标签判定一致
+            string wrappedField = $"char({(int)sep})||{field}||char({(int)sep})";
+            int count = tags.Count;
+            if (count == 1) {
+                wrapper.Like(wrappedField, $"{sep}{tags[0]}{sep}");
+                return;
+            }
+            wrapper.Like(wrappedField, $"{sep}{tags[0]}{sep}").LeftBracket().Or();
+            for (int i = 1; i < count - 1; i++) {
+                wrapper.Like(wrappedField, $"{sep}{tags[i]}{sep}").Or();
+            }
+            wrapper.Like(wrappedField, $"{sep}{tags[count - 1]}{sep}").RightBracket();
         }
     }
 

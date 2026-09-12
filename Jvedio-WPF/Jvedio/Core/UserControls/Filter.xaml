@@ -624,19 +624,23 @@
                                     DotSize="2"
                                     Visibility="{Binding GenreLoad, ElementName=filter, Converter={StaticResource LoadStatusConverter}}" />-->
                                 <ToggleButton
+                                    x:Name="genreSelectAll"
                                     Width="20"
                                     Height="20"
                                     Margin="5"
                                     VerticalAlignment="Center"
                                     Click="SetAllLabelChecked"
-                                    Style="{StaticResource SelectAllToggleButton}" />
+                                    Style="{StaticResource SelectAllToggleButton}"
+                                    Tag="{Binding ElementName=genreWrapPanel}" />
                                 <super:SearchBox
+                                    x:Name="genreSearchBox"
                                     Height="30"
                                     Margin="5"
                                     BorderBrush="{DynamicResource Button.Selected.BorderBrush}"
                                     FontSize="{DynamicResource GlobalFontSize12}"
+                                    PlaceHolder="{DynamicResource FilterTags}"
                                     Style="{StaticResource SearchBoxStyle}"
-                                    Visibility="Hidden" />
+                                    TextChanged="GenreSearch_TextChanged" />
                             </DockPanel>
                             <ScrollViewer Style="{StaticResource ItemScrollViewer}">
                                 <WrapPanel Name="genreWrapPanel" Orientation="Horizontal" />
@@ -672,12 +676,14 @@
                                     DotSize="2"
                                     Visibility="{Binding SeriesLoad, ElementName=filter, Converter={StaticResource LoadStatusConverter}}" />-->
                                 <ToggleButton
+                                    x:Name="seriesSelectAll"
                                     Width="20"
                                     Height="20"
                                     Margin="5"
                                     VerticalAlignment="Center"
                                     Click="SetAllLabelChecked"
-                                    Style="{StaticResource SelectAllToggleButton}" />
+                                    Style="{StaticResource SelectAllToggleButton}"
+                                    Tag="{Binding ElementName=seriesWrapPanel}" />
                                 <super:SearchBox
                                     Height="30"
                                     Margin="5"
@@ -686,7 +692,8 @@
                                     Style="{StaticResource SearchBoxStyle}"
                                     Visibility="Hidden" />
                             </DockPanel>
-                            <ScrollViewer Height="0" Style="{StaticResource ItemScrollViewer}">
+                            <!--  Height="0" 为原作者遗留：系列标签区被锁死（标签加载了但永不可见，无法勾选）——与其他三个标签面板对齐，恢复显示  -->
+                            <ScrollViewer Style="{StaticResource ItemScrollViewer}">
                                 <WrapPanel Name="seriesWrapPanel" Orientation="Horizontal" />
                             </ScrollViewer>
 
@@ -718,12 +725,14 @@
                                     DotSize="2"
                                     Visibility="{Binding DirectorLoad, ElementName=filter, Converter={StaticResource LoadStatusConverter}}" />-->
                                 <ToggleButton
+                                    x:Name="directorSelectAll"
                                     Width="20"
                                     Height="20"
                                     Margin="5"
                                     VerticalAlignment="Center"
                                     Click="SetAllLabelChecked"
-                                    Style="{StaticResource SelectAllToggleButton}" />
+                                    Style="{StaticResource SelectAllToggleButton}"
+                                    Tag="{Binding ElementName=directorWrapPanel}" />
                                 <super:SearchBox
                                     Height="30"
                                     Margin="5"
@@ -765,12 +774,14 @@
                                     DotSize="2"
                                     Visibility="{Binding StudioLoad, ElementName=filter, Converter={StaticResource LoadStatusConverter}}" />-->
                                 <ToggleButton
+                                    x:Name="studioSelectAll"
                                     Width="20"
                                     Height="20"
                                     Margin="5"
                                     VerticalAlignment="Center"
                                     Click="SetAllLabelChecked"
-                                    Style="{StaticResource SelectAllToggleButton}" />
+                                    Style="{StaticResource SelectAllToggleButton}"
+                                    Tag="{Binding ElementName=studioWrapPanel}" />
                                 <super:SearchBox
                                     Height="30"
                                     Margin="5"

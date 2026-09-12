@@ -17,6 +17,8 @@
     <sys:String x:Key="LikeAndSponsor">If you like JVEDIO, you can use the following ways to sponsor me ~</sys:String>
     <sys:String x:Key="UseScreenIfNoImage">Use the intercepted picture as the cover when there is no cover</sys:String>
     <sys:String x:Key="ScreenShotAfterImport">Immediately generate screenshots after importing resources</sys:String>
+    <sys:String x:Key="ScreenShotDurationUnreadable">Cannot read the video duration; the file may be corrupted or not a valid video</sys:String>
+    <sys:String x:Key="ScreenShotSkipRangeTooLarge">Skip start + skip end is not less than the video duration, cannot determine screenshot positions. Video duration</sys:String>
     <sys:String x:Key="LoadDataAfterScan">Load the new video immediately after the scan is completed</sys:String>
     <sys:String x:Key="DataExistsIndexAfterScan">There are indexes for establishing resources for new films</sys:String>
     <sys:String x:Key="ImageExistsIndexAfterScan">There is an index on the establishment of a picture of the new film</sys:String>
@@ -103,4 +105,5 @@
     <sys:String x:Key="AgeUnit">yrs</sys:String>
     <sys:String x:Key="Publisher">Publisher</sys:String>
     <sys:String x:Key="Studio">Studio</sys:String>
+    <sys:String x:Key="FilterTags">Filter tags</sys:String>
 </ResourceDictionary>
