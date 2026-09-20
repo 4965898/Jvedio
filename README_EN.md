@@ -119,6 +119,7 @@ Users : [User Guide](https://github.com/hitchao/Jvedio/wiki/02_Beginning)
 | 5.4.1.46 (Jvedio29.54) | 2026-09-13 | Fixed tag-filter false hits: selecting "高" also matched videos tagged "高画质" and any tag containing "高" (substring LIKE); switched to exact-tag matching (measured: 5881 → 205 videos) |
 | 5.4.1.47 (Jvedio29.55) | 2026-09-13 | Unlocked the Series filter panel: a leftover hard-coded zero height from the original author kept the 5309 series tags loaded but permanently invisible and unselectable; now displayed and filterable normally |
 | 5.4.1.48 (Jvedio29.56) | 2026-09-13 | Fixed two long-standing filter bugs: ① combining filter groups silently turned into a UNION instead of an intersection when a single tag/year was selected (e.g. Series+Genre showed 206 union results instead of the 5-video intersection); ② the Year filter never worked (the ReleaseYear column was never populated — all zeros), now matches by release date year |
+| 5.4.1.49 (Jvedio29.57) | 2026-09-21 | Fixed two task-scheduler bugs on the sync-info / translate task pages: ① "Cancel All" stopped working after clicking "Restart All" (the restart loop kept pulling canceled tasks back in batches — now cancel/clear-list aborts the restart chain immediately, with a double-click guard); ② after completing tasks, clearing the list and adding new ones left them stuck in "Waiting" forever (a dispatcher exit race / dead work loop orphaned the queue — added a 4s liveness fallback that re-kicks the dispatcher) |
 
 
 # Software Characteristics

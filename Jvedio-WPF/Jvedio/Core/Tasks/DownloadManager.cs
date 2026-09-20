@@ -121,8 +121,34 @@ namespace Jvedio.Core.Tasks
 
         public override void AddToDispatcher(AbstractTask task)
         {
+            bool dispatcherIdle = !Dispatcher.Working;
             Dispatcher.Enqueue(task as DownLoadTask);
             Dispatcher.BeginWork();
+            // BeginWork 与调度器「队列空即退出」的判断存在竞态：若在旧循环判定空队列与真正退出之间入队，
+            // BeginWork 会因 Working 仍为 true 直接返回，随后旧循环退出，新任务永远停在 WaitingToRun。
+            // 调度器空闲时入队后补一个迟到的兜底检查，确保新任务一定被调度器接管。
+            if (dispatcherIdle)
+                WatchForStuckStart(task);
+        }
+
+        /// <summary>
+        /// 兜底：入队后若任务迟迟未被调度器开始（调度器工作循环可能因异常死亡、或与退出判断竞态被落下），
+        /// 复位 Working 并重新拉起一个工作循环接管等待队列。
+        /// </summary>
+        private void WatchForStuckStart(AbstractTask task)
+        {
+            Task.Run(async () => {
+                try {
+                    await Task.Delay(4000);
+                    if (task.Status != System.Threading.Tasks.TaskStatus.WaitingToRun)
+                        return;
+                    if (Dispatcher.Working)
+                        Dispatcher.Working = false;
+                    Dispatcher.BeginWork();
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                }
+            });
         }
 
         public override void ClearDispatcher()
@@ -130,34 +156,66 @@ namespace Jvedio.Core.Tasks
             Dispatcher.ClearDoneList();
         }
 
+        /// <summary>
+        /// 重启全部失败（取消）的任务，分批重启并等待每批完成，避免并发刮削超限。
+        /// 用户在重启过程中点击「取消所有」/「清除列表」时会立即中止，不再自动重启后续批次。
+        /// </summary>
         public async void RestartAllFailed()
         {
-            var failed = CurrentTasks.Where(t => t.Status == System.Threading.Tasks.TaskStatus.Canceled).ToList();
-            if (failed.Count == 0)
+            if (RestartAllRunning)
                 return;
-            int index = 0;
-            while (index < failed.Count) {
-                int batch = Math.Min(failed.Count - index, TASK_COUNT);
-                for (int i = 0; i < batch; i++) {
-                    failed[index + i].Restart();
-                }
-                bool completed = false;
-                while (!completed) {
-                    completed = true;
+            RestartAllRunning = true;
+            RestartAllAborted = false;
+            try {
+                var failed = CurrentTasks.Where(t => t.Status == System.Threading.Tasks.TaskStatus.Canceled).ToList();
+                if (failed.Count == 0)
+                    return;
+                int index = 0;
+                while (index < failed.Count) {
+                    // 用户已取消/清空列表 → 终止自动重启链
+                    if (RestartAllAborted)
+                        return;
+                    int batch = Math.Min(failed.Count - index, TASK_COUNT);
+                    List<AbstractTask> toRestart = new List<AbstractTask>();
                     for (int i = 0; i < batch; i++) {
-                        var t = failed[index + i];
-                        if (t.Status == System.Threading.Tasks.TaskStatus.Running ||
-                            t.Status == System.Threading.Tasks.TaskStatus.WaitingToRun) {
-                            completed = false;
-                            break;
-                        }
+                        AbstractTask t = failed[index + i];
+                        // 仅重启仍在任务列表中的任务（清空列表后旧任务不再拉起），且仍处于失败（取消）状态
+                        if (CurrentTasks.Contains(t) && t.Status == System.Threading.Tasks.TaskStatus.Canceled)
+                            toRestart.Add(t);
                     }
-                    if (!completed)
-                        await Task.Delay(TASK_DELAY);
+                    if (toRestart.Count == 0) {
+                        index += batch;
+                        continue;
+                    }
+                    foreach (AbstractTask t in toRestart)
+                        t.Restart();
+                    bool completed = false;
+                    while (!completed) {
+                        // 重启过程中用户点了取消/清空列表：停掉本批次已重启的任务，不再重启后续批次
+                        if (RestartAllAborted) {
+                            foreach (AbstractTask t in toRestart)
+                                t.Cancel();
+                            return;
+                        }
+                        completed = true;
+                        for (int i = 0; i < toRestart.Count; i++) {
+                            var t = toRestart[i];
+                            if (t.Status == System.Threading.Tasks.TaskStatus.Running ||
+                                t.Status == System.Threading.Tasks.TaskStatus.WaitingToRun) {
+                                completed = false;
+                                break;
+                            }
+                        }
+                        if (!completed)
+                            await Task.Delay(TASK_DELAY);
+                    }
+                    index += batch;
                 }
-                index += batch;
+                if (!RestartAllAborted)
+                    Start();
+            } finally {
+                RestartAllRunning = false;
             }
-            Start();
         }
 
         #region "任务持久化（崩溃/退出后恢复未完成的刮削任务）"

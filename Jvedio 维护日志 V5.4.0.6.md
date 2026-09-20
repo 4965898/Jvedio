@@ -1042,6 +1042,29 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 
 **经验**：① 「A+B−A∩B 精确等于并集」是判定 OR 泄漏的铁证——实测值与并集公式吻合度 100% 时不用再猜，直接反编译 wrapper 找 Or 标记的挂载点；② **去重型 ORM 是组间连接符泄漏的温床**——`Where.Equals` 不含 Or/Bracket 字段，去重后修饰符留在旧对象上；凡「条件对象可变状态（Or/括号）+ 集合去重」的组合都要审；③ 单组筛选测试有**结构性盲区**：泄漏的 Or 在「本组是最后一个条件」时被尾部剥除而侥幸正确，只有跨组组合才暴露——筛选类功能的最小验收用例必须是「两组各选一个值」；④ 「筛选结果看着合理」≠「筛选正确」——年份死列 + Or 泄漏相互掩盖出 6/6 的假阳性，本次靠「ReleaseYear 全 0」的直查数据才戳穿；UIA 勘察自绘 TogglePanel 要有「ControlView 拍平」的预期，面板定位走「主滚动容器直接子级序列」而非逻辑树；⑤ 原作者禁用某 UI（Height="0"）往往是性能妥协（5309 标签逐条 Dispatcher 加载），恢复时保留懒加载（点开面板才加载）已是现状，无需额外优化。
 
+### 3.60 修复同步信息任务页「取消所有失效」+「清空列表后新任务永不开始」（2026-09-21，5.4.1.49 / Jvedio29.57）
+
+**现象**（用户报告，下载/翻译两个任务页同构、同病）：
+
+1. 右下角「下载」任务页点「取消所有」**有时失效**——尤其是先点「重启所有」后，再点取消所有，任务仍自顾自地开始同步信息、停不下来。
+2. 完成一批任务 → 清除任务列表 → 加入新任务后，新任务一直显示「等待中」却**永不开始**；必须手动「停止所有」再「重启所有」才会跑起来。
+
+**根因**（对 `SuperUtils.dll` 反编译，`TaskDispatcher<T>` 工作循环 + `AbstractTask` 生命周期双查）：
+
+- **Bug1（取消所有失效）**：[DownloadManager.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Tasks/DownloadManager.cs) / [TranslateTaskManager.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Tasks/TranslateTaskManager.cs) 的 `RestartAllFailed` 是 `async void` 分批重启循环——点「取消所有」只取消了**当前批次**，重启循环的轮询把「被取消」当成「已完成」，继续拉起下一批失败任务 → 任务一个接一个重新开始同步（IL 反编译确认轮询条件只看 `Running/WaitingToRun`，对 Canceled 直接放行）。`AbstractTask.Restart()` 不复位 `TokenCTS` 属另一处隐患（取消后的 token 永久失效，重启任务拿的是死 token，本次一并留意但网络层未观察 token 故不致命）。
+- **Bug2（新任务永不开始）**：`TaskDispatcher.BeginWork()` 是「`if (Working) return` + `Working=true` 后 `Task.Run` 拉循环」的单飞模式；循环尾「队列空即 `Working=false; break` 退出」。**入队/清空发生在旧循环「判定空队列」与「真正退出」之间的竞态窗口时**：`Enqueue` 后调 `BeginWork()` 读到 `Working` 仍为 true 直接返回，随后旧循环退出、`Working=false`，新任务**永久停在 WaitingToRun 无人接管**——用户「清空列表立刻加新任务」的操作节奏正好反复踩中；若循环线程因 `ClearDoneList` 并发清列表（UI 线程）撞上循环内无锁遍历 `DoneList/CanceledList` 抛异常，循环死亡后 `Working` 卡 true，之后所有 `BeginWork` 一律早退，症状同样「永不开始」且重启前不可恢复（用户手动「停止所有+重启所有」之所以能跑，是因为 `Restart` 直接 `Start()` 绕开了调度器）。
+
+**修复**（全部在 Jvedio 侧，不碰 SuperUtils.dll）：
+
+- **Bug1**：[BaseManager.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Tasks/BaseManager.cs) 新增 `RestartAllAborted`/`RestartAllRunning` 标志——`CancelAll()` 与 `RemoveTask()`（清除列表）置位中止信号；`RestartAllFailed` 改为：`RestartAllRunning` 防重复点击（原先双点会并发两条重启循环）、批次间与轮询内检查中止信号（中止时停掉本批次已重启任务并返回）、只重启**仍在任务列表中且仍为取消态**的任务（清空列表后旧任务不再被拉起）、`try/finally` 复位运行标志。
+- **Bug2**：`DownloadManager`/`TranslateTaskManager` 的 `AddToDispatcher` 在**调度器空闲时**入队后启动 `WatchForStuckStart` 兜底——入队 4 秒后若该任务仍是 `WaitingToRun`，复位 `Dispatcher.Working` 并重新 `BeginWork()` 拉起新循环接管队列（对「循环已死」「竞态被落下」「仅延迟」三种状态均收敛：正常运行的旧循环不受影响，`Start()` 的 `Running` 守卫防重复执行，`SafeQueue` 去重防重复入队）。
+
+**验证**：
+- 逻辑复现 harness（build-output/dispatcher-repro，引用真实 SuperUtils.dll + 同款 TaskConfig）：修复前「取消所有后 T2~T5 仍自动重启并跑完」；修复后 T2~T5 保持 Canceled 不再拉起；清空列表加新批次自动开始；模拟 `Working` 卡死时兜底能复位并拉起。
+- Release 编译通过（EXIT=0，仅预存在 MSB3270/MSB3177 警告）。
+
+**经验**：① `async void` 循环型操作必须有「可被外部打断」的信号——任何「分批自动继续」的逻辑都要在每批边界检查取消/清空信号，否则「取消」对用户就是假按钮；② 单飞入口（`BeginWork` 的 Working 门闩）+ 循环尾部「空即退」存在**「判空」与「退出」两步之间的入队竞态**——外部调用方要么在入队后补一次迟到的拉起，要么给调度器做存活性自愈；③ 底层 DLL 无法改时，用「复位公开标志（`Working` 可写）+ 重新拉起」做自愈兜底是可行解，但要靠任务自身状态（是否仍 WaitingToRun）判定「真的卡死」而不是无脑重启；④ 清空列表后仍在跑的旧任务（本批没被取消）会继续打网络——`RemoveTask` 触发中止 + 重启循环只认列表内任务，两条一起防。
+
 ## 四、踩坑经验（重点）
 
 ### 4.1 唯一约束把状态列纳入唯一键

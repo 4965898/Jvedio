@@ -1,4 +1,4 @@
-﻿using SuperUtils.Framework.Tasks;
+using SuperUtils.Framework.Tasks;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -33,6 +33,21 @@ namespace Jvedio.Core.Tasks
 
         #region "事件"
         public Action onRunning;
+        #endregion
+
+        #region "重启全部失败：取消/清空列表时中止自动重启链"
+
+        /// <summary>
+        /// 「重启全部失败」进行中：用户点击取消/清空列表后置位，重启循环据此中止后续批次的自动重启，
+        /// 避免已点取消的任务又被重启循环重新拉起（旧逻辑的「取消所有有时失效」根因）。
+        /// </summary>
+        protected volatile bool RestartAllAborted = false;
+
+        /// <summary>
+        /// 「重启全部失败」是否正在进行（防重复点击造成两条重启循环并发拉起同一批任务）。
+        /// </summary>
+        protected bool RestartAllRunning = false;
+
         #endregion
 
 
@@ -125,6 +140,8 @@ namespace Jvedio.Core.Tasks
 
         public void RemoveTask(System.Threading.Tasks.TaskStatus status)
         {
+            // 清空/移除任务即中止「重启全部失败」：不再自动拉起已被移出列表的旧任务
+            RestartAllAborted = true;
             if (status == (TaskStatus.Canceled | TaskStatus.RanToCompletion)) {
                 CurrentTasks.Clear();
             } else {
@@ -147,6 +164,8 @@ namespace Jvedio.Core.Tasks
 
         public void CancelAll()
         {
+            // 中止进行中的「重启全部失败」自动重启链，随后取消当前所有任务
+            RestartAllAborted = true;
             if (CurrentTasks.Count > 0) {
                 foreach (AbstractTask task in CurrentTasks) {
                     task.Cancel();
