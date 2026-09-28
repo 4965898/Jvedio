@@ -7,7 +7,9 @@ The workflow refuses to republish a version already tagged at a different commit
 To pack locally after building the application, BusCrawler, and DBCrawler in Release mode:
 
 ```powershell
-./scripts/pack-release.ps1 -Version 5.4.1.50
+./scripts/pack-release.ps1 -Version 5.4.1.51
 ```
 
 The package is written to `artifacts/`, which Git ignores.
+
+After the ZIP is published as the latest GitHub Release, CI runs `publish-update-feed.ps1` to update the original upgrade window's version data and file source in the `update-feed` branch. Use `-ValidateOnly` to generate and check the feed locally without pushing it.

@@ -34,7 +34,7 @@ Capture video pictures based on `FFmpeg`, smooth and beautiful application softw
 
 Project：[Jvedio](https://github.com/4965898/Jvedio) | Download：[Latest Version](https://github.com/4965898/Jvedio/releases)
 
-The in-app update check reads this repository's latest Release. After a new version passes the build on `master`, CI publishes a complete ZIP with the runtime dependencies and crawler plugins. Download and extract the ZIP to run Jvedio.
+The original in-app upgrade window reads this repository's latest Release and can update from its files. After a new version passes the build on `master`, CI publishes a complete ZIP with runtime dependencies and crawler plugins, then refreshes the upgrade feed. You can also download and extract the ZIP.
 
 ---
 
@@ -123,6 +123,7 @@ Users : [User Guide](Jvedio-WPF/Document/Wiki/5.0/02-Beginning.md)
 | 5.4.1.48 (Jvedio29.56) | 2026-09-13 | Fixed two long-standing filter bugs: ① combining filter groups silently turned into a UNION instead of an intersection when a single tag/year was selected (e.g. Series+Genre showed 206 union results instead of the 5-video intersection); ② the Year filter never worked (the ReleaseYear column was never populated — all zeros), now matches by release date year |
 | 5.4.1.49 (Jvedio29.57) | 2026-09-21 | Fixed two task-scheduler bugs on the sync-info / translate task pages: ① "Cancel All" stopped working after clicking "Restart All" (the restart loop kept pulling canceled tasks back in batches — now cancel/clear-list aborts the restart chain immediately, with a double-click guard); ② after completing tasks, clearing the list and adding new ones left them stuck in "Waiting" forever (a dispatcher exit race / dead work loop orphaned the queue — added a 4s liveness fallback that re-kicks the dispatcher) |
 | 5.4.1.50 (Jvedio29.58) | 2026-09-29 | Update checks now use this repository's Releases; About, Feedback and Help open this repository or its maintained documentation; a lock protects both task enqueue and worker shutdown, eliminating the queue race and the 4-second fallback; CI builds, verifies and publishes the complete ZIP automatically |
+| 5.4.1.51 (Jvedio29.59) | 2026-09-29 | Restored the original upgrade dialog. Its latest version, download link, and update files now come from this repository's Releases; CI also publishes the dialog's compatible update feed. |
 
 
 # Software Characteristics

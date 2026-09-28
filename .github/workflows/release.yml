@@ -151,3 +151,11 @@ jobs:
           }
           gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
+
+      - name: Publish feed for the original upgrade window
+        if: github.ref == 'refs/heads/master' || github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./scripts/publish-update-feed.ps1 -Version $env:RELEASE_VERSION -Repository $env:GITHUB_REPOSITORY

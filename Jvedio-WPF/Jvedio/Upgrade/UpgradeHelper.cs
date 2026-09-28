@@ -1,11 +1,11 @@
 using Jvedio.Core.Global;
 using Newtonsoft.Json.Linq;
-using SuperControls.Style;
-using SuperControls.Style.Windows;
-using SuperUtils.IO;
+using SuperControls.Style.Upgrade;
+using SuperUtils.NetWork;
+using SuperUtils.NetWork.Crawler;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -20,39 +20,43 @@ namespace Jvedio.Upgrade
 
         private const string LatestReleaseApi = "https://api.github.com/repos/" +
             UrlManager.ReleaseRepository + "/releases/latest";
-        private static Window ParentWindow { get; set; }
-        private static bool Checking { get; set; }
+        private const string UpdateFeed = "https://raw.githubusercontent.com/" +
+            UrlManager.ReleaseRepository + "/update-feed/";
+
+        private static bool WindowClosed { get; set; }
+        private static SuperUpgrader Upgrader { get; set; }
+        private static Dialog_Upgrade Dialog { get; set; }
 
         public static void Init(Window parent)
         {
-            ParentWindow = parent;
-            Logger.Info("init upgrade check ok");
+            Upgrader = new SuperUpgrader {
+                UpgradeSourceDict = new Dictionary<string, UpgradeSource> {
+                    { "Github", new UpgradeSource(UpdateFeed, UrlManager.ReleaseUrl + "/latest", "jvedioupdate") }
+                },
+                UpgradeSourceIndex = 0,
+                Language = "zh-CN",
+                Header = new CrawlerHeader(SuperWebProxy.SystemWebProxy).Default,
+                BeforeUpdateDelay = 5,
+                AfterUpdateDelay = 1,
+                UpDateFileDir = "TEMP",
+                AppName = "Jvedio.exe"
+            };
+            WindowClosed = true;
+            Logger.Info("init upgrade dialog ok");
         }
 
-        public static async void OpenWindow()
+        public static void OpenWindow()
         {
-            if (Checking)
-                return;
-
-            Checking = true;
-            try {
-                var release = await GetUpgradeInfo();
-                if (HasNewVersion(release.LatestVersion)) {
-                    PromptToOpenRelease(release.LatestVersion, release.ReleaseDate);
-                } else {
-                    string message = string.Format(
-                        LangManager.GetValueByKey("UpgradeUpToDate"),
-                        App.GetLocalVersion(false), release.LatestVersion);
-                    ShowMessage(message, MessageBoxImage.Information);
-                }
-            } catch (Exception ex) {
-                Logger.Error(ex);
-                string message = string.Format(
-                    LangManager.GetValueByKey("UpgradeCheckFailed"), ex.Message);
-                ShowMessage(message, MessageBoxImage.Warning);
-            } finally {
-                Checking = false;
+            if (WindowClosed) {
+                Dialog = new Dialog_Upgrade(Upgrader) {
+                    LocalVersion = App.GetLocalVersion(false)
+                };
+                Dialog.Closed += (sender, args) => WindowClosed = true;
+                Dialog.OnExitApp += () => Application.Current.Shutdown();
+                WindowClosed = false;
             }
+
+            Dialog?.ShowDialog();
         }
 
         public static bool HasNewVersion(string latestVersion)
@@ -62,34 +66,6 @@ namespace Jvedio.Upgrade
                 throw new FormatException("Invalid release version: " + latestVersion);
 
             return remote.CompareTo(Version.Parse(App.GetLocalVersion(false))) > 0;
-        }
-
-        public static void PromptToOpenRelease(string latestVersion, string releaseDate)
-        {
-            string message = string.Format(
-                LangManager.GetValueByKey("UpgradeAvailable"),
-                latestVersion, App.GetLocalVersion(false), releaseDate);
-            if (new MsgBox(message).ShowDialog(GetActiveWindow()) == true)
-                FileHelper.TryOpenUrl(UrlManager.ReleaseUrl + "/latest");
-        }
-
-        private static Window GetActiveWindow()
-        {
-            if (ParentWindow?.IsVisible == true &&
-                ParentWindow.WindowState != WindowState.Minimized)
-                return ParentWindow;
-            return Application.Current?.Windows.OfType<Window>().FirstOrDefault(window =>
-                window.IsActive && window.IsVisible && window.WindowState != WindowState.Minimized);
-        }
-
-        private static void ShowMessage(string message, MessageBoxImage icon)
-        {
-            string title = LangManager.GetValueByKey("CheckUpgrade");
-            Window owner = GetActiveWindow();
-            if (owner == null)
-                MessageBox.Show(message, title, MessageBoxButton.OK, icon);
-            else
-                MessageBox.Show(owner, message, title, MessageBoxButton.OK, icon);
         }
 
         public static async Task<(string LatestVersion, string ReleaseDate, string ReleaseNote)> GetUpgradeInfo()
@@ -102,13 +78,12 @@ namespace Jvedio.Upgrade
                     handler.UseProxy = true;
                 }
 
-                using (var client = new HttpClient(handler)) {
+                using (var client = new System.Net.Http.HttpClient(handler)) {
                     client.Timeout = TimeSpan.FromSeconds(20);
                     client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Jvedio-update-check");
                     client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/vnd.github+json");
 
-                    string response = await client.GetStringAsync(LatestReleaseApi);
-                    JObject release = JObject.Parse(response);
+                    JObject release = JObject.Parse(await client.GetStringAsync(LatestReleaseApi));
                     string latestVersion = release.Value<string>("tag_name");
                     if (string.IsNullOrWhiteSpace(latestVersion) ||
                         !Version.TryParse(latestVersion.Trim().TrimStart('v', 'V'), out _))

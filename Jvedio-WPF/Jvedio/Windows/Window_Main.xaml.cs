@@ -703,7 +703,7 @@ namespace Jvedio
                 await Task.Delay(UpgradeHelper.AUTO_CHECK_UPGRADE_DELAY);
                 (string LatestVersion, string ReleaseDate, string ReleaseNote) result = await UpgradeHelper.GetUpgradeInfo();
                 if (UpgradeHelper.HasNewVersion(result.LatestVersion))
-                    UpgradeHelper.PromptToOpenRelease(result.LatestVersion, result.ReleaseDate);
+                    UpgradeHelper.OpenWindow();
             } catch (Exception ex) {
                 Logger.Error(ex);
             }

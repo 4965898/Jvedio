@@ -85,6 +85,7 @@
 | 5.4.1.48（Jvedio29.56） | 2026-09-13 | 修复跨筛选组叠加变并集 + 年份筛选失效（均为原版遗留 bug）：① 单值筛选组的 `Eq/Like().LeftBracket().Or()` 模式因 wrapper Where 按值去重导致 Or=true 残留，组间 AND 变 OR（系列+类别应 5 部实际 206 部）；② 年份筛选读 `ReleaseYear` 列但全库为 0 从未填充，改 `substr(ReleaseDate,1,4)`（见 3.59） |
 | 5.4.1.49（Jvedio29.57） | 2026-09-21 | 修复重启全部后取消全部失效；用 4 秒存活性兜底缓解清空列表后新任务卡在等待中的问题（见 3.60） |
 | 5.4.1.50（Jvedio29.58） | 2026-09-29 | 检查更新、关于、反馈和帮助入口改向本仓库；入队与工作线程退出改为同锁管理，移除 4 秒兜底；自动构建和发布完整 ZIP（见 3.61、5.4） |
+| 5.4.1.51（Jvedio29.59） | 2026-09-29 | 恢复原版升级窗口；最新版本、官方下载与自动更新文件均来自本仓库的 Release 和配套更新清单（见 3.62） |
 
 > 这些发布说明与本地 diff 吻合，可互相印证。5.4.0.5 的 Release Body 已于 2026-08-09 更新为「下载指引 + 相对原版 5.4 的改进总结 + 原记录」三段式，源码也已同步 commit（见 1.2、第五章）。
 
@@ -1079,6 +1080,14 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 
 **验证**：本机 Visual Studio MSBuild 17.14 重建主程序、BusCrawler、DBCrawler 和并发压力程序均成功；210 个压力任务均仅启动一次。`Jvedio29.58.exe` 内部/文件版本均为 5.4.1.50，归档副本与编译产物 SHA-256 一致。完整 ZIP 已通过逐项校验，与上一候选完整包的 73 个文件路径一致；工作流 YAML 解析通过。正式 Release 以 CI 成功结果为准。
 
+### 3.62 恢复原升级窗口并改用本仓库更新源（2026-09-29，5.4.1.51 / Jvedio29.59）
+
+**原因与修复**：5.4.1.50 把「检查更新」换成简化提示框，改变了原有操作体验。现恢复 `Dialog_Upgrade` 原窗口；启动自动发现新版时也打开该窗口。窗口中的 `SuperUpgrader` 只使用 `4965898/Jvedio` 的 `update-feed` 分支读取 `latest.json`、`list.json` 与逐文件内容，「官网下载」直达本仓库最新 Release。保留原窗口的「检查更新」和「开始更新」操作，同时避免旧版 `hitchao` 清单覆盖本仓库版本。
+
+**发布**：完整 ZIP 纳入原版 `SuperUpdate.exe`。Release 发布后，工作流从同一 ZIP 生成旧窗口兼容的版本信息、文件 MD5 清单及文件源，再推送到 `update-feed` 分支；旧版源不会混入自动更新。检测分支推送只会响应 `master`，不会由更新源分支递归触发。若重新运行旧标签，脚本会跳过非最新 Release，避免版本回退。
+
+**本机验证**：Visual Studio MSBuild Release 构建主程序、BusCrawler、DBCrawler 成功；并发压力测试 210 个任务均只启动一次。`5.4.1.51` 完整 ZIP 通过逐项校验；更新源脚本对该 ZIP 生成并提交了 73 个文件的测试清单，未在测试模式下推送。
+
 ## 四、踩坑经验（重点）
 
 ### 4.1 唯一约束把状态列纳入唯一键
@@ -1233,8 +1242,8 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 1. 修改代码，将 `AssemblyInfo.cs` 中的 `AssemblyVersion` 与 `AssemblyFileVersion` 同步升为新的四段版本号；更新 README 三语和本文档。
 2. 本机用 Visual Studio MSBuild 编译 Release 主程序及维护中的 Bus/DB 爬虫，运行 `DispatcherStress.exe`，再运行 `scripts/pack-release.ps1 -Version <版本号>` 检查完整 ZIP。
 3. 只提交源码、文档、工作流、脚本与发布输入；不要把本机旧版 EXE、`build-output/`、测试样本或 `nuget.exe` 混入提交。推送至 `origin/master`。
-4. GitHub Actions 在 Windows 环境重建并测试。若版本号尚无标签且提交仍是 `master` 最新提交，自动创建同版本标签、上传已校验 ZIP 到草稿 Release，再发布为 Latest；已有同版本标签但指向其他提交时停止，须再次升版本号。
-5. 核对 Actions 结果、Release 的 ZIP 资产与下载可用性。源码推送成功不等于 Release 已发布，CI 失败时先修复失败原因。
+4. GitHub Actions 在 Windows 环境重建并测试。若版本号尚无标签且提交仍是 `master` 最新提交，自动创建同版本标签、上传已校验 ZIP 到草稿 Release，再发布为 Latest；随后从同一 ZIP 更新原升级窗口使用的 `update-feed` 分支。已有同版本标签但指向其他提交时停止，须再次升版本号。
+5. 核对 Actions 结果、Release 的 ZIP 资产、`update-feed/jvedioupdate/latest.json` 和下载可用性。源码推送成功不等于 Release 已发布，CI 失败时先修复失败原因。
 
 ### 5.5 本地部署迭代流程（2026-08-16 起）
 

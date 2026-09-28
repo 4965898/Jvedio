@@ -39,6 +39,7 @@ New-Item -ItemType Directory -Path $package -Force | Out-Null
 try {
     Get-ChildItem -LiteralPath $source -Force | Copy-Item -Destination $package -Recurse -Force
     Copy-Item -LiteralPath $compressionDll -Destination $package -Force
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'release-assets\SuperUpdate.exe') -Destination $package -Force
 
     foreach ($name in @('app.publish', 'data', 'Temp', 'TEMP', 'plugins')) {
         $target = Join-Path $package $name
@@ -69,7 +70,7 @@ try {
     Copy-Item -LiteralPath $dbDll -Destination (Join-Path $crawlerDest 'db\DBCrawler.dll') -Force
 
     $required = @(
-        'Jvedio.exe', 'Jvedio.exe.config', 'SuperUtils.dll',
+        'Jvedio.exe', 'Jvedio.exe.config', 'SuperUpdate.exe', 'SuperUtils.dll',
         'SuperControls.Style.dll', 'MediaInfo.dll', 'System.Data.SQLite.dll',
         'System.IO.Compression.dll',
         'x64\SQLite.Interop.dll', 'x86\SQLite.Interop.dll',
