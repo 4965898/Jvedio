@@ -30,7 +30,9 @@
 基于 `FFmpeg` 截取视频图片，Window 桌面端流畅美观的应用软件
 
 
-官方网址：[Jvedio](https://hitchao.github.io/JvedioWebPage/) | 下载地址：[最新版本](https://github.com/4965898/Jvedio/releases)
+项目主页：[Jvedio](https://github.com/4965898/Jvedio) | 下载地址：[最新版本](https://github.com/4965898/Jvedio/releases)
+
+本仓库的「检查更新」读取上述仓库的最新 Release；新版本源码推送至 `master` 并通过构建验证后，自动发布包含运行依赖与爬虫插件的完整 ZIP。请下载 ZIP 解压使用。
 
 ---
 
@@ -50,9 +52,9 @@
 
 # 使用说明
 
-开发者请看：[开发者文档](https://github.com/hitchao/Jvedio/wiki/20_Developer)
+开发者请看：[开发者文档](Jvedio-WPF/Document/Wiki/5.0/20-Developer.md)
 
-用户请看：[用户文档](https://github.com/hitchao/Jvedio/wiki/02_Beginning)
+用户请看：[用户文档](Jvedio-WPF/Document/Wiki/5.0/02-Beginning.md)
 
 
 # 相关项目
@@ -62,7 +64,7 @@
 |--|--|
 |Jvedio 官方网页|[JvedioWebPage](https://github.com/hitchao/JvedioWebPage)|
 |Chrome（360极速浏览器） 插件|[Jvedio-Chrome-Extensions](https://github.com/hitchao/Jvedio-Chrome-Extensions)|
-|Jvedio 升级的服务器源|[jvedioupdate](https://github.com/hitchao/jvedioupdate)|
+|原版升级服务（历史参考）|[jvedioupdate](https://github.com/hitchao/jvedioupdate)|
 |Gif 控件修改于|[WpfAnimatedGif](https://github.com/hitchao/WpfAnimatedGif)|
 
 # 自改版本记录
@@ -118,6 +120,7 @@
 | 5.4.1.47（Jvedio29.55） | 2026-09-13 | 解锁「系列」筛选面板：原作者遗留的高度锁死导致系列标签（5309 个）已加载但永不可见、无法勾选，现恢复正常显示与筛选 |
 | 5.4.1.48（Jvedio29.56） | 2026-09-13 | 修复两个原版遗留筛选 bug：① 跨筛选组叠加变并集——单选一个标签/年份时组间 AND 变 OR（如 系列+类别 应显示交集 5 部却显示并集 206 部）；② 年份筛选完全失效（ReleaseYear 列从未填充，全库为 0），改按发行日期年份匹配 |
 | 5.4.1.49（Jvedio29.57） | 2026-09-21 | 修复同步信息/翻译任务页两个任务调度 bug：①「取消所有」在点过「重启所有」后失效（重启循环把已取消任务又一批批重新拉起，改「取消/清空列表立即中止重启链 + 防重复点击」）；② 完成任务清空列表后再加新任务会永远停在「等待中」不开始（调度器退出竞态/循环异常死亡致新任务无人接管，加入队 4 秒存活性兜底自动拉起） |
+| 5.4.1.50（Jvedio29.58） | 2026-09-29 | 检查更新改为读取本仓库 Release；「关于」「反馈」和帮助入口指向本仓库及随源码维护的文档；用队列与工作线程共用锁的调度器根治入队竞态，移除等待 4 秒重启的兜底；完整 ZIP 的构建、校验和 Release 发布自动化 |
 
 # 版本计划
 

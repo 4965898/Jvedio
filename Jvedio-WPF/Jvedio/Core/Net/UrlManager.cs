@@ -10,24 +10,26 @@ namespace Jvedio.Core.Global
         #region "const"
         private const string DonateJsonBasePath = "SuperStudio-Donate";
 
-        public const string ServerHelpUrl = "https://github.com/hitchao/Jvedio/wiki";
-        public const string ProjectUrl = "https://github.com/hitchao/Jvedio";
-        public const string WebPage = "https://hitchao.github.io/JvedioWebPage/";
-        public const string ReleaseUrl = "https://github.com/hitchao/Jvedio/releases";
+        public const string ProjectUrl = "https://github.com/" + ReleaseRepository;
+        private const string DocumentationUrl = ProjectUrl + "/blob/master/Jvedio-WPF/Document/Wiki/5.0/";
+        public const string ServerHelpUrl = DocumentationUrl + "02-Beginning.md";
+        public const string WebPage = ProjectUrl;
+        public const string ReleaseRepository = "4965898/Jvedio";
+        public const string ReleaseUrl = "https://github.com/" + ReleaseRepository + "/releases";
         public const string UpgradeSource = "https://hitchao.github.io/";
         public const string ServerUrl = "https://hitchao.github.io/hitchao/jvedio-server/jvedio-server.jar";
 
 
         public const string NoticeUrl = "https://hitchao.github.io/jvedioupdate/notice.json";
-        public const string FeedBackUrl = "https://github.com/hitchao/Jvedio/issues";
-        public const string WikiUrl = "https://github.com/hitchao/Jvedio/wiki/02_Beginning";
-        public const string WebPageUrl = "https://hitchao.github.io/JvedioWebPage/";
+        public const string FeedBackUrl = ProjectUrl + "/issues";
+        public const string WikiUrl = DocumentationUrl + "02-Beginning.md";
+        public const string WebPageUrl = ProjectUrl;
         public const string ThemeDIY = "https://hitchao.github.io/JvedioWebPage/theme.html";
         public const string PLUGIN_LIST_URL = "https://hitchao.github.io/Jvedio-Plugin/pluginlist.json";
         public const string PLUGIN_LIST_BASE_URL = "https://hitchao.github.io/Jvedio-Plugin/";
         public const string FFMPEG_URL = "https://www.gyan.dev/ffmpeg/builds/";
-        public const string PLUGIN_UPLOAD_HELP = "https://github.com/hitchao/Jvedio/wiki/08_Plugin";
-        public const string HEADER_HELP = "https://github.com/hitchao/Jvedio/wiki/05_Headers";
+        public const string PLUGIN_UPLOAD_HELP = DocumentationUrl + "08-Plugin.md";
+        public const string HEADER_HELP = DocumentationUrl + "05-Headers.md";
 
 
         #endregion

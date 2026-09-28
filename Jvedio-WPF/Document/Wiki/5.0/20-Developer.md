@@ -10,7 +10,7 @@
 1. 克隆仓库
 
 ```bash
-git clone https://github.com/hitchao/Jvedio
+git clone https://github.com/4965898/Jvedio
 ```
 
 3. 使用 Visual Studio 2022 打开 Jvedio-WPF 目录下的 Jvedio.sln

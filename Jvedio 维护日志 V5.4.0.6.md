@@ -1,7 +1,7 @@
 # Jvedio 维护日志 V5.4.0.6
 
 > 本文档沉淀自 2025-12 起对 Jvedio（WPF 本地视频管理软件）的接手维护与二次开发实践，供后续开发参考。
-> 最后更新：2026-09-13
+> 最后更新：2026-09-29
 
 ---
 
@@ -13,13 +13,13 @@
 |---|---|---|---|
 | `hitchao/Jvedio` | 原作者仓库 | **已归档（archived）**，最后提交 2023-12-18 | 2022-06 ~ 2023-12 |
 | `4965898/Jvedio` | 接手 fork（`fork: true`，`parent: hitchao/Jvedio`） | 活跃，默认分支 `master` | 2025-12-04 起 |
-| 本地 `a:\Trae\repository\Jvedio-1` | 开发工作树 | origin 已切到 `4965898/Jvedio`，源码已 commit（`e5a8e36`）并 push | — |
+| 本地 `A:\Trae\repository\Jvedio-1` | 开发工作树 | origin 指向 `4965898/Jvedio`，维护代码与本文档随 `master` 推送 | — |
 
 ### 1.2 接手后的关键现状（务必知晓）
 
-1. **源码已入库**：2026-08-09 起 origin 已切到 `4965898/Jvedio`，25 个改动文件 + Bus2 爬虫新目录已 commit（`e5a8e36`「接手维护：修复图片存在性索引、新增Bus2爬虫、重构筛选与下载层」）并 push 到 fork master，不再走「只发 exe 不提交源码」的旧流程。
-2. **本地工作树状态**：源码改动已全部提交；`build-output/`（编译产物 + 打包脚本）、`nuget.exe`（8MB 工具）、`LULU-430.txt`（JavBus 抓取测试样本）、本文档按约定**未入库**（刻意保留为本地文件）。
-3. **本地 master**：`0d29c1d`（hitchao 最后 commit）→ `e5a8e36`（接手维护汇总 commit），远程 fork master 已同步。
+1. **源码已入库**：2026-08-09 起 origin 已切到 `4965898/Jvedio`，不再走「只发 exe 不提交源码」的旧流程。5.4.1.50 起，版本号更新并推送 `master` 后由 GitHub Actions 构建、校验完整 ZIP 并发布 Release（见 5.4）。
+2. **本地工作树状态**：维护代码、Release 工作流、打包脚本、插件发布输入与本文档入库；`build-output/`、本机编译 EXE、`nuget.exe` 及抓取测试样本保留为本地文件，不进入源码提交。
+3. **版本对应**：5.4.1.49 / Jvedio29.57 使用 4 秒兜底缓解任务入队竞态；5.4.1.50 / Jvedio29.58 使用本仓库实现的调度器从根源消除该竞态（见 3.60～3.61）。
 4. **原仓库已归档**，无法向上游提 PR，所有维护只能在自己 fork 内进行。
 
 ### 1.3 技术栈
@@ -83,6 +83,8 @@
 | 5.4.1.46（Jvedio29.54） | 2026-09-13 | 修复「类别/系列/导演/制作商」标签筛选误命中：LIKE 子串匹配改为整标签匹配（Genre 为 \a 分隔多值列，勾「高」命中 5881 部含「高画质」等，修复后只命中 205 部）；类别搜索框回退子串匹配（见 3.58 修订二） |
 | 5.4.1.47（Jvedio29.55） | 2026-09-13 | 解锁系列面板标签区：原作者遗留 `ScrollViewer Height="0"` 把标签列表锁死（5309 个系列标签已加载但永不可见、无法勾选，系列筛选器 UI 完全不可用），删除 Height="0" 与其他标签面板对齐（见 3.59） |
 | 5.4.1.48（Jvedio29.56） | 2026-09-13 | 修复跨筛选组叠加变并集 + 年份筛选失效（均为原版遗留 bug）：① 单值筛选组的 `Eq/Like().LeftBracket().Or()` 模式因 wrapper Where 按值去重导致 Or=true 残留，组间 AND 变 OR（系列+类别应 5 部实际 206 部）；② 年份筛选读 `ReleaseYear` 列但全库为 0 从未填充，改 `substr(ReleaseDate,1,4)`（见 3.59） |
+| 5.4.1.49（Jvedio29.57） | 2026-09-21 | 修复重启全部后取消全部失效；用 4 秒存活性兜底缓解清空列表后新任务卡在等待中的问题（见 3.60） |
+| 5.4.1.50（Jvedio29.58） | 2026-09-29 | 检查更新、关于、反馈和帮助入口改向本仓库；入队与工作线程退出改为同锁管理，移除 4 秒兜底；自动构建和发布完整 ZIP（见 3.61、5.4） |
 
 > 这些发布说明与本地 diff 吻合，可互相印证。5.4.0.5 的 Release Body 已于 2026-08-09 更新为「下载指引 + 相对原版 5.4 的改进总结 + 原记录」三段式，源码也已同步 commit（见 1.2、第五章）。
 
@@ -1065,6 +1067,18 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 
 **经验**：① `async void` 循环型操作必须有「可被外部打断」的信号——任何「分批自动继续」的逻辑都要在每批边界检查取消/清空信号，否则「取消」对用户就是假按钮；② 单飞入口（`BeginWork` 的 Working 门闩）+ 循环尾部「空即退」存在**「判空」与「退出」两步之间的入队竞态**——外部调用方要么在入队后补一次迟到的拉起，要么给调度器做存活性自愈；③ 底层 DLL 无法改时，用「复位公开标志（`Working` 可写）+ 重新拉起」做自愈兜底是可行解，但要靠任务自身状态（是否仍 WaitingToRun）判定「真的卡死」而不是无脑重启；④ 清空列表后仍在跑的旧任务（本批没被取消）会继续打网络——`RemoveTask` 触发中止 + 重启循环只认列表内任务，两条一起防。
 
+> 以上为 5.4.1.49 的历史修复记录；4 秒兜底已在 5.4.1.50 移除，现行实现见 3.61。
+
+### 3.61 更新与发布归口、任务调度竞态根治（2026-09-29，5.4.1.50 / Jvedio29.58）
+
+**更新入口**：`UpgradeHelper` 读取 `4965898/Jvedio` 的 GitHub 最新 Release，并用四段版本号比较；检测到新版时引导下载完整 ZIP。`UrlManager` 将「关于」「反馈」「项目主页」和帮助文档指向本仓库，README 三语及 Issue 模板同步修正。上游主题教程、插件源等独立资源仍保留其原地址。
+
+**调度器根因修复**：原 `SuperUtils.Framework.Tasks.TaskDispatcher<T>` 的「队列判空」和 `Working=false` 不在同一临界区，新任务可能在旧线程退出前入队却被 `Working=true` 阻止启动；`ClearDoneList` 还可能与循环遍历并发。新增 `ReliableTaskDispatcher<T>`，在一把锁下管理待运行队列、运行中任务、完成/取消列表和工作线程状态：旧线程判空并退出时，新入队任务必能启动新线程。下载、翻译和截图任务管理器改用新调度器，移除下载/翻译「等待 4 秒再拉起」的兜底。`BaseManager.AddTask` 先注册事件和 UI 列表再入队；下载任务先记录可恢复快照再入队，防止瞬时完成时丢失事件或留下过期记录。
+
+**发布闭环**：新建 `.github/workflows/release.yml` 与 `scripts/pack-release.ps1`。`master` 上四段 `AssemblyVersion` 提升后，CI 恢复依赖、重建主程序与 Bus/DB 爬虫、运行并发压力测试、打包并校验完整 ZIP，再创建同版本标签与 Release；重复版本或标签指向不同提交时拒绝覆盖。FC2/Library 暂无源码，发布输入目录保留来自既有完整包的 DLL；Bus/DB DLL 每次从源码重建。发布时不上传单独 EXE，以免缺依赖无法运行。
+
+**验证**：本机 Visual Studio MSBuild 17.14 重建主程序、BusCrawler、DBCrawler 和并发压力程序均成功；210 个压力任务均仅启动一次。`Jvedio29.58.exe` 内部/文件版本均为 5.4.1.50，归档副本与编译产物 SHA-256 一致。完整 ZIP 已通过逐项校验，与上一候选完整包的 73 个文件路径一致；工作流 YAML 解析通过。正式 Release 以 CI 成功结果为准。
+
 ## 四、踩坑经验（重点）
 
 ### 4.1 唯一约束把状态列纳入唯一键
@@ -1148,32 +1162,33 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 ### 5.1 构建
 - 解决方案：`Jvedio-WPF/Jvedio.sln`
 - 主项目：`Jvedio-WPF/Jvedio/Jvedio.csproj`
-- 爬虫插件单独编译：`Core/Crawler/Bus2/BusCrawler/BusCrawler.csproj` → 产出 `BusCrawler.dll`
-- 编译产物参考 `build-output/`（`Jvedio24.exe` / `Jvedio25.exe` / `BusCrawler.dll`）
+- 爬虫插件单独编译：`Core/Crawler/Bus2/BusCrawler/BusCrawler.csproj` → `BusCrawler.dll`；`Core/Crawler/Db2/DbCrawler/DbCrawler.csproj` → `DBCrawler.dll`
+- 本机 Visual Studio MSBuild：`D:\Visual Studio IDE\MSBuild\Current\Bin\MSBuild.exe`；本机版本归档放在 `build-output/`，不提交源码仓库
 - **无 .NET Framework 4.7.2 targeting pack 的机器**（只有 VS BuildTools 时最常见）：从 nuget.org 下载 `Microsoft.NETFramework.ReferenceAssemblies.net472` 包解压（`https://www.nuget.org/api/v2/package/Microsoft.NETFramework.ReferenceAssemblies.net472/1.0.3`），MSBuild 加参数 `/p:TargetFrameworkRootPath=<解压目录>\build` 即可编译，**无需安装 SDK/开发者工具包**（2026-08-10 实测：BuildTools-only 环境用此法编译 sln 通过）。
 
 ### 5.2 发布完整 zip（已验证流程）
 
 > **核心教训：release 不能只传单个 exe。** 接手初期曾在 release 只上传 2MB 的 `Jvedio.exe`，但项目没有用 Costura/ILRepack 合并依赖，exe 旁边必须跟着 40+ 个 dll（`SuperControls.Style.dll` 2.3MB、`MediaInfo.dll` 3MB、`EntityFramework.dll` 4.9MB 等）+ `x64/x86/SQLite.Interop.dll` 原生库 + `Jvedio.exe.config` + `plugins/` 插件目录。用户只下 exe 会因缺 dll 无法启动。对照原作者 `hitchao/Jvedio` 的 `Jvedio-5.4.zip` 就是 10.11MB 的完整包。
 
-**打包脚本**：[build-output/pack_release.ps1](file:///a:/Trae/repository/Jvedio-1/build-output/pack_release.ps1)（已沉淀，发版时改版本号重跑即可）
+**现行打包脚本**：`scripts/pack-release.ps1 -Version 5.4.1.50`。脚本和发布所需插件输入已入库；`build-output/pack_release.ps1` 仅作历史参考。
 
 **打包流程**（脚本自动完成）：
-1. 源：`Jvedio-WPF/Jvedio/bin/Release/`（exe 哈希与 `build-output/Jvedio25.exe` 一致即最新编译版，无需重新编译）
-2. 复制到 staging 目录，剔除：`app.publish/`、`*.pdb`、`*.xml`、旧版 exe（`Jvedio20~23.exe`）、测试样本 txt
-3. **修正 BusCrawler.dll 缺失**：`plugins/crawlers/bus/main.json` 的 `"Files": ["./BusCrawler.dll"]` 指向 `./BusCrawler.dll`，但 bus 目录常只有旧版 `BusCrawler v2可用.dll`——必须把最新 `build-output/BusCrawler.dll` 复制为 `bus/BusCrawler.dll`，否则爬虫加载失败
-4. `Compress-Archive` 打成 `Jvedio-{版本}.zip`（含一层版本号外层目录，仿原版）
-5. 产物约 10.5MB，63 个条目，结构与原版 `Jvedio-5.4.zip` 对齐
+1. 从 `Jvedio-WPF/Jvedio/bin/Release/` 复制全量运行文件，并校验 EXE 内部版本与目标版本一致。
+2. 在独立临时目录移除 ClickOnce 清单、调试符号、用户数据和旧编号 EXE。
+3. 将源码重建的 Bus/DB DLL 与 `release-assets/plugins/crawlers/` 中的四套插件配置合并；FC2/Library DLL 暂由已发布完整包保留。
+4. 生成 `artifacts/Jvedio-{版本}.zip`，逐项校验 EXE、配置、SQLite 原生库、高亮规则及四个爬虫入口均存在且非空。
 
 **打包内容清单**（用户解压即得）：
 - `Jvedio.exe` + `Jvedio.exe.config` + `Jvedio.ico`
 - 40+ 依赖 dll（SuperUtils / SuperControls.Style / MediaInfo / EntityFramework / System.Data.SQLite / Newtonsoft.Json / HtmlAgilityPack …）
 - `x64/` `x86/` SQLite 原生库
 - `AvalonEdit/Highlighting/` 语法高亮规则
-- `plugins/crawlers/bus/`（Bus2 爬虫：`BusCrawler.dll` + `main.json` + `config.json`）
+- `plugins/crawlers/bus/`、`db/`、`fc2/`、`library/` 四个爬虫目录及其 DLL、配置、图标
 - 运行环境：.NET Framework 4.7.2（Win10 1803+ 自带）
 
-### 5.3 上传到 Release（GitHub API 方式）
+### 5.3 旧版手工上传记录（应急参考）
+
+5.4.1.50 起，正常发布由 5.4 的 GitHub Actions 工作流完成。以下 API 过程仅记录早期手工发版的处理方式。
 
 gh 未登录时，可从 git credential helper 提取 token，直接调 GitHub API（无需手动 `gh auth login`）：
 
@@ -1213,17 +1228,13 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 - 但随后 GET `/releases/tags/{tag}` 端点仍返回旧 body（23 字符）——这是 CDN 缓存延迟，非更新失败
 - **验证更新结果必须用 `/releases/{id}` 端点**，不要用 `/releases/tags/{tag}`，否则会误判失败
 
-### 5.4 版本迭代流程（下次发版清单）
+### 5.4 版本迭代与自动发布流程（5.4.1.50 起）
 
-1. 改代码 → 重新编译 Release（`Jvedio-WPF/Jvedio/Jvedio.csproj`）
-2. 爬虫有改动则单独编译 `Core/Crawler/Bus2/BusCrawler/BusCrawler.csproj` → 产出 `BusCrawler.dll`
-3. 改 `build-output/pack_release.ps1` 里的版本号字符串（如 `5.4.0.5` → `5.4.0.6`）→ 运行生成 `Jvedio-5.4.0.6.zip`
-4. 源码 commit + push：`git add Jvedio-WPF/ && git commit -m "..." && git push origin master`
-5. 建 tag + release（tag 命名 `5.4.0.6`，title「自改5.4.0.6」）
-6. 用 5.3 的 API 方式上传 zip + 写 Release Body（下载指引 + 改进内容 + 原 body 保留）
-7. 如有旧的不完整 asset，删除
-
-> **源码已入库**：2026-08-09 起 origin 已切到 `4965898/Jvedio`，源码改动已 commit（`e5a8e36`）并 push，不再走「只发 exe 不提交源码」的旧流程。后续发版务必同步 commit。
+1. 修改代码，将 `AssemblyInfo.cs` 中的 `AssemblyVersion` 与 `AssemblyFileVersion` 同步升为新的四段版本号；更新 README 三语和本文档。
+2. 本机用 Visual Studio MSBuild 编译 Release 主程序及维护中的 Bus/DB 爬虫，运行 `DispatcherStress.exe`，再运行 `scripts/pack-release.ps1 -Version <版本号>` 检查完整 ZIP。
+3. 只提交源码、文档、工作流、脚本与发布输入；不要把本机旧版 EXE、`build-output/`、测试样本或 `nuget.exe` 混入提交。推送至 `origin/master`。
+4. GitHub Actions 在 Windows 环境重建并测试。若版本号尚无标签且提交仍是 `master` 最新提交，自动创建同版本标签、上传已校验 ZIP 到草稿 Release，再发布为 Latest；已有同版本标签但指向其他提交时停止，须再次升版本号。
+5. 核对 Actions 结果、Release 的 ZIP 资产与下载可用性。源码推送成功不等于 Release 已发布，CI 失败时先修复失败原因。
 
 ### 5.5 本地部署迭代流程（2026-08-16 起）
 

@@ -32,13 +32,13 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="CommonNet">
-      <HintPath>a:\Trae\repository\Jvedio-1\Jvedio-WPF\Jvedio\Reference\CommonNet.dll</HintPath>
+      <HintPath>..\..\..\..\Reference\CommonNet.dll</HintPath>
     </Reference>
     <Reference Include="HtmlAgilityPack">
-      <HintPath>a:\Trae\repository\Jvedio-1\Jvedio-WPF\Jvedio\Reference\HtmlAgilityPack.dll</HintPath>
+      <HintPath>..\..\..\..\Reference\HtmlAgilityPack.dll</HintPath>
     </Reference>
     <Reference Include="SuperUtils">
-      <HintPath>a:\Trae\repository\Jvedio-1\Jvedio-WPF\Jvedio\Reference\SuperUtils.dll</HintPath>
+      <HintPath>..\..\..\..\Reference\SuperUtils.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />

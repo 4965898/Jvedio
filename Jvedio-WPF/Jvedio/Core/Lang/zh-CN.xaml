@@ -105,4 +105,7 @@
     <sys:String x:Key="Publisher">发行商</sys:String>
     <sys:String x:Key="Studio">制作商</sys:String>
     <sys:String x:Key="FilterTags">筛选标签</sys:String>
+    <sys:String x:Key="UpgradeAvailable">发现新版本 {0}（当前版本 {1}）&#10;发布日期：{2}&#10;是否打开下载页面？</sys:String>
+    <sys:String x:Key="UpgradeUpToDate">当前版本：{0}&#10;最新公开版本：{1}&#10;无需更新。</sys:String>
+    <sys:String x:Key="UpgradeCheckFailed">检查更新失败：{0}</sys:String>
 </ResourceDictionary>

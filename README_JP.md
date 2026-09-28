@@ -30,7 +30,9 @@
 ウィンドウデスクトップ上の`FFmpeg`、スムーズで美しいアプリケーションソフトウェアに基づいてビデオ写真をキャプチャします
 
 
-公式ウェブサイト：[Jvedio](https://hitchao.github.io/JvedioWebPage/) | ダウンロードリンク：[最新バージョン](https://github.com/4965898/Jvedio/releases)
+プロジェクト：[Jvedio](https://github.com/4965898/Jvedio) | ダウンロードリンク：[最新バージョン](https://github.com/4965898/Jvedio/releases)
+
+アプリ内の更新確認はこのリポジトリの最新 Release を参照します。新バージョンが `master` でビルド検証に通ると、実行に必要なライブラリとクローラープラグインを含む ZIP が自動公開されます。ZIP をダウンロードして展開してください。
 
 
 
@@ -53,9 +55,9 @@
 
 # 使用説明書
 
-開発者：[開発者](https://github.com/hitchao/Jvedio/wiki/20_Developer)
+開発者：[開発者](Jvedio-WPF/Document/Wiki/5.0/20-Developer.md)
 
-ユーザー: [ユーザー](https://github.com/hitchao/Jvedio/wiki/02_Beginning)
+ユーザー: [ユーザー](Jvedio-WPF/Document/Wiki/5.0/02-Beginning.md)
 
 
 # 関連項目
@@ -65,7 +67,7 @@
 |-|-|
 | Jvedio公式ウェブページ| [JvedioWebPage](https://github.com/hitchao/JvedioWebPage)|
 | Chrome(360スピードブラウザ)プラグイン| [Jvedio-Chrome-Extensions](https://github.com/hitchao/Jvedio-Chrome-Extensions)|
-| Jvedioアップグレードサーバーソース| [jvedioupdate](https://github.com/hitchao/jvedioupdate)|
+| 旧版の更新サーバー（履歴）| [jvedioupdate](https://github.com/hitchao/jvedioupdate)|
 | Gifコン​​トロールが変更されました| [WpfAnimatedGif](https://github.com/hitchao/WpfAnimatedGif)|
 
 
@@ -119,6 +121,7 @@
 | 5.4.1.47（Jvedio29.55） | 2026-09-13 | 「シリーズ」フィルターパネルを解放：原作者が残した高さゼロ固定により、5309 個のシリーズタグが読み込まれているのに永遠に表示されず選択できなかった状態を解消、正常に表示・フィルター可能に |
 | 5.4.1.48（Jvedio29.56） | 2026-09-13 | 2 つの旧来のフィルターバグを修正：① フィルターグループの組み合わせが、タグ/年を 1 つだけ選んだ場合に暗黙的に和集合になってしまう問題（例：シリーズ+ジャンルで積集合 5 件のはずが和集合 206 件と表示）② 年フィルターが全く機能していなかった問題（ReleaseYear 列は未投入で全行 0、発売日の年から照合するよう変更） |
 | 5.4.1.49（Jvedio29.57） | 2026-09-21 | 情報同期/翻訳タスクページのタスクスケジューラに関する 2 つのバグを修正：①「全キャンセル」が「全て再開」をクリックした後に効かなくなる問題（再開ループがキャンセル済みタスクをバッチで再度引き上げていた——キャンセル/リストクリアで再開チェーンを即時中止、ダブルクリックガードも追加）② タスク完了後にリストをクリアして新タスクを追加しても「待機中」のまま永遠に始まらない問題（ディスパッチャの終了競合/ワークループ死亡でキューが放置される——入隊 4 秒後の活性フォールバックで自動再開） |
+| 5.4.1.50（Jvedio29.58） | 2026-09-29 | 更新確認をこのリポジトリの Release に変更。「概要」「フィードバック」「ヘルプ」はこのリポジトリと同梱の文書を参照。タスクの入隊とワーカー終了を同じロックで保護して競合を解消し、4 秒後に再起動する暫定処理を削除。完全版 ZIP のビルド・検証・Release 公開を自動化 |
 
 
 # ソフトウェア特性

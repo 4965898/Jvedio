@@ -1,0 +1,24 @@
+{
+  "PluginMetaData": {
+    "PluginName": "图书馆 信息同步",
+    "PluginType": 0,
+    "Reboot": true,
+    "Authors": [
+      {
+        "Name": "chao"
+      }
+    ],
+    "ReleaseNotes": {
+      "Files": ["./LibraryCrawler.dll"],
+      "Version": "1.4.0",
+      "Date": "2023-09-29",
+      "Desc": "图书馆 信息同步",
+      "KeyWords": [
+        {
+          "Key": "类别",
+          "Value": "爬虫"
+        }
+      ]
+    }
+  }
+}

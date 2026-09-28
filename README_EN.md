@@ -32,7 +32,9 @@ Add tags to manage videos, use artificial intelligence to identify actors, suppo
 Capture video pictures based on `FFmpeg`, smooth and beautiful application software on Window desktop
 
 
-WebSite：[Jvedio](https://hitchao.github.io/JvedioWebPage/) | Download：[Latest Version](https://github.com/4965898/Jvedio/releases)
+Project：[Jvedio](https://github.com/4965898/Jvedio) | Download：[Latest Version](https://github.com/4965898/Jvedio/releases)
+
+The in-app update check reads this repository's latest Release. After a new version passes the build on `master`, CI publishes a complete ZIP with the runtime dependencies and crawler plugins. Download and extract the ZIP to run Jvedio.
 
 ---
 
@@ -54,9 +56,9 @@ WebSite：[Jvedio](https://hitchao.github.io/JvedioWebPage/) | Download：[Lates
 
 # Document
 
-Developers : [Developer Document](https://github.com/hitchao/Jvedio/wiki/20_Developer)
+Developers : [Developer Document](Jvedio-WPF/Document/Wiki/5.0/20-Developer.md)
 
-Users : [User Guide](https://github.com/hitchao/Jvedio/wiki/02_Beginning)
+Users : [User Guide](Jvedio-WPF/Document/Wiki/5.0/02-Beginning.md)
 
 
 # Related items
@@ -66,7 +68,7 @@ Users : [User Guide](https://github.com/hitchao/Jvedio/wiki/02_Beginning)
 |--|--|
 |Jvedio official webpage|[JvedioWebPage](https://github.com/hitchao/JvedioWebPage)|
 |Chrome (360 speed browser) plug-in|[Jvedio-Chrome-Extensions](https://github.com/hitchao/Jvedio-Chrome-Extensions)|
-|Jvedio upgraded server source|[jvedioupdate](https://github.com/hitchao/jvedioupdate)|
+|Original update server (historical)|[jvedioupdate](https://github.com/hitchao/jvedioupdate)|
 |Gif control modified in|[WpfAnimatedGif](https://github.com/hitchao/WpfAnimatedGif)|
 
 
@@ -120,6 +122,7 @@ Users : [User Guide](https://github.com/hitchao/Jvedio/wiki/02_Beginning)
 | 5.4.1.47 (Jvedio29.55) | 2026-09-13 | Unlocked the Series filter panel: a leftover hard-coded zero height from the original author kept the 5309 series tags loaded but permanently invisible and unselectable; now displayed and filterable normally |
 | 5.4.1.48 (Jvedio29.56) | 2026-09-13 | Fixed two long-standing filter bugs: ① combining filter groups silently turned into a UNION instead of an intersection when a single tag/year was selected (e.g. Series+Genre showed 206 union results instead of the 5-video intersection); ② the Year filter never worked (the ReleaseYear column was never populated — all zeros), now matches by release date year |
 | 5.4.1.49 (Jvedio29.57) | 2026-09-21 | Fixed two task-scheduler bugs on the sync-info / translate task pages: ① "Cancel All" stopped working after clicking "Restart All" (the restart loop kept pulling canceled tasks back in batches — now cancel/clear-list aborts the restart chain immediately, with a double-click guard); ② after completing tasks, clearing the list and adding new ones left them stuck in "Waiting" forever (a dispatcher exit race / dead work loop orphaned the queue — added a 4s liveness fallback that re-kicks the dispatcher) |
+| 5.4.1.50 (Jvedio29.58) | 2026-09-29 | Update checks now use this repository's Releases; About, Feedback and Help open this repository or its maintained documentation; a lock protects both task enqueue and worker shutdown, eliminating the queue race and the 4-second fallback; CI builds, verifies and publishes the complete ZIP automatically |
 
 
 # Software Characteristics

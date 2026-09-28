@@ -54,11 +54,11 @@ namespace Jvedio.Core.Tasks
             return Instance;
         }
 
-        private static TaskDispatcher<ScreenShotTask> Dispatcher { get; set; }
+        private static ReliableTaskDispatcher<ScreenShotTask> Dispatcher { get; set; }
 
         static ScreenShotManager()
         {
-            Dispatcher = TaskDispatcher<ScreenShotTask>.CreateInstance(DEFAULT_CONFIG);
+            Dispatcher = ReliableTaskDispatcher<ScreenShotTask>.CreateInstance(DEFAULT_CONFIG);
             Dispatcher.onWorking += (s, e) => {
                 App.Current.Dispatcher.Invoke(() => {
                     Instance.onRunning?.Invoke();
@@ -71,7 +71,6 @@ namespace Jvedio.Core.Tasks
         public override void AddToDispatcher(AbstractTask task)
         {
             Dispatcher.Enqueue(task as ScreenShotTask);
-            Dispatcher.BeginWork();
         }
 
         public override void ClearDispatcher()

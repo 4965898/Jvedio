@@ -1,0 +1,153 @@
+name: Build and release Jvedio
+
+on:
+  push:
+    branches: [master]
+    tags: ['*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: microsoft/setup-msbuild@v3
+      - uses: nuget/setup-nuget@v3
+
+      - name: Validate source and release version
+        shell: pwsh
+        run: |
+          $assembly = Get-Content 'Jvedio-WPF/Jvedio/Properties/AssemblyInfo.cs' |
+            Select-String '^\[assembly: AssemblyVersion\("([0-9.]+)"\)\]$' |
+            Select-Object -First 1
+          if (-not $assembly) { throw 'AssemblyVersion was not found.' }
+          $version = $assembly.Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            if ($env:GITHUB_REF_NAME -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+              throw "Release tag must be a four-part version: $env:GITHUB_REF_NAME"
+            }
+            if ($env:GITHUB_REF_NAME -ne $version) {
+              throw "Release tag $env:GITHUB_REF_NAME does not match AssemblyVersion $version"
+            }
+            git fetch origin master --no-tags
+            git merge-base --is-ancestor HEAD origin/master
+            if ($LASTEXITCODE -ne 0) { throw 'Release tag is not on master.' }
+          }
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Restore NuGet packages and .NET Framework references
+        shell: pwsh
+        run: |
+          $msbuildDirectory = Split-Path (Get-Command msbuild).Source
+          nuget restore Jvedio-WPF/Jvedio.sln -MSBuildPath $msbuildDirectory -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw 'NuGet restore failed.' }
+          nuget install Microsoft.NETFramework.ReferenceAssemblies.net472 -Version 1.0.3 -ExcludeVersion -OutputDirectory .ci/ref -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw '.NET Framework reference restore failed.' }
+
+      - name: Build application and maintained crawlers
+        shell: pwsh
+        run: |
+          $refs = Join-Path $PWD '.ci/ref/Microsoft.NETFramework.ReferenceAssemblies.net472/build'
+          $projects = @(
+            'Jvedio-WPF/Jvedio/Jvedio.csproj',
+            'Jvedio-WPF/Jvedio/Core/Crawler/Bus2/BusCrawler/BusCrawler.csproj',
+            'Jvedio-WPF/Jvedio/Core/Crawler/Db2/DbCrawler/DbCrawler.csproj'
+          )
+          foreach ($project in $projects) {
+            msbuild $project /t:Rebuild /p:Configuration=Release /p:TargetFrameworkRootPath="$refs" /p:LangVersion=9.0 /nologo /v:minimal
+            if ($LASTEXITCODE -ne 0) { throw "Build failed: $project" }
+          }
+
+      - name: Check task dispatcher concurrency
+        shell: pwsh
+        run: |
+          $refs = Join-Path $PWD '.ci/ref/Microsoft.NETFramework.ReferenceAssemblies.net472/build'
+          msbuild Jvedio-WPF/DispatcherStress/DispatcherStress.csproj /t:Rebuild /p:Configuration=Release /p:TargetFrameworkRootPath="$refs" /p:LangVersion=9.0 /nologo /v:minimal
+          if ($LASTEXITCODE -ne 0) { throw 'Dispatcher stress build failed.' }
+          & 'Jvedio-WPF/DispatcherStress/bin/Release/DispatcherStress.exe'
+          if ($LASTEXITCODE -ne 0) { throw 'Dispatcher stress test failed.' }
+
+      - name: Pack and verify complete ZIP
+        shell: pwsh
+        run: |
+          ./scripts/pack-release.ps1 -Version $env:RELEASE_VERSION
+
+      - name: Preserve build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jvedio-${{ env.RELEASE_VERSION }}
+          path: artifacts/Jvedio-${{ env.RELEASE_VERSION }}.zip
+          if-no-files-found: error
+
+      - name: Publish verified GitHub Release
+        if: github.ref == 'refs/heads/master' || github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:RELEASE_VERSION
+          $zip = "artifacts/Jvedio-$tag.zip"
+          if ($env:GITHUB_REF_TYPE -ne 'tag') {
+            git fetch origin master --no-tags
+            if ($LASTEXITCODE -ne 0) { throw 'Could not refresh master.' }
+            $head = git rev-parse origin/master
+            if ($head -ne $env:GITHUB_SHA) {
+              Write-Host 'A newer master commit is available; this run will not publish.'
+              exit 0
+            }
+          }
+
+          $remoteTag = @(git ls-remote --tags --refs origin "refs/tags/$tag")
+          if ($LASTEXITCODE -ne 0) { throw 'Could not inspect release tag.' }
+          if ($remoteTag.Count -eq 0) {
+            if ($env:GITHUB_REF_TYPE -eq 'tag') { throw 'The pushed release tag is missing.' }
+            git tag $tag
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create release tag.' }
+            git push origin "refs/tags/$tag"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not push release tag.' }
+          } else {
+            git fetch origin "refs/tags/$tag:refs/tags/$tag"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not fetch release tag.' }
+          }
+
+          $tagCommit = git rev-list -n 1 "refs/tags/$tag"
+          if ($tagCommit -ne $env:GITHUB_SHA) {
+            throw "Version $tag was already tagged at another commit. Bump AssemblyVersion."
+          }
+
+          $releaseIndex = gh release list --repo $env:GITHUB_REPOSITORY --limit 1000 --json tagName,isDraft | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not inspect existing releases.' }
+          $existing = @($releaseIndex | Where-Object tagName -eq $tag)
+          if ($existing.Count -gt 0) {
+            $release = $existing[0]
+            if (-not $release.isDraft) {
+              $assetNames = @(gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name')
+              if ($LASTEXITCODE -ne 0 -or "Jvedio-$tag.zip" -notin $assetNames) {
+                throw "Published release $tag is missing its ZIP."
+              }
+              Write-Host "Release $tag is already published."
+              exit 0
+            }
+            gh release upload $tag $zip --repo $env:GITHUB_REPOSITORY --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Draft release asset upload failed.' }
+          } else {
+            gh release create $tag $zip --repo $env:GITHUB_REPOSITORY --draft --verify-tag --generate-notes --title "自改$tag"
+            if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
+          }
+
+          $assetNames = @(gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name')
+          if ($LASTEXITCODE -ne 0 -or "Jvedio-$tag.zip" -notin $assetNames) {
+            throw 'Uploaded ZIP could not be verified.'
+          }
+          gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }

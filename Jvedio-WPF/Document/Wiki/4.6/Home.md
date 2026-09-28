@@ -8,7 +8,7 @@
 
 ---
 
-【**使用教程**】： [新手入门](Introduction_1) 【下载地址】：[前往下载](https://github.com/hitchao/Jvedio/releases)
+【**使用教程**】： [新手入门](Introduction_1) 【下载地址】：[前往下载](https://github.com/4965898/Jvedio/releases)
 
 
 

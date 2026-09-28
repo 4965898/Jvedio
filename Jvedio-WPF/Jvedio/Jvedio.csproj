@@ -97,7 +97,7 @@
     </Reference>
     <Reference Include="CommonNet, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\Jvedio-Crawler\Common\bin\Debug\CommonNet.dll</HintPath>
+      <HintPath>Reference\CommonNet.dll</HintPath>
     </Reference>
     <Reference Include="EntityFramework, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
       <HintPath>..\packages\EntityFramework.6.4.4\lib\net45\EntityFramework.dll</HintPath>
@@ -135,7 +135,7 @@
     </Reference>
     <Reference Include="MediaInfoNET, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>Lib\MediaInfoNET.dll</HintPath>
+      <HintPath>Reference\MediaInfoNET.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.VisualBasic" />
     <Reference Include="Microsoft.WindowsAPICodePack, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
@@ -159,7 +159,7 @@
     </Reference>
     <Reference Include="PInvoke, Version=0.0.0.0, Culture=neutral, processorArchitecture=x86">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>Lib\PInvoke.dll</HintPath>
+      <HintPath>Reference\PInvoke.dll</HintPath>
     </Reference>
     <Reference Include="PresentationFramework.Aero">
       <Private>True</Private>
@@ -170,7 +170,7 @@
     </Reference>
     <Reference Include="QueryEngine, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>Lib\QueryEngine.dll</HintPath>
+      <HintPath>Reference\QueryEngine.dll</HintPath>
     </Reference>
     <Reference Include="SuperControls.Style">
       <HintPath>.\Reference\SuperControls.Style.dll</HintPath>
@@ -242,7 +242,7 @@
     </Reference>
     <Reference Include="UsnOperation, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>Lib\UsnOperation.dll</HintPath>
+      <HintPath>Reference\UsnOperation.dll</HintPath>
     </Reference>
     <Reference Include="VirtualizingWrapPanel, Version=1.5.7.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\VirtualizingWrapPanel.1.5.7\lib\net452\VirtualizingWrapPanel.dll</HintPath>
@@ -309,6 +309,7 @@
     <Compile Include="Core\Media\ImageCache.cs" />
     <Compile Include="Core\Scan\IScan.cs" />
     <Compile Include="Core\Tasks\BaseManager.cs" />
+    <Compile Include="Core\Tasks\ReliableTaskDispatcher.cs" />
     <Compile Include="Core\Tasks\ScreenShotManager.cs" />
     <Compile Include="Core\Net\UrlManager.cs" />
     <Compile Include="Core\Interfaces\IDictKeys.cs" />

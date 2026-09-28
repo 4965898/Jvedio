@@ -702,19 +702,10 @@ namespace Jvedio
             try {
                 await Task.Delay(UpgradeHelper.AUTO_CHECK_UPGRADE_DELAY);
                 (string LatestVersion, string ReleaseDate, string ReleaseNote) result = await UpgradeHelper.GetUpgradeInfo();
-                string remote = result.LatestVersion;
-                string ReleaseDate = result.ReleaseDate;
-                if (!string.IsNullOrEmpty(remote)) {
-                    string local = App.GetLocalVersion(false);
-                    if (local.CompareTo(remote) < 0) {
-                        bool opened = (bool)new MsgBox(
-                            $"存在新版本\n版本：{remote}\n日期：{ReleaseDate}").ShowDialog();
-                        if (opened)
-                            UpgradeHelper.OpenWindow();
-                    }
-                }
+                if (UpgradeHelper.HasNewVersion(result.LatestVersion))
+                    UpgradeHelper.PromptToOpenRelease(result.LatestVersion, result.ReleaseDate);
             } catch (Exception ex) {
-                Console.WriteLine(ex.Message);
+                Logger.Error(ex);
             }
         }
 

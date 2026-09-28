@@ -82,11 +82,11 @@ namespace Jvedio.Core.Tasks
         #endregion
 
 
-        private static TaskDispatcher<DownLoadTask> Dispatcher { get; set; }
+        private static ReliableTaskDispatcher<DownLoadTask> Dispatcher { get; set; }
 
         static DownloadManager()
         {
-            Dispatcher = TaskDispatcher<DownLoadTask>.CreateInstance(DEFAULT_CONFIG);
+            Dispatcher = ReliableTaskDispatcher<DownLoadTask>.CreateInstance(DEFAULT_CONFIG);
             Dispatcher.onWorking += (s, e) => {
                 App.Current.Dispatcher.Invoke(() => {
                     Instance.onRunning?.Invoke();
@@ -121,34 +121,7 @@ namespace Jvedio.Core.Tasks
 
         public override void AddToDispatcher(AbstractTask task)
         {
-            bool dispatcherIdle = !Dispatcher.Working;
             Dispatcher.Enqueue(task as DownLoadTask);
-            Dispatcher.BeginWork();
-            // BeginWork 与调度器「队列空即退出」的判断存在竞态：若在旧循环判定空队列与真正退出之间入队，
-            // BeginWork 会因 Working 仍为 true 直接返回，随后旧循环退出，新任务永远停在 WaitingToRun。
-            // 调度器空闲时入队后补一个迟到的兜底检查，确保新任务一定被调度器接管。
-            if (dispatcherIdle)
-                WatchForStuckStart(task);
-        }
-
-        /// <summary>
-        /// 兜底：入队后若任务迟迟未被调度器开始（调度器工作循环可能因异常死亡、或与退出判断竞态被落下），
-        /// 复位 Working 并重新拉起一个工作循环接管等待队列。
-        /// </summary>
-        private void WatchForStuckStart(AbstractTask task)
-        {
-            Task.Run(async () => {
-                try {
-                    await Task.Delay(4000);
-                    if (task.Status != System.Threading.Tasks.TaskStatus.WaitingToRun)
-                        return;
-                    if (Dispatcher.Working)
-                        Dispatcher.Working = false;
-                    Dispatcher.BeginWork();
-                } catch (Exception ex) {
-                    Logger.Error(ex);
-                }
-            });
         }
 
         public override void ClearDispatcher()
@@ -233,7 +206,9 @@ namespace Jvedio.Core.Tasks
 
         public new void AddTask(AbstractTask task)
         {
-            base.AddTask(task);
+            if (CurrentTasks.Contains(task))
+                return;
+
             task.onCompleted += OnTaskPersistCompleted;
             if (task is DownLoadTask downloadTask) {
                 lock (_PersistLock) {
@@ -241,6 +216,18 @@ namespace Jvedio.Core.Tasks
                 }
             }
             SaveTasksToFile();
+            try {
+                base.AddTask(task);
+            } catch {
+                task.onCompleted -= OnTaskPersistCompleted;
+                if (task is DownLoadTask failedDownloadTask) {
+                    lock (_PersistLock) {
+                        _PendingRecords.Remove(failedDownloadTask.DataID);
+                    }
+                    SaveTasksToFile();
+                }
+                throw;
+            }
         }
 
         private void OnTaskPersistCompleted(object sender, EventArgs e)

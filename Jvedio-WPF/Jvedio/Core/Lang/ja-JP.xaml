@@ -105,4 +105,7 @@
     <sys:String x:Key="Publisher">発売元</sys:String>
     <sys:String x:Key="Studio">メーカー</sys:String>
     <sys:String x:Key="FilterTags">タグを絞り込む</sys:String>
+    <sys:String x:Key="UpgradeAvailable">新しいバージョン {0} があります（現在：{1}）。&#10;公開日：{2}&#10;ダウンロードページを開きますか？</sys:String>
+    <sys:String x:Key="UpgradeUpToDate">現在のバージョン：{0}&#10;最新の公開版：{1}&#10;更新は不要です。</sys:String>
+    <sys:String x:Key="UpgradeCheckFailed">更新を確認できませんでした：{0}</sys:String>
 </ResourceDictionary>

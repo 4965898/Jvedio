@@ -111,14 +111,20 @@ namespace Jvedio.Core.Tasks
         public void AddTask(AbstractTask task)
         {
             if (!CurrentTasks.Contains(task)) {
-
-                AddToDispatcher(task);
-
                 task.onCanceled += DecreaseRunCount;
                 task.onCompleted += DecreaseRunCount;
                 RunningCount++;
-
                 CurrentTasks.Add(task);
+                try {
+                    // The dispatcher may start and finish the task immediately.
+                    AddToDispatcher(task);
+                } catch {
+                    CurrentTasks.Remove(task);
+                    RunningCount--;
+                    task.onCanceled -= DecreaseRunCount;
+                    task.onCompleted -= DecreaseRunCount;
+                    throw;
+                }
             }
         }
 

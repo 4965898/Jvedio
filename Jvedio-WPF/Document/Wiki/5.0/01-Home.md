@@ -1,4 +1,4 @@
-<h1 align="center"><a href="https://hitchao.github.io/JvedioWebPage/" >Jvedio</a></h1>
+<h1 align="center"><a href="https://github.com/4965898/Jvedio" >Jvedio</a></h1>
 
 <h3 align="center">本地视频与图片的管理</h3>
 
@@ -8,7 +8,7 @@
 
 ---
 
-【**使用教程**】： [新手入门](02_Beginning) 【下载地址】：[前往下载](https://github.com/hitchao/Jvedio/releases)
+【**使用教程**】： [新手入门](02-Beginning.md) 【下载地址】：[前往下载](https://github.com/4965898/Jvedio/releases)
 
 [<img src="https://s1.ax1x.com/2022/06/11/XcZRLF.png" alt="XcZRLF.png" style="zoom:80%;" />](https://imgtu.com/i/XcZRLF)
 

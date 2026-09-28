@@ -1,4 +1,4 @@
-<h1 align="center"><a href="https://hitchao.github.io/JvedioWebPage/" >Jvedio</a></h1>
+<h1 align="center"><a href="https://github.com/4965898/Jvedio" >Jvedio</a></h1>
 
 <h3 align="center">本地视频与图片的管理</h3>
 
@@ -10,11 +10,11 @@
 
 # 目录
 
-- [关于 Jvedio](https://github.com/hitchao/Jvedio/wiki/01_Home)
-- [新手教程](https://github.com/hitchao/Jvedio/wiki/02_Beginning)
-- [软件设置](https://github.com/hitchao/Jvedio/wiki/03_Settings)
-- [快捷键](https://github.com/hitchao/Jvedio/wiki/04_Shortcuts)
-- [信息同步获取 Headers 步骤](https://github.com/hitchao/Jvedio/wiki/05_Headers)
-- [常见问题](https://github.com/hitchao/Jvedio/wiki/06_FAQ)
-- [日志说明](https://github.com/hitchao/Jvedio/wiki/07_Log)
-- [﻿﻿﻿﻿开发者文档](https://github.com/hitchao/Jvedio/wiki/20_Developer)
+- [关于 Jvedio](01-Home.md)
+- [新手教程](02-Beginning.md)
+- [软件设置](03-Settings.md)
+- [快捷键](04-Shortcuts.md)
+- [信息同步获取 Headers 步骤](05-Headers.md)
+- [常见问题](06-FAQ.md)
+- [日志说明](07-Log.md)
+- [开发者文档](20-Developer.md)

@@ -106,4 +106,7 @@
     <sys:String x:Key="Publisher">Publisher</sys:String>
     <sys:String x:Key="Studio">Studio</sys:String>
     <sys:String x:Key="FilterTags">Filter tags</sys:String>
+    <sys:String x:Key="UpgradeAvailable">Version {0} is available (installed: {1}).&#10;Published: {2}&#10;Open the download page?</sys:String>
+    <sys:String x:Key="UpgradeUpToDate">Installed version: {0}&#10;Latest public release: {1}&#10;No update is needed.</sys:String>
+    <sys:String x:Key="UpgradeCheckFailed">Could not check for updates: {0}</sys:String>
 </ResourceDictionary>

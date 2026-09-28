@@ -17,4 +17,4 @@
 
 > **请勿上传任何暴力、色情、恐怖的信息或图片！**
 
-请将对应的日志复制到此处，无则可不填，关于日志请看 [日志文件](https://github.com/hitchao/Jvedio/wiki/07_Log)
+请将对应的日志复制到此处，无则可不填，关于日志请看 [日志文件](https://github.com/4965898/Jvedio/blob/master/Jvedio-WPF/Document/Wiki/5.0/07-Log.md)
