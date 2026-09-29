@@ -134,6 +134,18 @@ SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
 
         public long AutoBackupPeriodIndex { get; set; }
 
+        private string _BackupMode;
+        /// <summary>LocalOnly、RemoteOnly 或 Both；旧配置沿用此前的本地加在线行为。</summary>
+        public string BackupMode {
+            get {
+                if (_BackupMode == "LocalOnly" || _BackupMode == "RemoteOnly" || _BackupMode == "Both")
+                    return _BackupMode;
+                return BackupRemoteType == "WebDAV" || BackupRemoteType == "S3" ? "Both" : "LocalOnly";
+            }
+            set { _BackupMode = value; }
+        }
+        public System.DateTime LastSuccessfulBackupUtc { get; set; }
+
         /// <summary>留空时沿用原有用户目录下的 backup 文件夹。</summary>
         public string BackupDirectory { get; set; }
 

@@ -276,17 +276,33 @@ namespace Jvedio
                 int index = (int)ConfigManager.Settings.AutoBackupPeriodIndex;
                 int period = Jvedio.Core.WindowConfig.Settings.BackUpPeriods[Math.Max(0,
                     Math.Min(index, Jvedio.Core.WindowConfig.Settings.BackUpPeriods.Count - 1))];
-                string root = BackupService.LocalRoot;
-                DateTime latest = Directory.Exists(root)
-                    ? Directory.EnumerateDirectories(root).Select(Path.GetFileName)
-                        .Select(name => DateTime.TryParseExact(name,
-                            new[] { "yyyy-MM-dd_HHmmss_fff", "yyyy-MM-dd_HHmmss", "yyyy-MM-dd" },
-                            System.Globalization.CultureInfo.InvariantCulture,
-                            System.Globalization.DateTimeStyles.None, out DateTime value) ? value : DateTime.MinValue)
-                        .DefaultIfEmpty(DateTime.MinValue).Max()
-                    : DateTime.MinValue;
-                if ((DateTime.Now - latest).TotalDays >= period)
-                    await BackupService.CreateAsync(true);
+                DateTime latest = ConfigManager.Settings.LastSuccessfulBackupUtc == DateTime.MinValue
+                    ? DateTime.MinValue : ConfigManager.Settings.LastSuccessfulBackupUtc.ToLocalTime();
+                if (ConfigManager.Settings.BackupMode != "RemoteOnly") {
+                    string root = BackupService.LocalRoot;
+                    DateTime latestLocal = Directory.Exists(root)
+                        ? Directory.EnumerateDirectories(root).Select(Path.GetFileName)
+                            .Select(name => DateTime.TryParseExact(name,
+                                new[] { "yyyy-MM-dd_HHmmss_fff", "yyyy-MM-dd_HHmmss", "yyyy-MM-dd" },
+                                System.Globalization.CultureInfo.InvariantCulture,
+                                System.Globalization.DateTimeStyles.None, out DateTime value) ? value : DateTime.MinValue)
+                            .DefaultIfEmpty(DateTime.MinValue).Max()
+                        : DateTime.MinValue;
+                    if (latestLocal > latest) latest = latestLocal;
+                }
+                if ((DateTime.Now - latest).TotalDays >= period) {
+                    var result = await BackupService.CreateAsync();
+                    if (!string.IsNullOrEmpty(result.RemoteError)) {
+                        Logger.Error("自动在线备份失败：" + result.RemoteError);
+                        if (!string.IsNullOrEmpty(result.CleanupError))
+                            Logger.Error("自动备份临时文件清理失败：" + result.CleanupError);
+                        return false;
+                    }
+                    if (!string.IsNullOrEmpty(result.CleanupError))
+                        Logger.Error("自动备份临时文件清理失败：" + result.CleanupError);
+                    ConfigManager.Settings.LastSuccessfulBackupUtc = DateTime.UtcNow;
+                    ConfigManager.Settings.Save();
+                }
                 return true;
             } catch (Exception ex) {
                 Logger.Error(ex);

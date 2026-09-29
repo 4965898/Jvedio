@@ -109,6 +109,11 @@
     <sys:String x:Key="UpgradeUpToDate">当前版本：{0}&#10;最新公开版本：{1}&#10;无需更新。</sys:String>
     <sys:String x:Key="UpgradeCheckFailed">检查更新失败：{0}</sys:String>
     <sys:String x:Key="BackupDirectoryLabel">本地备份目录（留空沿用默认目录）</sys:String>
+    <sys:String x:Key="BackupModeLabel">备份方式</sys:String>
+    <sys:String x:Key="BackupModeLocalOnly">仅本地备份</sys:String>
+    <sys:String x:Key="BackupModeRemoteOnly">仅在线备份</sys:String>
+    <sys:String x:Key="BackupModeBoth">本地及在线备份</sys:String>
+    <sys:String x:Key="BackupRemoteOnlyNote">仅在线备份会临时生成快照，上传后清理；请在下方选择 WebDAV 或 S3。</sys:String>
     <sys:String x:Key="Browse">浏览</sys:String>
     <sys:String x:Key="BackupRemoteLabel">在线备份</sys:String>
     <sys:String x:Key="BackupWebDavFolderLabel">在线备份子文件夹（相对于 WebDAV URL）</sys:String>
@@ -160,6 +165,10 @@
     <sys:String x:Key="BackupConnectionCleanupWarning">{0} 读写正常，但无法删除测试文件 {1}；请检查删除权限或网络。</sys:String>
     <sys:String x:Key="BackupCreating">正在生成并校验备份…</sys:String>
     <sys:String x:Key="BackupCreated">备份成功：{0}</sys:String>
+    <sys:String x:Key="BackupCreatedRemote">在线备份成功：{0}</sys:String>
+    <sys:String x:Key="BackupCreatedBoth">本地及在线备份成功：{0}；{1}</sys:String>
+    <sys:String x:Key="BackupPartial">本地备份已保存：{0}；在线备份失败：{1}</sys:String>
+    <sys:String x:Key="BackupCleanupWarning">临时文件清理失败：{0}</sys:String>
     <sys:String x:Key="BackupFailed">备份失败：{0}</sys:String>
     <sys:String x:Key="BackupDownloading">正在下载在线备份…</sys:String>
     <sys:String x:Key="RemoteRestoreFailed">在线恢复失败：{0}</sys:String>

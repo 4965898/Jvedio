@@ -30,6 +30,15 @@ namespace Jvedio.Core.Backup
             public Dictionary<string, string> ImageSha256 { get; set; }
         }
 
+        public sealed class BackupResult
+        {
+            public string Mode { get; internal set; }
+            public string LocalFolder { get; internal set; }
+            public string RemoteType { get; internal set; }
+            public string RemoteError { get; internal set; }
+            public string CleanupError { get; internal set; }
+        }
+
         public static string LocalRoot {
             get {
                 string configured = ConfigManager.Settings.BackupDirectory?.Trim();
@@ -47,21 +56,59 @@ namespace Jvedio.Core.Backup
             }
         }
 
-        public static async Task<string> CreateAsync(bool uploadRemote)
+        public static async Task<BackupResult> CreateAsync()
         {
-            string folder = await Task.Run(() => CreateLocal());
-            if (uploadRemote && !string.IsNullOrWhiteSpace(ConfigManager.Settings.BackupRemoteType) &&
-                ConfigManager.Settings.BackupRemoteType != "None") {
-                string archive = await Task.Run(() => CreateArchive(folder));
-                try { await RemoteBackupStore.UploadAsync(archive); }
-                finally { if (File.Exists(archive)) File.Delete(archive); }
+            string mode = ConfigManager.Settings.BackupMode;
+            if (mode != "LocalOnly" && mode != "RemoteOnly" && mode != "Both")
+                throw new InvalidOperationException("未知备份方式");
+            bool keepLocal = mode != "RemoteOnly";
+            bool uploadRemote = mode != "LocalOnly";
+            string provider = ConfigManager.Settings.BackupRemoteType;
+            if (uploadRemote && provider != "WebDAV" && provider != "S3")
+                throw new InvalidOperationException("仅在线备份或本地及在线备份时，请先选择 WebDAV 或 S3");
+
+            var result = new BackupResult { Mode = mode, RemoteType = uploadRemote ? provider : null };
+            string temporaryRoot = null;
+            try {
+                string folder;
+                if (keepLocal) {
+                    folder = await Task.Run(() => CreateLocal());
+                    result.LocalFolder = folder;
+                } else {
+                    temporaryRoot = Path.Combine(Path.GetTempPath(), "Jvedio-online-backup-" + Guid.NewGuid().ToString("N"));
+                    string root = temporaryRoot;
+                    folder = await Task.Run(() => CreateSnapshot(root));
+                }
+                if (uploadRemote) {
+                    string archive = null;
+                    try {
+                        archive = await Task.Run(() => CreateArchive(folder));
+                        await RemoteBackupStore.UploadAsync(archive);
+                    } catch (Exception ex) {
+                        result.RemoteError = ex.Message;
+                    } finally {
+                        if (archive != null && File.Exists(archive)) {
+                            try { File.Delete(archive); }
+                            catch (Exception ex) { result.CleanupError = ex.Message; }
+                        }
+                    }
+                }
+            } finally {
+                if (temporaryRoot != null && Directory.Exists(temporaryRoot)) {
+                    try { await Task.Run(() => Directory.Delete(temporaryRoot, true)); }
+                    catch (Exception ex) { result.CleanupError = ex.Message; }
+                }
             }
-            return folder;
+            return result;
         }
 
         public static string CreateLocal()
         {
-            string root = LocalRoot;
+            return CreateSnapshot(LocalRoot);
+        }
+
+        private static string CreateSnapshot(string root)
+        {
             Directory.CreateDirectory(root);
             string folder = Path.Combine(root, DateTime.Now.ToString("yyyy-MM-dd_HHmmss_fff"));
             Directory.CreateDirectory(folder);

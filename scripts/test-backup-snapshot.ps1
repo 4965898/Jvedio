@@ -68,6 +68,11 @@ $settings = $settingsType.GetMethod('CreateInstance').Invoke($null, @())
 $configType = $assembly.GetType('Jvedio.ConfigManager', $true)
 $configType.GetProperty('Settings').SetValue($null, $settings)
 $settingsType.GetProperty('BackupDirectory').SetValue($settings, (Join-Path $scratch 'local-backups'))
+$modeProperty = $settingsType.GetProperty('BackupMode')
+if ($modeProperty.GetValue($settings) -ne 'LocalOnly') { throw 'New settings did not default to local backup' }
+$settingsType.GetProperty('BackupRemoteType').SetValue($settings, 'WebDAV')
+if ($modeProperty.GetValue($settings) -ne 'Both') { throw 'Existing remote configuration did not retain local plus online mode' }
+$settingsType.GetProperty('BackupRemoteType').SetValue($settings, 'None')
 $type.GetMethod('StageRestore').Invoke($null, [object[]]@([string]$archive))
 $type.GetMethod('ApplyPendingRestore').Invoke($null, @())
 $restored = New-Object System.Data.SQLite.SQLiteConnection("Data Source=$(Join-Path $liveRoot 'app_datas.sqlite');Version=3;Read Only=True;")
@@ -104,7 +109,13 @@ try {
     $type.GetMethod('ValidateFolder').Invoke($null, [object[]]@([string]$localBackup))
     throw 'Corrupt backup image was accepted'
 } catch {
-    if ($_.Exception.Message -like '*was accepted*') { throw }
+if ($_.Exception.Message -like '*was accepted*') { throw }
+}
+$modeProperty.SetValue($settings, 'LocalOnly')
+$localModeResult = $type.GetMethod('CreateAsync').Invoke($null, @()).GetAwaiter().GetResult()
+if ($localModeResult.Mode -ne 'LocalOnly' -or -not (Test-Path -LiteralPath $localModeResult.LocalFolder) -or
+    $localModeResult.RemoteType -or $localModeResult.RemoteError) {
+    throw 'Local-only backup mode produced the wrong result'
 }
 
 # Exercise both transports against a loopback object store. The mock checks the
@@ -140,7 +151,10 @@ $server = Start-Job -ArgumentList $port, $storeRoot -ScriptBlock {
                     } else { $context.Response.StatusCode = 409 }
                 } elseif ($context.Request.HttpMethod -eq 'PUT') {
                     $parent = [System.IO.Path]::GetDirectoryName($file)
-                    if ($key.StartsWith('dav/') -and -not [System.IO.Directory]::Exists($parent)) {
+                    if ($key -like '*/upload-denied/*') {
+                        $context.Request.InputStream.CopyTo([System.IO.Stream]::Null)
+                        $context.Response.StatusCode = 403
+                    } elseif ($key.StartsWith('dav/') -and -not [System.IO.Directory]::Exists($parent)) {
                         $context.Response.StatusCode = 409
                     } else {
                         [System.IO.Directory]::CreateDirectory($parent) | Out-Null
@@ -185,6 +199,17 @@ try {
     $settingsType.GetProperty('BackupRemoteType').SetValue($settings, 'WebDAV')
     $settingsType.GetProperty('BackupWebDavUrl').SetValue($settings, "http://127.0.0.1:$port/dav")
     $settingsType.GetProperty('BackupWebDavFolder').SetValue($settings, "Jvedio/$folderName")
+    $modeProperty.SetValue($settings, 'RemoteOnly')
+    $localBefore = @(Get-ChildItem -LiteralPath (Join-Path $scratch 'local-backups') -Directory).Count
+    $tempBefore = @(Get-ChildItem -LiteralPath ([System.IO.Path]::GetTempPath()) -Directory -Filter 'Jvedio-online-backup-*' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name)
+    $remoteOnlyResult = $type.GetMethod('CreateAsync').Invoke($null, @()).GetAwaiter().GetResult()
+    $localAfter = @(Get-ChildItem -LiteralPath (Join-Path $scratch 'local-backups') -Directory).Count
+    $tempAfter = @(Get-ChildItem -LiteralPath ([System.IO.Path]::GetTempPath()) -Directory -Filter 'Jvedio-online-backup-*' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name)
+    if ($remoteOnlyResult.Mode -ne 'RemoteOnly' -or $remoteOnlyResult.LocalFolder -or
+        $remoteOnlyResult.RemoteError -or $remoteOnlyResult.CleanupError -or $localAfter -ne $localBefore -or
+        @($tempAfter | Where-Object { $_ -notin $tempBefore }).Count -gt 0) {
+        throw 'Online-only backup retained a local snapshot or failed to upload'
+    }
     Write-Output 'Testing WebDAV upload'
     $upload = $remote.GetMethod('UploadAsync').Invoke($null, [object[]]@($archive))
     try {
@@ -199,6 +224,13 @@ try {
     }
     $davTest = $remote.GetMethod('TestConnectionAsync').Invoke($null, [object[]]@('WebDAV')).GetAwaiter().GetResult()
     if ($davTest) { throw "WebDAV test object was not removed: $davTest" }
+    $modeProperty.SetValue($settings, 'Both')
+    $bothResult = $type.GetMethod('CreateAsync').Invoke($null, @()).GetAwaiter().GetResult()
+    if ($bothResult.Mode -ne 'Both' -or -not (Test-Path -LiteralPath $bothResult.LocalFolder) -or
+        $bothResult.RemoteType -ne 'WebDAV' -or $bothResult.RemoteError -or
+        (Test-Path -LiteralPath ($bothResult.LocalFolder + '.zip'))) {
+        throw 'Local-and-online backup mode produced the wrong result'
+    }
     $settingsType.GetProperty('BackupWebDavFolder').SetValue($settings, '')
     $remote.GetMethod('UploadAsync').Invoke($null, [object[]]@($archive)).GetAwaiter().GetResult()
     if (-not (Test-Path -LiteralPath (Join-Path $storeRoot 'dav\latest.json'))) {
@@ -226,6 +258,13 @@ try {
     if (Get-ChildItem -LiteralPath $storeRoot -Filter '.jvedio-connection-test-*' -File -Recurse -Force) {
         throw 'A connection test object was left behind'
     }
+    $modeProperty.SetValue($settings, 'Both')
+    $settingsType.GetProperty('BackupS3Prefix').SetValue($settings, 'upload-denied')
+    $partialResult = $type.GetMethod('CreateAsync').Invoke($null, @()).GetAwaiter().GetResult()
+    if (-not (Test-Path -LiteralPath $partialResult.LocalFolder) -or -not $partialResult.RemoteError -or
+        (Test-Path -LiteralPath ($partialResult.LocalFolder + '.zip'))) {
+        throw 'Partial backup failure did not retain the local snapshot and report remote failure'
+    }
     $settingsType.GetProperty('BackupS3Prefix').SetValue($settings, 'cleanup-denied')
     $denyTest = $remote.GetMethod('TestConnectionAsync').Invoke($null, [object[]]@('S3')).GetAwaiter().GetResult()
     $denyFile = Join-Path $storeRoot "jvedio-test\cleanup-denied\$denyTest"
@@ -240,4 +279,4 @@ try {
     [void](Wait-Job $server -Timeout 3)
     Remove-Job $server -Force -ErrorAction SilentlyContinue
 }
-Write-Output "PASS: WAL snapshot, ZIP restore, WebDAV/S3 transfer and connection tests ($scratch)"
+Write-Output "PASS: WAL snapshot, restore, three backup modes, WebDAV/S3 transport and connection tests ($scratch)"

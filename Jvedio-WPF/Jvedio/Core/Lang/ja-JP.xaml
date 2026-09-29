@@ -109,6 +109,11 @@
     <sys:String x:Key="UpgradeUpToDate">現在のバージョン：{0}&#10;最新の公開版：{1}&#10;更新は不要です。</sys:String>
     <sys:String x:Key="UpgradeCheckFailed">更新を確認できませんでした：{0}</sys:String>
     <sys:String x:Key="BackupDirectoryLabel">ローカルバックアップ先（空欄なら既定）</sys:String>
+    <sys:String x:Key="BackupModeLabel">バックアップ方式</sys:String>
+    <sys:String x:Key="BackupModeLocalOnly">ローカルのみ</sys:String>
+    <sys:String x:Key="BackupModeRemoteOnly">オンラインのみ</sys:String>
+    <sys:String x:Key="BackupModeBoth">ローカルとオンライン</sys:String>
+    <sys:String x:Key="BackupRemoteOnlyNote">オンラインのみの場合、一時的にローカルへスナップショットを作成し、アップロード後に削除します。下で WebDAV または S3 を選択してください。</sys:String>
     <sys:String x:Key="Browse">参照</sys:String>
     <sys:String x:Key="BackupRemoteLabel">オンラインバックアップ</sys:String>
     <sys:String x:Key="BackupWebDavFolderLabel">バックアップ用サブフォルダー（WebDAV URL からの相対パス）</sys:String>
@@ -160,6 +165,10 @@
     <sys:String x:Key="BackupConnectionCleanupWarning">{0} の読み書きは正常ですが、テストファイル {1} を削除できませんでした。削除権限または接続を確認してください。</sys:String>
     <sys:String x:Key="BackupCreating">バックアップを作成・検証しています…</sys:String>
     <sys:String x:Key="BackupCreated">バックアップ完了：{0}</sys:String>
+    <sys:String x:Key="BackupCreatedRemote">オンラインバックアップ完了：{0}</sys:String>
+    <sys:String x:Key="BackupCreatedBoth">ローカルとオンラインのバックアップ完了：{0}；{1}</sys:String>
+    <sys:String x:Key="BackupPartial">ローカルバックアップを保存しました：{0}；オンラインバックアップ失敗：{1}</sys:String>
+    <sys:String x:Key="BackupCleanupWarning">一時ファイルを削除できませんでした：{0}</sys:String>
     <sys:String x:Key="BackupFailed">バックアップ失敗：{0}</sys:String>
     <sys:String x:Key="BackupDownloading">オンラインバックアップをダウンロードしています…</sys:String>
     <sys:String x:Key="RemoteRestoreFailed">オンライン復元失敗：{0}</sys:String>

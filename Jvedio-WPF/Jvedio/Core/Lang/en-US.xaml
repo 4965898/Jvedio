@@ -110,6 +110,11 @@
     <sys:String x:Key="UpgradeUpToDate">Installed version: {0}&#10;Latest public release: {1}&#10;No update is needed.</sys:String>
     <sys:String x:Key="UpgradeCheckFailed">Could not check for updates: {0}</sys:String>
     <sys:String x:Key="BackupDirectoryLabel">Local backup folder (blank: default folder)</sys:String>
+    <sys:String x:Key="BackupModeLabel">Backup mode</sys:String>
+    <sys:String x:Key="BackupModeLocalOnly">Local only</sys:String>
+    <sys:String x:Key="BackupModeRemoteOnly">Online only</sys:String>
+    <sys:String x:Key="BackupModeBoth">Local and online</sys:String>
+    <sys:String x:Key="BackupRemoteOnlyNote">Online-only backups use a temporary local snapshot that is removed after upload. Choose WebDAV or S3 below.</sys:String>
     <sys:String x:Key="Browse">Browse</sys:String>
     <sys:String x:Key="BackupRemoteLabel">Online backup</sys:String>
     <sys:String x:Key="BackupWebDavFolderLabel">Backup subfolder (relative to WebDAV URL)</sys:String>
@@ -161,6 +166,10 @@
     <sys:String x:Key="BackupConnectionCleanupWarning">{0} can read and write, but could not delete test file {1}. Check delete permission or the connection.</sys:String>
     <sys:String x:Key="BackupCreating">Creating and checking the backup…</sys:String>
     <sys:String x:Key="BackupCreated">Backup created: {0}</sys:String>
+    <sys:String x:Key="BackupCreatedRemote">Online backup created: {0}</sys:String>
+    <sys:String x:Key="BackupCreatedBoth">Local and online backup created: {0}; {1}</sys:String>
+    <sys:String x:Key="BackupPartial">Local backup saved: {0}; online backup failed: {1}</sys:String>
+    <sys:String x:Key="BackupCleanupWarning">Could not remove temporary files: {0}</sys:String>
     <sys:String x:Key="BackupFailed">Backup failed: {0}</sys:String>
     <sys:String x:Key="BackupDownloading">Downloading the online backup…</sys:String>
     <sys:String x:Key="RemoteRestoreFailed">Online restore failed: {0}</sys:String>

@@ -1370,6 +1370,7 @@ namespace Jvedio
         private void LoadBackupSettings()
         {
             var s = ConfigManager.Settings;
+            BackupModeBox.SelectedIndex = s.BackupMode == "RemoteOnly" ? 1 : s.BackupMode == "Both" ? 2 : 0;
             BackupDirectoryBox.Text = s.BackupDirectory ?? string.Empty;
             BackupRemoteTypeBox.SelectedIndex = s.BackupRemoteType == "WebDAV" ? 1 : s.BackupRemoteType == "S3" ? 2 : 0;
             BackupWebDavUrlBox.Text = s.BackupWebDavUrl ?? string.Empty;
@@ -1392,6 +1393,8 @@ namespace Jvedio
         private void SaveBackupSettings()
         {
             var s = ConfigManager.Settings;
+            s.BackupMode = BackupModeBox.SelectedIndex == 1 ? "RemoteOnly" :
+                BackupModeBox.SelectedIndex == 2 ? "Both" : "LocalOnly";
             s.BackupDirectory = BackupDirectoryBox.Text?.Trim();
             s.BackupRemoteType = BackupRemoteTypeBox.SelectedIndex == 1 ? "WebDAV" :
                 BackupRemoteTypeBox.SelectedIndex == 2 ? "S3" : "None";
@@ -1452,8 +1455,24 @@ namespace Jvedio
             try {
                 SaveSettings();
                 ConfigManager.Settings.Save();
-                string folder = await BackupService.CreateAsync(true);
-                BackupStatusText.Text = string.Format(LangManager.GetValueByKey("BackupCreated"), folder);
+                var result = await BackupService.CreateAsync();
+                if (!string.IsNullOrEmpty(result.RemoteError)) {
+                    string failure = string.IsNullOrEmpty(result.LocalFolder)
+                        ? string.Format(LangManager.GetValueByKey("BackupFailed"), result.RemoteError)
+                        : string.Format(LangManager.GetValueByKey("BackupPartial"), result.LocalFolder, result.RemoteError);
+                    BackupStatusText.Text = string.IsNullOrEmpty(result.CleanupError) ? failure :
+                        failure + " " + string.Format(LangManager.GetValueByKey("BackupCleanupWarning"), result.CleanupError);
+                    return;
+                }
+                string summary = result.Mode == "LocalOnly"
+                    ? string.Format(LangManager.GetValueByKey("BackupCreated"), result.LocalFolder)
+                    : result.Mode == "RemoteOnly"
+                        ? string.Format(LangManager.GetValueByKey("BackupCreatedRemote"), result.RemoteType)
+                        : string.Format(LangManager.GetValueByKey("BackupCreatedBoth"), result.LocalFolder, result.RemoteType);
+                BackupStatusText.Text = string.IsNullOrEmpty(result.CleanupError) ? summary :
+                    summary + " " + string.Format(LangManager.GetValueByKey("BackupCleanupWarning"), result.CleanupError);
+                ConfigManager.Settings.LastSuccessfulBackupUtc = DateTime.UtcNow;
+                ConfigManager.Settings.Save();
             } catch (Exception ex) {
                 Logger.Error(ex);
                 BackupStatusText.Text = string.Format(LangManager.GetValueByKey("BackupFailed"), ex.Message);
