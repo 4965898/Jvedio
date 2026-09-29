@@ -47,6 +47,14 @@ $extracted = Join-Path $scratch 'extracted'
 New-Item -ItemType Directory -Path $extracted | Out-Null
 $type.GetMethod('ExtractArchive', $flags).Invoke($null, [object[]]@([string]$archive, [string]$extracted))
 $type.GetMethod('ValidateFolder').Invoke($null, [object[]]@([string]$extracted))
+$archiveDb = New-Object System.Data.SQLite.SQLiteConnection("Data Source=$(Join-Path $extracted 'app_datas.sqlite');Version=3;Read Only=True;")
+$archiveDb.Open()
+$archiveQuery = $archiveDb.CreateCommand()
+$archiveQuery.CommandText = 'SELECT value FROM items LIMIT 1'
+$archiveValue = [string]$archiveQuery.ExecuteScalar()
+$archiveQuery.Dispose()
+$archiveDb.Dispose()
+if ($archiveValue -ne 'committed-in-wal') { throw "ZIP snapshot lost WAL data: $archiveValue" }
 
 # Restore into an isolated user data directory and check the old data rollback.
 $liveRoot = Join-Path $scratch 'live-user'
@@ -68,6 +76,9 @@ $settings = $settingsType.GetMethod('CreateInstance').Invoke($null, @())
 $configType = $assembly.GetType('Jvedio.ConfigManager', $true)
 $configType.GetProperty('Settings').SetValue($null, $settings)
 $settingsType.GetProperty('BackupDirectory').SetValue($settings, (Join-Path $scratch 'local-backups'))
+if ($settingsType.GetProperty('MaxLocalBackups').GetValue($settings) -ne 10) {
+    throw 'New settings did not default to a 10-snapshot retention limit'
+}
 $modeProperty = $settingsType.GetProperty('BackupMode')
 if ($modeProperty.GetValue($settings) -ne 'LocalOnly') { throw 'New settings did not default to local backup' }
 $settingsType.GetProperty('BackupRemoteType').SetValue($settings, 'WebDAV')
@@ -117,6 +128,22 @@ if ($localModeResult.Mode -ne 'LocalOnly' -or -not (Test-Path -LiteralPath $loca
     $localModeResult.RemoteType -or $localModeResult.RemoteError) {
     throw 'Local-only backup mode produced the wrong result'
 }
+$backupRoot = Join-Path $scratch 'local-backups'
+$unmanaged = Join-Path $backupRoot '2000-01-01'
+New-Item -ItemType Directory -Path $unmanaged | Out-Null
+Copy-Item -LiteralPath (Join-Path $localModeResult.LocalFolder 'app_configs.sqlite') -Destination $unmanaged
+Copy-Item -LiteralPath (Join-Path $localModeResult.LocalFolder 'app_datas.sqlite') -Destination $unmanaged
+[System.IO.File]::WriteAllText((Join-Path $unmanaged 'notes.txt'), 'preserve this folder')
+$settingsType.GetProperty('MaxLocalBackups').SetValue($settings, 2)
+Start-Sleep -Milliseconds 5
+$retained1 = $type.GetMethod('CreateAsync').Invoke($null, @()).GetAwaiter().GetResult()
+Start-Sleep -Milliseconds 5
+$retained2 = $type.GetMethod('CreateAsync').Invoke($null, @()).GetAwaiter().GetResult()
+$managed = @(Get-ChildItem -LiteralPath $backupRoot -Directory | Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}_\d{6}_\d{3}$' })
+if ($managed.Count -ne 2 -or -not (Test-Path -LiteralPath $retained2.LocalFolder) -or
+    -not (Test-Path -LiteralPath (Join-Path $unmanaged 'notes.txt')) -or $retained2.RetentionError) {
+    throw "Local retention failed: managed=$($managed.Count), latest=$($retained2.LocalFolder), error=$($retained2.RetentionError), unmanaged=$(Test-Path -LiteralPath (Join-Path $unmanaged 'notes.txt'))"
+}
 
 # Exercise both transports against a loopback object store. The mock checks the
 # uploaded payload and returns the same objects for remote restore.
@@ -142,6 +169,47 @@ $server = Start-Job -ArgumentList $port, $storeRoot -ScriptBlock {
                 $file = Join-Path $root ($key.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
                 if ($context.Request.Url.AbsolutePath -eq '/__ready' -or $stop) {
                     $context.Response.StatusCode = 200
+                } elseif ($context.Request.HttpMethod -eq 'PROPFIND' -and [System.IO.Directory]::Exists($file)) {
+                    $xml = '<d:multistatus xmlns:d="DAV:">'
+                    $xml += '<d:response><d:href>' + [System.Security.SecurityElement]::Escape($context.Request.Url.AbsolutePath) + '</d:href></d:response>'
+                    foreach ($item in Get-ChildItem -LiteralPath $file -File) {
+                        $href = $context.Request.Url.AbsolutePath.TrimEnd('/') + '/' + [Uri]::EscapeDataString($item.Name)
+                        $xml += '<d:response><d:href>' + [System.Security.SecurityElement]::Escape($href) + '</d:href><d:propstat><d:prop>'
+                        $xml += '<d:getcontentlength>' + $item.Length + '</d:getcontentlength>'
+                        $xml += '<d:getlastmodified>' + $item.LastWriteTimeUtc.ToString('r') + '</d:getlastmodified>'
+                        $xml += '</d:prop></d:propstat></d:response>'
+                    }
+                    $xml += '</d:multistatus>'
+                    $bytes = [System.Text.Encoding]::UTF8.GetBytes($xml)
+                    $context.Response.StatusCode = 207
+                    $context.Response.ContentType = 'application/xml; charset=utf-8'
+                    $context.Response.ContentLength64 = $bytes.Length
+                    $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
+                } elseif ($context.Request.HttpMethod -eq 'GET' -and $context.Request.Url.Query.Contains('list-type=2')) {
+                    $prefix = ''
+                    $token = ''
+                    foreach ($pair in $context.Request.Url.Query.TrimStart('?').Split('&')) {
+                        if ($pair.StartsWith('prefix=')) { $prefix = [Uri]::UnescapeDataString($pair.Substring(7)) }
+                        if ($pair.StartsWith('continuation-token=')) { $token = [Uri]::UnescapeDataString($pair.Substring(19)) }
+                    }
+                    $bucketRoot = Join-Path $root $key
+                    $objects = @(Get-ChildItem -LiteralPath $bucketRoot -File -Filter '*.zip' -Recurse | Sort-Object FullName | Where-Object {
+                        $_.FullName.Substring($bucketRoot.Length).TrimStart('\').Replace('\', '/').StartsWith($prefix)
+                    })
+                    $page = if ($token -eq 'page2') { @($objects | Select-Object -Skip 1) } else { @($objects | Select-Object -First 1) }
+                    $truncated = $token -ne 'page2' -and $objects.Count -gt 1
+                    $xml = '<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><IsTruncated>' + $truncated.ToString().ToLowerInvariant() + '</IsTruncated>'
+                    if ($truncated) { $xml += '<NextContinuationToken>page2</NextContinuationToken>' }
+                    foreach ($item in $page) {
+                        $objectKey = $item.FullName.Substring($bucketRoot.Length).TrimStart('\').Replace('\', '/')
+                        $xml += '<Contents><Key>' + [System.Security.SecurityElement]::Escape($objectKey) + '</Key>'
+                        $xml += '<Size>' + $item.Length + '</Size><LastModified>' + $item.LastWriteTimeUtc.ToString('yyyy-MM-ddTHH:mm:ss.fffZ') + '</LastModified></Contents>'
+                    }
+                    $xml += '</ListBucketResult>'
+                    $bytes = [System.Text.Encoding]::UTF8.GetBytes($xml)
+                    $context.Response.ContentType = 'application/xml; charset=utf-8'
+                    $context.Response.ContentLength64 = $bytes.Length
+                    $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
                 } elseif ($context.Request.HttpMethod -eq 'MKCOL') {
                     $collection = $file.TrimEnd([System.IO.Path]::DirectorySeparatorChar)
                     if ([System.IO.Directory]::Exists($collection)) { $context.Response.StatusCode = 405 }
@@ -231,6 +299,14 @@ try {
         (Test-Path -LiteralPath ($bothResult.LocalFolder + '.zip'))) {
         throw 'Local-and-online backup mode produced the wrong result'
     }
+    $davList = $remote.GetMethod('ListBackupsAsync').Invoke($null, @()).GetAwaiter().GetResult()
+    if ($davList.Count -lt 2 -or -not ($davList | Where-Object FileName -eq 'snapshot.zip')) {
+        throw 'WebDAV backup list did not include older and newer ZIP files'
+    }
+    $davSelected = $remote.GetMethod('DownloadAsync').Invoke($null, [object[]]@('snapshot.zip', [string](Join-Path $scratch 'dav-selected'))).GetAwaiter().GetResult()
+    if ((Get-FileHash -LiteralPath $davSelected).Hash -ne (Get-FileHash -LiteralPath $archive).Hash) {
+        throw 'Selected older WebDAV backup differs'
+    }
     $settingsType.GetProperty('BackupWebDavFolder').SetValue($settings, '')
     $remote.GetMethod('UploadAsync').Invoke($null, [object[]]@($archive)).GetAwaiter().GetResult()
     if (-not (Test-Path -LiteralPath (Join-Path $storeRoot 'dav\latest.json'))) {
@@ -245,6 +321,38 @@ try {
     $settingsType.GetProperty('BackupS3AccessKey').SetValue($settings, 'TESTACCESS')
     $secret = $remote.GetMethod('Protect').Invoke($null, [object[]]@('test-secret'))
     $settingsType.GetProperty('BackupS3SecretKeyProtected').SetValue($settings, $secret)
+    # Independently verify that the signed canonical query matches the URL sent to S3.
+    function Get-HmacBytes([byte[]]$key, [string]$value) {
+        $hmac = [System.Security.Cryptography.HMACSHA256]::new($key)
+        try { return $hmac.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($value)) }
+        finally { $hmac.Dispose() }
+    }
+    function Get-Sha256Hex([string]$value) {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try { return [BitConverter]::ToString($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($value))).Replace('-', '').ToLowerInvariant() }
+        finally { $sha.Dispose() }
+    }
+    $payloadHash = Get-Sha256Hex ''
+    $listQuery = 'continuation-token=page%2F2&list-type=2&prefix=snapshots%2F' + [Uri]::EscapeDataString($folderName) + '%2F'
+    $signer = $remote.GetMethod('CreateS3Request', [System.Reflection.BindingFlags]'NonPublic,Static')
+    $signed = $signer.Invoke($null, [object[]]@([System.Net.Http.HttpMethod]::Get, '/jvedio-test', $listQuery, $payloadHash))
+    try {
+        $stamp = ($signed.Headers.GetValues('x-amz-date') | Select-Object -First 1)
+        $scope = $stamp.Substring(0, 8) + '/us-east-1/s3/aws4_request'
+        $canonical = "GET`n$($signed.RequestUri.AbsolutePath)`n$($signed.RequestUri.Query.TrimStart('?'))`n"
+        $canonical += "host:$($signed.Headers.Host)`nx-amz-content-sha256:$payloadHash`nx-amz-date:$stamp`n`n"
+        $canonical += "host;x-amz-content-sha256;x-amz-date`n$payloadHash"
+        $toSign = "AWS4-HMAC-SHA256`n$stamp`n$scope`n$(Get-Sha256Hex $canonical)"
+        $kDate = Get-HmacBytes ([System.Text.Encoding]::UTF8.GetBytes('AWS4test-secret')) $stamp.Substring(0, 8)
+        $kRegion = Get-HmacBytes $kDate 'us-east-1'
+        $kService = Get-HmacBytes $kRegion 's3'
+        $kSigning = Get-HmacBytes $kService 'aws4_request'
+        $expectedSignature = [BitConverter]::ToString((Get-HmacBytes $kSigning $toSign)).Replace('-', '').ToLowerInvariant()
+        $authorization = ($signed.Headers.GetValues('Authorization') | Select-Object -First 1)
+        if ($authorization -notlike "*Signature=$expectedSignature") {
+            throw 'S3 list request signature did not match the transmitted path and query'
+        }
+    } finally { $signed.Dispose() }
     Write-Output 'Testing S3 upload'
     $remote.GetMethod('UploadAsync').Invoke($null, [object[]]@($archive)).GetAwaiter().GetResult()
     Write-Output 'Testing S3 download'
@@ -252,6 +360,17 @@ try {
     if ((Get-FileHash -LiteralPath $s3).Hash -ne (Get-FileHash -LiteralPath $archive).Hash) { throw 'S3 download differs' }
     if (-not (Test-Path -LiteralPath (Join-Path $storeRoot "jvedio-test\snapshots\$folderName\latest.json"))) {
         throw 'S3 backup was not stored under the selected folder prefix'
+    }
+    $modeProperty.SetValue($settings, 'RemoteOnly')
+    $s3ModeResult = $type.GetMethod('CreateAsync').Invoke($null, @()).GetAwaiter().GetResult()
+    if ($s3ModeResult.RemoteError -or $s3ModeResult.LocalFolder) { throw 'S3 online-only backup failed' }
+    $s3List = $remote.GetMethod('ListBackupsAsync').Invoke($null, @()).GetAwaiter().GetResult()
+    if ($s3List.Count -lt 2 -or -not ($s3List | Where-Object FileName -eq 'snapshot.zip')) {
+        throw 'S3 paged backup list did not include older and newer ZIP files'
+    }
+    $s3Selected = $remote.GetMethod('DownloadAsync').Invoke($null, [object[]]@('snapshot.zip', [string](Join-Path $scratch 's3-selected'))).GetAwaiter().GetResult()
+    if ((Get-FileHash -LiteralPath $s3Selected).Hash -ne (Get-FileHash -LiteralPath $archive).Hash) {
+        throw 'Selected older S3 backup differs'
     }
     $s3Test = $remote.GetMethod('TestConnectionAsync').Invoke($null, [object[]]@('S3')).GetAwaiter().GetResult()
     if ($s3Test) { throw "S3 test object was not removed: $s3Test" }
@@ -279,4 +398,4 @@ try {
     [void](Wait-Job $server -Timeout 3)
     Remove-Job $server -Force -ErrorAction SilentlyContinue
 }
-Write-Output "PASS: WAL snapshot, restore, three backup modes, WebDAV/S3 transport and connection tests ($scratch)"
+Write-Output "PASS: WAL snapshot, restore, retention, three modes, remote lists and transports ($scratch)"

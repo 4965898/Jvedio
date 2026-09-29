@@ -110,6 +110,8 @@
     <sys:String x:Key="UpgradeUpToDate">Installed version: {0}&#10;Latest public release: {1}&#10;No update is needed.</sys:String>
     <sys:String x:Key="UpgradeCheckFailed">Could not check for updates: {0}</sys:String>
     <sys:String x:Key="BackupDirectoryLabel">Local backup folder (blank: default folder)</sys:String>
+    <sys:String x:Key="BackupRetentionLabel">Keep local backups (1–10)</sys:String>
+    <sys:String x:Key="BackupRetentionTip">After a new local backup, recognizable older snapshots beyond this count are removed.</sys:String>
     <sys:String x:Key="BackupModeLabel">Backup mode</sys:String>
     <sys:String x:Key="BackupModeLocalOnly">Local only</sys:String>
     <sys:String x:Key="BackupModeRemoteOnly">Online only</sys:String>
@@ -127,7 +129,17 @@
     <sys:String x:Key="BackupNow">Back up now</sys:String>
     <sys:String x:Key="RestoreBackupZip">Restore from ZIP</sys:String>
     <sys:String x:Key="RestoreBackupFolder">Restore from folder</sys:String>
-    <sys:String x:Key="RestoreRemoteBackup">Restore latest online backup</sys:String>
+    <sys:String x:Key="RestoreRemoteBackup">Restore from online backup list</sys:String>
+    <sys:String x:Key="RemoteBackupListing">Loading the online backup list…</sys:String>
+    <sys:String x:Key="RemoteBackupEmpty">No ZIP backups were found in this online folder.</sys:String>
+    <sys:String x:Key="RemoteBackupListFailed">Could not list online backups: {0}. Check the connection and listing permission.</sys:String>
+    <sys:String x:Key="RemoteBackupPickerTitle">Choose an online backup</sys:String>
+    <sys:String x:Key="RemoteBackupPickerHint">Choose the ZIP to restore. Its contents will be checked before restoration.</sys:String>
+    <sys:String x:Key="RemoteBackupFileName">Backup file</sys:String>
+    <sys:String x:Key="RemoteBackupModified">Modified</sys:String>
+    <sys:String x:Key="RemoteBackupSize">Size</sys:String>
+    <sys:String x:Key="RemoteBackupChoose">Restore selected backup</sys:String>
+    <sys:String x:Key="RemoteBackupCancel">Cancel</sys:String>
     <sys:String x:Key="AutoUpgradeDialog">Open update dialog automatically</sys:String>
     <sys:String x:Key="IgnoreThisUpdate">Ignore this version</sys:String>
     <sys:String x:Key="LibraryHealth">Library health</sys:String>
@@ -170,6 +182,7 @@
     <sys:String x:Key="BackupCreatedBoth">Local and online backup created: {0}; {1}</sys:String>
     <sys:String x:Key="BackupPartial">Local backup saved: {0}; online backup failed: {1}</sys:String>
     <sys:String x:Key="BackupCleanupWarning">Could not remove temporary files: {0}</sys:String>
+    <sys:String x:Key="BackupRetentionWarning">Could not remove older local backups: {0}</sys:String>
     <sys:String x:Key="BackupFailed">Backup failed: {0}</sys:String>
     <sys:String x:Key="BackupDownloading">Downloading the online backup…</sys:String>
     <sys:String x:Key="RemoteRestoreFailed">Online restore failed: {0}</sys:String>

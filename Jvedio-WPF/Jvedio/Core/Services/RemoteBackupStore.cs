@@ -1,6 +1,8 @@
 using Jvedio.Core.Config;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -10,6 +12,8 @@ using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
+using System.Xml.Linq;
 
 namespace Jvedio.Core.Backup
 {
@@ -20,6 +24,16 @@ namespace Jvedio.Core.Backup
         {
             public string FileName { get; set; }
             public string Sha256 { get; set; }
+        }
+
+        public sealed class RemoteBackupItem
+        {
+            public string FileName { get; set; }
+            public long Size { get; set; }
+            public DateTime ModifiedUtc { get; set; }
+            public string ModifiedText => ModifiedUtc == DateTime.MinValue ? string.Empty :
+                ModifiedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+            public string SizeText => Size <= 0 ? string.Empty : (Size / 1024d / 1024d).ToString("F1") + " MB";
         }
 
         public static string Protect(string plain)
@@ -89,34 +103,168 @@ namespace Jvedio.Core.Backup
             return cleaned ? null : name;
         }
 
+        public static async Task<IReadOnlyList<RemoteBackupItem>> ListBackupsAsync()
+        {
+            string type = ConfigManager.Settings.BackupRemoteType;
+            if (type != "WebDAV" && type != "S3")
+                throw new InvalidOperationException("请先配置 WebDAV 或 S3 在线备份");
+            using (var client = new HttpClient { Timeout = TimeSpan.FromMinutes(2) }) {
+                List<RemoteBackupItem> items = type == "WebDAV"
+                    ? await ListWebDavAsync(client) : await ListS3Async(client);
+                return items.GroupBy(item => item.FileName, StringComparer.Ordinal)
+                    .Select(group => group.OrderByDescending(item => item.ModifiedUtc).First())
+                    .OrderByDescending(item => item.ModifiedUtc)
+                    .ThenByDescending(item => item.FileName, StringComparer.Ordinal).ToList();
+            }
+        }
+
+        public static async Task<string> DownloadAsync(string fileName, string localDirectory)
+        {
+            string type = ConfigManager.Settings.BackupRemoteType;
+            if (type != "WebDAV" && type != "S3")
+                throw new InvalidOperationException("请先配置 WebDAV 或 S3 在线备份");
+            using (var client = new HttpClient { Timeout = TimeSpan.FromMinutes(30) })
+                return await DownloadFileAsync(client, type, fileName, localDirectory, null);
+        }
+
         public static async Task<string> DownloadLatestAsync(string localDirectory)
         {
             string type = ConfigManager.Settings.BackupRemoteType;
             if (type != "WebDAV" && type != "S3")
                 throw new InvalidOperationException("请先配置 WebDAV 或 S3 在线备份");
-            Directory.CreateDirectory(localDirectory);
             using (var client = new HttpClient { Timeout = TimeSpan.FromMinutes(30) }) {
                 byte[] pointerBytes = await GetBytesAsync(client, type, "latest.json");
                 LatestPointer pointer = JsonConvert.DeserializeObject<LatestPointer>(Encoding.UTF8.GetString(pointerBytes));
-                if (pointer == null || string.IsNullOrEmpty(pointer.FileName) ||
-                    Path.GetFileName(pointer.FileName) != pointer.FileName || !pointer.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                if (pointer == null || !SafeArchiveName(pointer.FileName))
                     throw new InvalidDataException("在线备份清单无效");
-                string target = Path.Combine(localDirectory, pointer.FileName);
-                string temporary = target + ".partial";
-                try {
-                    using (var request = CreateRequest(type, HttpMethod.Get, pointer.FileName, HashBytes(new byte[0])))
-                    using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead)) {
-                        response.EnsureSuccessStatusCode();
-                        using (var input = await response.Content.ReadAsStreamAsync())
-                        using (var output = File.Create(temporary)) await input.CopyToAsync(output);
-                    }
-                    if (!string.Equals(HashFile(temporary), pointer.Sha256, StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("在线备份校验值不一致");
-                    if (File.Exists(target)) File.Delete(target);
-                    File.Move(temporary, target);
-                } finally { if (File.Exists(temporary)) File.Delete(temporary); }
-                return target;
+                return await DownloadFileAsync(client, type, pointer.FileName, localDirectory, pointer.Sha256);
             }
+        }
+
+        private static bool SafeArchiveName(string name)
+        {
+            return !string.IsNullOrWhiteSpace(name) && name.IndexOfAny(new[] { '/', '\\' }) < 0 &&
+                name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0 && !Path.IsPathRooted(name) &&
+                name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static async Task<string> DownloadFileAsync(HttpClient client, string type,
+            string fileName, string localDirectory, string expectedHash)
+        {
+            if (!SafeArchiveName(fileName)) throw new InvalidDataException("在线备份文件名无效");
+            Directory.CreateDirectory(localDirectory);
+            string target = Path.Combine(localDirectory, fileName);
+            string temporary = target + ".partial";
+            try {
+                using (var request = CreateRequest(type, HttpMethod.Get, fileName, HashBytes(new byte[0])))
+                using (var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead)) {
+                    response.EnsureSuccessStatusCode();
+                    using (var input = await response.Content.ReadAsStreamAsync())
+                    using (var output = File.Create(temporary)) await input.CopyToAsync(output);
+                }
+                if (!string.IsNullOrEmpty(expectedHash) &&
+                    !string.Equals(HashFile(temporary), expectedHash, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("在线备份校验值不一致");
+                if (File.Exists(target)) File.Delete(target);
+                File.Move(temporary, target);
+                return target;
+            } finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        }
+
+        private static async Task<List<RemoteBackupItem>> ListWebDavAsync(HttpClient client)
+        {
+            Uri folder = WebDavCollectionUri();
+            using (var request = CreateWebDavRequest(new HttpMethod("PROPFIND"), folder)) {
+                request.Headers.TryAddWithoutValidation("Depth", "1");
+                request.Content = new StringContent(
+                    "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop>" +
+                    "<d:getcontentlength/><d:getlastmodified/><d:resourcetype/>" +
+                    "</d:prop></d:propfind>", Encoding.UTF8, "application/xml");
+                using (var response = await client.SendAsync(request)) {
+                    response.EnsureSuccessStatusCode();
+                    XDocument document = ReadXml(await response.Content.ReadAsStringAsync());
+                    var items = new List<RemoteBackupItem>();
+                    string pathPrefix = folder.AbsolutePath;
+                    foreach (XElement entry in document.Descendants().Where(x => x.Name.LocalName == "response")) {
+                        string href = entry.Elements().FirstOrDefault(x => x.Name.LocalName == "href")?.Value;
+                        if (string.IsNullOrWhiteSpace(href)) continue;
+                        Uri url = Uri.TryCreate(href, UriKind.Absolute, out Uri absolute)
+                            ? absolute : new Uri(folder, href);
+                        if (url.Scheme != folder.Scheme || url.Host != folder.Host || url.Port != folder.Port ||
+                            !url.AbsolutePath.StartsWith(pathPrefix, StringComparison.Ordinal)) continue;
+                        string relative = url.AbsolutePath.Substring(pathPrefix.Length);
+                        if (relative.IndexOf('/') >= 0) continue;
+                        string name = Uri.UnescapeDataString(relative);
+                        if (!SafeArchiveName(name)) continue;
+                        long.TryParse(entry.Descendants().FirstOrDefault(x => x.Name.LocalName == "getcontentlength")?.Value,
+                            NumberStyles.Integer, CultureInfo.InvariantCulture, out long size);
+                        DateTime modified = ParseRemoteDate(entry.Descendants()
+                            .FirstOrDefault(x => x.Name.LocalName == "getlastmodified")?.Value, name);
+                        items.Add(new RemoteBackupItem { FileName = name, Size = size, ModifiedUtc = modified });
+                    }
+                    return items;
+                }
+            }
+        }
+
+        private static async Task<List<RemoteBackupItem>> ListS3Async(HttpClient client)
+        {
+            string[] segments = FolderSegments(ConfigManager.Settings.BackupS3Prefix);
+            string prefix = segments.Length == 0 ? string.Empty : string.Join("/", segments) + "/";
+            string bucketPath = "/" + Uri.EscapeDataString(S3BucketName());
+            var items = new List<RemoteBackupItem>();
+            var seenTokens = new HashSet<string>(StringComparer.Ordinal);
+            string continuation = null;
+            while (true) {
+                var parameters = new Dictionary<string, string> { { "list-type", "2" } };
+                if (prefix.Length > 0) parameters["prefix"] = prefix;
+                if (!string.IsNullOrEmpty(continuation)) parameters["continuation-token"] = continuation;
+                string query = CanonicalQuery(parameters);
+                using (var request = CreateS3Request(HttpMethod.Get, bucketPath, query, HashBytes(new byte[0])))
+                using (var response = await client.SendAsync(request)) {
+                    response.EnsureSuccessStatusCode();
+                    XDocument document = ReadXml(await response.Content.ReadAsStringAsync());
+                    foreach (XElement entry in document.Descendants().Where(x => x.Name.LocalName == "Contents")) {
+                        string key = entry.Elements().FirstOrDefault(x => x.Name.LocalName == "Key")?.Value;
+                        if (key == null || !key.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                        string name = key.Substring(prefix.Length);
+                        if (!SafeArchiveName(name)) continue;
+                        long.TryParse(entry.Elements().FirstOrDefault(x => x.Name.LocalName == "Size")?.Value,
+                            NumberStyles.Integer, CultureInfo.InvariantCulture, out long size);
+                        DateTime modified = ParseRemoteDate(entry.Elements()
+                            .FirstOrDefault(x => x.Name.LocalName == "LastModified")?.Value, name);
+                        items.Add(new RemoteBackupItem { FileName = name, Size = size, ModifiedUtc = modified });
+                    }
+                    bool truncated = string.Equals(document.Descendants()
+                        .FirstOrDefault(x => x.Name.LocalName == "IsTruncated")?.Value, "true",
+                        StringComparison.OrdinalIgnoreCase);
+                    if (!truncated) return items;
+                    continuation = document.Descendants()
+                        .FirstOrDefault(x => x.Name.LocalName == "NextContinuationToken")?.Value;
+                    if (string.IsNullOrEmpty(continuation) || !seenTokens.Add(continuation))
+                        throw new InvalidDataException("S3 备份列表分页标记无效");
+                }
+            }
+        }
+
+        private static XDocument ReadXml(string content)
+        {
+            using (var text = new StringReader(content))
+            using (var reader = XmlReader.Create(text, new XmlReaderSettings {
+                DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null
+            })) return XDocument.Load(reader);
+        }
+
+        private static DateTime ParseRemoteDate(string value, string fileName)
+        {
+            if (DateTime.TryParse(value, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTime parsed))
+                return parsed;
+            string stem = Path.GetFileNameWithoutExtension(fileName);
+            if (DateTime.TryParseExact(stem, new[] { "yyyy-MM-dd_HHmmss_fff", "yyyy-MM-dd_HHmmss" },
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime local))
+                return local.ToUniversalTime();
+            return DateTime.MinValue;
         }
 
         private static async Task SendFileAsync(HttpClient client, string type, string name, string path)
@@ -172,6 +320,14 @@ namespace Jvedio.Core.Backup
             return root.GetLeftPart(UriPartial.Path).TrimEnd('/');
         }
 
+        private static Uri WebDavCollectionUri()
+        {
+            string url = WebDavBaseUrl();
+            foreach (string segment in FolderSegments(ConfigManager.Settings.BackupWebDavFolder))
+                url += "/" + Uri.EscapeDataString(segment);
+            return new Uri(url + "/");
+        }
+
         private static HttpRequestMessage CreateWebDavRequest(HttpMethod method, Uri url)
         {
             var settings = ConfigManager.Settings;
@@ -205,23 +361,44 @@ namespace Jvedio.Core.Backup
         {
             var settings = ConfigManager.Settings;
             if (type == "WebDAV") {
-                string url = WebDavBaseUrl();
-                foreach (string segment in FolderSegments(settings.BackupWebDavFolder))
-                    url += "/" + Uri.EscapeDataString(segment);
-                return CreateWebDavRequest(method, new Uri(url + "/" + Uri.EscapeDataString(name)));
+                return CreateWebDavRequest(method, new Uri(WebDavCollectionUri(), Uri.EscapeDataString(name)));
             }
             if (type != "S3") throw new InvalidOperationException("未知备份类型");
+            string encodedPath = "/" + Uri.EscapeDataString(S3BucketName()) + "/" +
+                string.Join("/", FolderSegments(settings.BackupS3Prefix).Concat(new[] { name }).Select(Uri.EscapeDataString));
+            return CreateS3Request(method, encodedPath, string.Empty, hash);
+        }
+
+        private static string S3BucketName()
+        {
+            var settings = ConfigManager.Settings;
             if (string.IsNullOrWhiteSpace(settings.BackupS3Bucket) || string.IsNullOrWhiteSpace(settings.BackupS3AccessKey))
                 throw new InvalidOperationException("请填写 S3 存储桶和访问密钥");
+            return settings.BackupS3Bucket.Trim();
+        }
+
+        private static string CanonicalQuery(IEnumerable<KeyValuePair<string, string>> parameters)
+        {
+            return string.Join("&", parameters.Select(pair => new {
+                Key = Uri.EscapeDataString(pair.Key), Value = Uri.EscapeDataString(pair.Value ?? string.Empty)
+            }).OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .ThenBy(pair => pair.Value, StringComparer.Ordinal)
+                .Select(pair => pair.Key + "=" + pair.Value));
+        }
+
+        private static HttpRequestMessage CreateS3Request(HttpMethod method, string encodedPath,
+            string canonicalQuery, string hash)
+        {
+            var settings = ConfigManager.Settings;
+            S3BucketName();
             string region = string.IsNullOrWhiteSpace(settings.BackupS3Region) ? "us-east-1" : settings.BackupS3Region.Trim();
             string endpoint = string.IsNullOrWhiteSpace(settings.BackupS3Endpoint)
                 ? "https://s3." + region + ".amazonaws.com" : settings.BackupS3Endpoint.Trim();
             Uri rootUri = RequireHttps(endpoint);
-            if (rootUri.AbsolutePath != "/")
+            if (rootUri.AbsolutePath != "/" || rootUri.Query.Length > 0 || rootUri.Fragment.Length > 0)
                 throw new InvalidOperationException("S3 Endpoint 请填写服务器根地址，不包含路径");
-            string encodedPath = "/" + Uri.EscapeDataString(settings.BackupS3Bucket.Trim()) + "/" +
-                string.Join("/", FolderSegments(settings.BackupS3Prefix).Concat(new[] { name }).Select(Uri.EscapeDataString));
-            Uri urlS3 = new Uri(rootUri.ToString().TrimEnd('/') + encodedPath);
+            Uri urlS3 = new Uri(rootUri.ToString().TrimEnd('/') + encodedPath +
+                (string.IsNullOrEmpty(canonicalQuery) ? string.Empty : "?" + canonicalQuery));
             var s3Request = new HttpRequestMessage(method, urlS3);
             DateTime now = DateTime.UtcNow;
             string stamp = now.ToString("yyyyMMddTHHmmssZ");
@@ -229,7 +406,8 @@ namespace Jvedio.Core.Backup
             string host = urlS3.IsDefaultPort ? urlS3.Host : urlS3.Host + ":" + urlS3.Port;
             string signedHeaders = "host;x-amz-content-sha256;x-amz-date";
             string canonicalHeaders = "host:" + host + "\n" + "x-amz-content-sha256:" + hash + "\n" + "x-amz-date:" + stamp + "\n";
-            string canonical = method.Method + "\n" + encodedPath + "\n\n" + canonicalHeaders + "\n" + signedHeaders + "\n" + hash;
+            string canonical = method.Method + "\n" + encodedPath + "\n" + canonicalQuery + "\n" +
+                canonicalHeaders + "\n" + signedHeaders + "\n" + hash;
             string scope = date + "/" + region + "/s3/aws4_request";
             string toSign = "AWS4-HMAC-SHA256\n" + stamp + "\n" + scope + "\n" + HashBytes(Encoding.UTF8.GetBytes(canonical));
             byte[] secret = Encoding.UTF8.GetBytes("AWS4" + Unprotect(settings.BackupS3SecretKeyProtected));

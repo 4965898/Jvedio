@@ -37,6 +37,7 @@ namespace Jvedio.Core.Backup
             public string RemoteType { get; internal set; }
             public string RemoteError { get; internal set; }
             public string CleanupError { get; internal set; }
+            public string RetentionError { get; internal set; }
         }
 
         public static string LocalRoot {
@@ -74,6 +75,10 @@ namespace Jvedio.Core.Backup
                 if (keepLocal) {
                     folder = await Task.Run(() => CreateLocal());
                     result.LocalFolder = folder;
+                    try {
+                        int keep = Math.Max(1, Math.Min(10, ConfigManager.Settings.MaxLocalBackups));
+                        await Task.Run(() => PruneLocalSnapshots(LocalRoot, keep));
+                    } catch (Exception ex) { result.RetentionError = ex.Message; }
                 } else {
                     temporaryRoot = Path.Combine(Path.GetTempPath(), "Jvedio-online-backup-" + Guid.NewGuid().ToString("N"));
                     string root = temporaryRoot;
@@ -105,6 +110,38 @@ namespace Jvedio.Core.Backup
         public static string CreateLocal()
         {
             return CreateSnapshot(LocalRoot);
+        }
+
+        private static void PruneLocalSnapshots(string root, int keep)
+        {
+            if (!Directory.Exists(root)) return;
+            string rootPrefix = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var snapshots = new List<Tuple<string, DateTime>>();
+            foreach (string folder in Directory.EnumerateDirectories(root)) {
+                var info = new DirectoryInfo(folder);
+                if ((info.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                string name = info.Name;
+                if (!DateTime.TryParseExact(name,
+                    new[] { "yyyy-MM-dd_HHmmss_fff", "yyyy-MM-dd_HHmmss", "yyyy-MM-dd" },
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out DateTime created)) continue;
+                if (DatabaseNames.Any(db => !File.Exists(Path.Combine(folder, db)))) continue;
+                var allowed = new HashSet<string>(DatabaseNames, StringComparer.OrdinalIgnoreCase) {
+                    "image", ManifestName
+                };
+                foreach (string db in DatabaseNames)
+                    foreach (string suffix in DatabaseSidecars) allowed.Add(db + suffix);
+                if (Directory.EnumerateFileSystemEntries(folder).Any(entry =>
+                    !allowed.Contains(Path.GetFileName(entry)))) continue;
+                snapshots.Add(Tuple.Create(folder, created));
+            }
+            foreach (var old in snapshots.OrderByDescending(item => item.Item2).ThenByDescending(item => item.Item1)
+                .Skip(keep)) {
+                string full = Path.GetFullPath(old.Item1);
+                if (!full.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("备份清理路径越界");
+                Directory.Delete(full, true);
+            }
         }
 
         private static string CreateSnapshot(string root)

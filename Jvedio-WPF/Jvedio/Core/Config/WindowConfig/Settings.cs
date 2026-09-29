@@ -25,6 +25,7 @@ namespace Jvedio.Core.WindowConfig
             Prefix = string.Empty;
             AutoBackupPeriodIndex = DEFAULT_BACKUP_PERIOD_INDEX;
             AutoBackup = true;
+            MaxLocalBackups = 10;
             ProtectExistingScrapeFields = true;
             DetailShowBg = true;
             CurrentLanguage = "zh-CN";
@@ -145,6 +146,7 @@ SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
             set { _BackupMode = value; }
         }
         public System.DateTime LastSuccessfulBackupUtc { get; set; }
+        public int MaxLocalBackups { get; set; }
 
         /// <summary>留空时沿用原有用户目录下的 backup 文件夹。</summary>
         public string BackupDirectory { get; set; }

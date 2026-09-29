@@ -292,6 +292,8 @@ namespace Jvedio
                 }
                 if ((DateTime.Now - latest).TotalDays >= period) {
                     var result = await BackupService.CreateAsync();
+                    if (!string.IsNullOrEmpty(result.RetentionError))
+                        Logger.Error("旧本地备份清理失败：" + result.RetentionError);
                     if (!string.IsNullOrEmpty(result.RemoteError)) {
                         Logger.Error("自动在线备份失败：" + result.RemoteError);
                         if (!string.IsNullOrEmpty(result.CleanupError))

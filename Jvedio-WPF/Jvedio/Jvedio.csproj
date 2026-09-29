@@ -433,6 +433,7 @@
     <Compile Include="Core\Services\RemoteBackupStore.cs" />
     <Compile Include="Core\Services\ScrapeFieldPolicy.cs" />
     <Compile Include="Windows\Window_LibraryHealth.cs" />
+    <Compile Include="Windows\Window_RemoteBackupPicker.cs" />
     <Compile Include="Windows\Window_ScrapePreview.cs" />
     <Compile Include="Core\Tasks\DurationIndexManager.cs" />
     <Compile Include="Core\Tasks\TranslateTaskManager.cs" />

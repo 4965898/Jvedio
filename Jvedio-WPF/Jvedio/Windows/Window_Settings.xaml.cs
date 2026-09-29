@@ -10,6 +10,7 @@ using Jvedio.Entity;
 using Jvedio.Entity.Common;
 using Jvedio.Mapper;
 using Jvedio.ViewModel;
+using Jvedio.Windows;
 using Newtonsoft.Json;
 using SuperControls.Style;
 using SuperControls.Style.Plugin;
@@ -1372,6 +1373,7 @@ namespace Jvedio
             var s = ConfigManager.Settings;
             BackupModeBox.SelectedIndex = s.BackupMode == "RemoteOnly" ? 1 : s.BackupMode == "Both" ? 2 : 0;
             BackupDirectoryBox.Text = s.BackupDirectory ?? string.Empty;
+            BackupRetentionBox.Text = Math.Max(1, Math.Min(10, s.MaxLocalBackups)).ToString();
             BackupRemoteTypeBox.SelectedIndex = s.BackupRemoteType == "WebDAV" ? 1 : s.BackupRemoteType == "S3" ? 2 : 0;
             BackupWebDavUrlBox.Text = s.BackupWebDavUrl ?? string.Empty;
             BackupWebDavFolderBox.Text = s.BackupWebDavFolder ?? string.Empty;
@@ -1396,6 +1398,9 @@ namespace Jvedio
             s.BackupMode = BackupModeBox.SelectedIndex == 1 ? "RemoteOnly" :
                 BackupModeBox.SelectedIndex == 2 ? "Both" : "LocalOnly";
             s.BackupDirectory = BackupDirectoryBox.Text?.Trim();
+            s.MaxLocalBackups = Math.Max(1, Math.Min(10,
+                int.TryParse(BackupRetentionBox.Text, out int retention) ? retention : 10));
+            BackupRetentionBox.Text = s.MaxLocalBackups.ToString();
             s.BackupRemoteType = BackupRemoteTypeBox.SelectedIndex == 1 ? "WebDAV" :
                 BackupRemoteTypeBox.SelectedIndex == 2 ? "S3" : "None";
             s.BackupWebDavUrl = BackupWebDavUrlBox.Text?.Trim();
@@ -1456,12 +1461,16 @@ namespace Jvedio
                 SaveSettings();
                 ConfigManager.Settings.Save();
                 var result = await BackupService.CreateAsync();
+                string warnings = string.Empty;
+                if (!string.IsNullOrEmpty(result.CleanupError))
+                    warnings += " " + string.Format(LangManager.GetValueByKey("BackupCleanupWarning"), result.CleanupError);
+                if (!string.IsNullOrEmpty(result.RetentionError))
+                    warnings += " " + string.Format(LangManager.GetValueByKey("BackupRetentionWarning"), result.RetentionError);
                 if (!string.IsNullOrEmpty(result.RemoteError)) {
                     string failure = string.IsNullOrEmpty(result.LocalFolder)
                         ? string.Format(LangManager.GetValueByKey("BackupFailed"), result.RemoteError)
                         : string.Format(LangManager.GetValueByKey("BackupPartial"), result.LocalFolder, result.RemoteError);
-                    BackupStatusText.Text = string.IsNullOrEmpty(result.CleanupError) ? failure :
-                        failure + " " + string.Format(LangManager.GetValueByKey("BackupCleanupWarning"), result.CleanupError);
+                    BackupStatusText.Text = failure + warnings;
                     return;
                 }
                 string summary = result.Mode == "LocalOnly"
@@ -1469,8 +1478,7 @@ namespace Jvedio
                     : result.Mode == "RemoteOnly"
                         ? string.Format(LangManager.GetValueByKey("BackupCreatedRemote"), result.RemoteType)
                         : string.Format(LangManager.GetValueByKey("BackupCreatedBoth"), result.LocalFolder, result.RemoteType);
-                BackupStatusText.Text = string.IsNullOrEmpty(result.CleanupError) ? summary :
-                    summary + " " + string.Format(LangManager.GetValueByKey("BackupCleanupWarning"), result.CleanupError);
+                BackupStatusText.Text = summary + warnings;
                 ConfigManager.Settings.LastSuccessfulBackupUtc = DateTime.UtcNow;
                 ConfigManager.Settings.Save();
             } catch (Exception ex) {
@@ -1499,19 +1507,48 @@ namespace Jvedio
         {
             if (_BackupBusy) return;
             _BackupBusy = true;
-            string archive = null;
+            IReadOnlyList<RemoteBackupStore.RemoteBackupItem> backups = null;
             try {
                 SaveSettings();
                 ConfigManager.Settings.Save();
+                BackupStatusText.Text = LangManager.GetValueByKey("RemoteBackupListing");
+                backups = await RemoteBackupStore.ListBackupsAsync();
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                BackupStatusText.Text = string.Format(LangManager.GetValueByKey("RemoteBackupListFailed"), ex.Message);
+            } finally {
+                _BackupBusy = false;
+            }
+            if (backups == null) return;
+            if (backups.Count == 0) {
+                BackupStatusText.Text = LangManager.GetValueByKey("RemoteBackupEmpty");
+                return;
+            }
+            var picker = new Window_RemoteBackupPicker(backups) { Owner = this };
+            if (picker.ShowDialog() != true || picker.SelectedBackup == null) return;
+            if (new MsgBox(LangManager.GetValueByKey("RestoreConfirm")).ShowDialog(this) != true) return;
+
+            string temporaryRoot = Path.Combine(Path.GetTempPath(), "Jvedio-restore-download-" + Guid.NewGuid().ToString("N"));
+            bool staged = false;
+            _BackupBusy = true;
+            try {
                 BackupStatusText.Text = LangManager.GetValueByKey("BackupDownloading");
-                archive = await RemoteBackupStore.DownloadLatestAsync(BackupService.LocalRoot);
+                string archive = await RemoteBackupStore.DownloadAsync(picker.SelectedBackup.FileName, temporaryRoot);
+                BackupStatusText.Text = LangManager.GetValueByKey("RestorePreparing");
+                await Task.Run(() => BackupService.StageRestore(archive));
+                BackupStatusText.Text = LangManager.GetValueByKey("RestoreReady");
+                staged = true;
             } catch (Exception ex) {
                 Logger.Error(ex);
                 BackupStatusText.Text = string.Format(LangManager.GetValueByKey("RemoteRestoreFailed"), ex.Message);
             } finally {
+                if (Directory.Exists(temporaryRoot)) {
+                    try { await Task.Run(() => Directory.Delete(temporaryRoot, true)); }
+                    catch (Exception ex) { Logger.Error(ex); }
+                }
                 _BackupBusy = false;
             }
-            if (!string.IsNullOrEmpty(archive)) await StageBackupRestore(archive);
+            if (staged) Application.Current.Shutdown();
         }
 
         private async Task StageBackupRestore(string source)

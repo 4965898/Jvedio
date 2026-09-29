@@ -109,6 +109,8 @@
     <sys:String x:Key="UpgradeUpToDate">当前版本：{0}&#10;最新公开版本：{1}&#10;无需更新。</sys:String>
     <sys:String x:Key="UpgradeCheckFailed">检查更新失败：{0}</sys:String>
     <sys:String x:Key="BackupDirectoryLabel">本地备份目录（留空沿用默认目录）</sys:String>
+    <sys:String x:Key="BackupRetentionLabel">本地备份保留份数（1–10）</sys:String>
+    <sys:String x:Key="BackupRetentionTip">生成新本地备份后，自动清理超出份数的可识别旧备份。</sys:String>
     <sys:String x:Key="BackupModeLabel">备份方式</sys:String>
     <sys:String x:Key="BackupModeLocalOnly">仅本地备份</sys:String>
     <sys:String x:Key="BackupModeRemoteOnly">仅在线备份</sys:String>
@@ -126,7 +128,17 @@
     <sys:String x:Key="BackupNow">立即备份</sys:String>
     <sys:String x:Key="RestoreBackupZip">从 ZIP 恢复</sys:String>
     <sys:String x:Key="RestoreBackupFolder">从文件夹恢复</sys:String>
-    <sys:String x:Key="RestoreRemoteBackup">恢复最新在线备份</sys:String>
+    <sys:String x:Key="RestoreRemoteBackup">从在线备份列表恢复</sys:String>
+    <sys:String x:Key="RemoteBackupListing">正在读取在线备份列表…</sys:String>
+    <sys:String x:Key="RemoteBackupEmpty">当前在线文件夹中没有 ZIP 备份。</sys:String>
+    <sys:String x:Key="RemoteBackupListFailed">无法获取在线备份列表：{0}。请检查连接和列举权限。</sys:String>
+    <sys:String x:Key="RemoteBackupPickerTitle">选择在线备份</sys:String>
+    <sys:String x:Key="RemoteBackupPickerHint">选择要恢复的 ZIP 备份；恢复前会校验文件内容。</sys:String>
+    <sys:String x:Key="RemoteBackupFileName">备份文件</sys:String>
+    <sys:String x:Key="RemoteBackupModified">修改时间</sys:String>
+    <sys:String x:Key="RemoteBackupSize">大小</sys:String>
+    <sys:String x:Key="RemoteBackupChoose">恢复所选备份</sys:String>
+    <sys:String x:Key="RemoteBackupCancel">取消</sys:String>
     <sys:String x:Key="AutoUpgradeDialog">发现新版本时自动弹出升级窗口</sys:String>
     <sys:String x:Key="IgnoreThisUpdate">忽略此版本</sys:String>
     <sys:String x:Key="LibraryHealth">资料体检中心</sys:String>
@@ -169,6 +181,7 @@
     <sys:String x:Key="BackupCreatedBoth">本地及在线备份成功：{0}；{1}</sys:String>
     <sys:String x:Key="BackupPartial">本地备份已保存：{0}；在线备份失败：{1}</sys:String>
     <sys:String x:Key="BackupCleanupWarning">临时文件清理失败：{0}</sys:String>
+    <sys:String x:Key="BackupRetentionWarning">旧本地备份清理失败：{0}</sys:String>
     <sys:String x:Key="BackupFailed">备份失败：{0}</sys:String>
     <sys:String x:Key="BackupDownloading">正在下载在线备份…</sys:String>
     <sys:String x:Key="RemoteRestoreFailed">在线恢复失败：{0}</sys:String>

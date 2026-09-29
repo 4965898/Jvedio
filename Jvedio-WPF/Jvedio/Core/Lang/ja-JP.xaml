@@ -109,6 +109,8 @@
     <sys:String x:Key="UpgradeUpToDate">現在のバージョン：{0}&#10;最新の公開版：{1}&#10;更新は不要です。</sys:String>
     <sys:String x:Key="UpgradeCheckFailed">更新を確認できませんでした：{0}</sys:String>
     <sys:String x:Key="BackupDirectoryLabel">ローカルバックアップ先（空欄なら既定）</sys:String>
+    <sys:String x:Key="BackupRetentionLabel">ローカルバックアップ保持数（1～10）</sys:String>
+    <sys:String x:Key="BackupRetentionTip">新しいローカルバックアップの後、上限を超えた識別可能な古いバックアップを削除します。</sys:String>
     <sys:String x:Key="BackupModeLabel">バックアップ方式</sys:String>
     <sys:String x:Key="BackupModeLocalOnly">ローカルのみ</sys:String>
     <sys:String x:Key="BackupModeRemoteOnly">オンラインのみ</sys:String>
@@ -126,7 +128,17 @@
     <sys:String x:Key="BackupNow">今すぐバックアップ</sys:String>
     <sys:String x:Key="RestoreBackupZip">ZIP から復元</sys:String>
     <sys:String x:Key="RestoreBackupFolder">フォルダーから復元</sys:String>
-    <sys:String x:Key="RestoreRemoteBackup">最新のオンラインバックアップから復元</sys:String>
+    <sys:String x:Key="RestoreRemoteBackup">オンラインバックアップ一覧から復元</sys:String>
+    <sys:String x:Key="RemoteBackupListing">オンラインバックアップ一覧を読み込んでいます…</sys:String>
+    <sys:String x:Key="RemoteBackupEmpty">このオンラインフォルダーに ZIP バックアップはありません。</sys:String>
+    <sys:String x:Key="RemoteBackupListFailed">オンラインバックアップ一覧を取得できません：{0}。接続と一覧表示権限を確認してください。</sys:String>
+    <sys:String x:Key="RemoteBackupPickerTitle">オンラインバックアップを選択</sys:String>
+    <sys:String x:Key="RemoteBackupPickerHint">復元する ZIP を選択してください。復元前に内容を検証します。</sys:String>
+    <sys:String x:Key="RemoteBackupFileName">バックアップファイル</sys:String>
+    <sys:String x:Key="RemoteBackupModified">更新日時</sys:String>
+    <sys:String x:Key="RemoteBackupSize">サイズ</sys:String>
+    <sys:String x:Key="RemoteBackupChoose">選択したバックアップを復元</sys:String>
+    <sys:String x:Key="RemoteBackupCancel">キャンセル</sys:String>
     <sys:String x:Key="AutoUpgradeDialog">新しいバージョンで更新画面を自動表示</sys:String>
     <sys:String x:Key="IgnoreThisUpdate">このバージョンを無視</sys:String>
     <sys:String x:Key="LibraryHealth">ライブラリー診断</sys:String>
@@ -169,6 +181,7 @@
     <sys:String x:Key="BackupCreatedBoth">ローカルとオンラインのバックアップ完了：{0}；{1}</sys:String>
     <sys:String x:Key="BackupPartial">ローカルバックアップを保存しました：{0}；オンラインバックアップ失敗：{1}</sys:String>
     <sys:String x:Key="BackupCleanupWarning">一時ファイルを削除できませんでした：{0}</sys:String>
+    <sys:String x:Key="BackupRetentionWarning">古いローカルバックアップを削除できませんでした：{0}</sys:String>
     <sys:String x:Key="BackupFailed">バックアップ失敗：{0}</sys:String>
     <sys:String x:Key="BackupDownloading">オンラインバックアップをダウンロードしています…</sys:String>
     <sys:String x:Key="RemoteRestoreFailed">オンライン復元失敗：{0}</sys:String>
