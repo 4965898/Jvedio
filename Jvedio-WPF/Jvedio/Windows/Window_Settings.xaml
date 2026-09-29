@@ -2096,30 +2096,30 @@
                                     <ComboBoxItem Content="WebDAV" />
                                     <ComboBoxItem Content="S3" />
                                 </ComboBox>
-                                <Expander Margin="5" Header="WebDAV">
+                                <Expander Margin="5" Header="WebDAV" Foreground="{DynamicResource Window.Foreground}">
                                     <StackPanel Margin="5">
-                                        <TextBlock Text="URL（HTTPS）" />
+                                        <TextBlock Text="URL（HTTPS）" Foreground="{DynamicResource Window.Foreground}" />
                                         <TextBox x:Name="BackupWebDavUrlBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="{DynamicResource BackupUserLabel}" />
+                                        <TextBlock Text="{DynamicResource BackupUserLabel}" Foreground="{DynamicResource Window.Foreground}" />
                                         <TextBox x:Name="BackupWebDavUserBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="{DynamicResource BackupPasswordLabel}" />
-                                        <PasswordBox x:Name="BackupWebDavPasswordBox" />
+                                        <TextBlock Text="{DynamicResource BackupPasswordLabel}" Foreground="{DynamicResource Window.Foreground}" />
+                                        <PasswordBox x:Name="BackupWebDavPasswordBox" Foreground="{DynamicResource Window.Foreground}" Background="{DynamicResource Window.Title.Background}" CaretBrush="{DynamicResource Window.Foreground}" />
                                     </StackPanel>
                                 </Expander>
-                                <Expander Margin="5" Header="S3">
+                                <Expander Margin="5" Header="S3" Foreground="{DynamicResource Window.Foreground}">
                                     <StackPanel Margin="5">
-                                        <TextBlock Text="Endpoint（HTTPS，留空使用 AWS）" />
+                                        <TextBlock Text="Endpoint（HTTPS，留空使用 AWS）" Foreground="{DynamicResource Window.Foreground}" />
                                         <TextBox x:Name="BackupS3EndpointBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="Region" />
+                                        <TextBlock Text="Region" Foreground="{DynamicResource Window.Foreground}" />
                                         <TextBox x:Name="BackupS3RegionBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="Bucket" />
+                                        <TextBlock Text="Bucket" Foreground="{DynamicResource Window.Foreground}" />
                                         <TextBox x:Name="BackupS3BucketBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="Prefix" />
+                                        <TextBlock Text="Prefix" Foreground="{DynamicResource Window.Foreground}" />
                                         <TextBox x:Name="BackupS3PrefixBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="Access Key ID" />
+                                        <TextBlock Text="Access Key ID" Foreground="{DynamicResource Window.Foreground}" />
                                         <TextBox x:Name="BackupS3AccessKeyBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="Secret Access Key" />
-                                        <PasswordBox x:Name="BackupS3SecretBox" />
+                                        <TextBlock Text="Secret Access Key" Foreground="{DynamicResource Window.Foreground}" />
+                                        <PasswordBox x:Name="BackupS3SecretBox" Foreground="{DynamicResource Window.Foreground}" Background="{DynamicResource Window.Title.Background}" CaretBrush="{DynamicResource Window.Foreground}" />
                                     </StackPanel>
                                 </Expander>
                                 <WrapPanel Margin="5">

@@ -135,6 +135,9 @@
     <sys:String x:Key="HealthCopy">問題一覧をコピー</sys:String>
     <sys:String x:Key="HealthIssue">問題</sys:String>
     <sys:String x:Key="HealthPath">ファイルパス（ダブルクリックで表示）</sys:String>
+    <sys:String x:Key="HealthVIDCopyTip">識別コードをダブルクリックしてコピー</sys:String>
+    <sys:String x:Key="HealthVIDCopied">識別コードをコピーしました：{0}</sys:String>
+    <sys:String x:Key="HealthCopyFailed">コピーに失敗しました。再試行してください。</sys:String>
     <sys:String x:Key="HealthWorking">ファイルと情報を確認中…</sys:String>
     <sys:String x:Key="HealthComplete">確認完了：{0} 件</sys:String>
     <sys:String x:Key="ScrapePreviewTitle">取得結果のプレビュー</sys:String>

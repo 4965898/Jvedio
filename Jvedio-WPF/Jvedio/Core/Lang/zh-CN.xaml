@@ -135,6 +135,9 @@
     <sys:String x:Key="HealthCopy">复制问题清单</sys:String>
     <sys:String x:Key="HealthIssue">问题</sys:String>
     <sys:String x:Key="HealthPath">文件路径（双击定位）</sys:String>
+    <sys:String x:Key="HealthVIDCopyTip">双击识别码即可复制</sys:String>
+    <sys:String x:Key="HealthVIDCopied">已复制识别码：{0}</sys:String>
+    <sys:String x:Key="HealthCopyFailed">复制失败，请重试</sys:String>
     <sys:String x:Key="HealthWorking">正在检查文件及资料…</sys:String>
     <sys:String x:Key="HealthComplete">体检完成：{0} 项问题</sys:String>
     <sys:String x:Key="ScrapePreviewTitle">刮削结果预览</sys:String>

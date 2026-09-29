@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Media;
 using static Jvedio.App;
 using static Jvedio.MapperManager;
 
@@ -81,9 +83,13 @@ namespace Jvedio.Windows
 
             AddColumn(LangManager.GetValueByKey("HealthIssue"), "Issue", 135);
             AddColumn(LangManager.GetValueByKey("ID"), "VID", 125);
+            _Grid.Columns[1].Header = new TextBlock {
+                Text = LangManager.GetValueByKey("ID"),
+                ToolTip = LangManager.GetValueByKey("HealthVIDCopyTip")
+            };
             AddColumn(LangManager.GetValueByKey("Title"), "Title", 220);
             AddColumn(LangManager.GetValueByKey("HealthPath"), "Path", 390);
-            _Grid.MouseDoubleClick += (s, e) => OpenSelectedPath();
+            _Grid.MouseDoubleClick += OnGridDoubleClick;
             root.Children.Add(_Grid);
             Content = root;
             Loaded += async (s, e) => await RefreshAsync(true);
@@ -163,6 +169,29 @@ namespace Jvedio.Windows
                 else if (Directory.Exists(Path.GetDirectoryName(selected.Path)))
                     Process.Start("explorer.exe", "\"" + Path.GetDirectoryName(selected.Path) + "\"");
             } catch (Exception ex) { Logger.Error(ex); }
+        }
+
+        private void OnGridDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            DependencyObject source = e.OriginalSource as DependencyObject;
+            while (source != null && !(source is DataGridCell)) {
+                source = source is Visual ? VisualTreeHelper.GetParent(source) : LogicalTreeHelper.GetParent(source);
+            }
+            if (!(source is DataGridCell cell)) return;
+            if (cell.Column == _Grid.Columns[1]) {
+                if (_Grid.SelectedItem is HealthIssue issue && !string.IsNullOrWhiteSpace(issue.VID)) {
+                    try {
+                        Clipboard.SetText(issue.VID);
+                        _Status.Text = string.Format(LangManager.GetValueByKey("HealthVIDCopied"), issue.VID);
+                    } catch (Exception ex) {
+                        Logger.Error(ex);
+                        _Status.Text = LangManager.GetValueByKey("HealthCopyFailed");
+                    }
+                }
+                e.Handled = true;
+                return;
+            }
+            OpenSelectedPath();
         }
     }
 }

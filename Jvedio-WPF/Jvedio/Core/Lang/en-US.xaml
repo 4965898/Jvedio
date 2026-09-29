@@ -136,6 +136,9 @@
     <sys:String x:Key="HealthCopy">Copy issue list</sys:String>
     <sys:String x:Key="HealthIssue">Issue</sys:String>
     <sys:String x:Key="HealthPath">File path (double-click to locate)</sys:String>
+    <sys:String x:Key="HealthVIDCopyTip">Double-click an ID to copy it</sys:String>
+    <sys:String x:Key="HealthVIDCopied">Copied ID: {0}</sys:String>
+    <sys:String x:Key="HealthCopyFailed">Copy failed. Please try again.</sys:String>
     <sys:String x:Key="HealthWorking">Checking files and metadata…</sys:String>
     <sys:String x:Key="HealthComplete">Check complete: {0} issues</sys:String>
     <sys:String x:Key="ScrapePreviewTitle">Scrape result preview</sys:String>
