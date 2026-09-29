@@ -358,6 +358,18 @@
                                     ContextMenu="{StaticResource SettingsContextMenu}"
                                     Style="{StaticResource SettingHoverPath}"
                                     ToolTip="{DynamicResource Settings}" />
+                                <Ellipse
+                                    x:Name="UpdateBadge"
+                                    Width="10"
+                                    Height="10"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Top"
+                                    Fill="#E53935"
+                                    IsHitTestVisible="False"
+                                    Panel.ZIndex="1"
+                                    Stroke="{DynamicResource Menu.Background}"
+                                    StrokeThickness="1"
+                                    Visibility="Collapsed" />
                             </Grid>
                         </Grid>
 

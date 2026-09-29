@@ -141,7 +141,17 @@ jobs:
             gh release upload $tag $zip --repo $env:GITHUB_REPOSITORY --clobber
             if ($LASTEXITCODE -ne 0) { throw 'Draft release asset upload failed.' }
           } else {
-            gh release create $tag $zip --repo $env:GITHUB_REPOSITORY --draft --verify-tag --generate-notes --title "自改$tag"
+            $row = Get-Content README.md -Encoding utf8 |
+              Where-Object { $_.StartsWith("| $tag（", [StringComparison]::Ordinal) } |
+              Select-Object -Last 1
+            if (-not $row) { throw "README.md has no release note for $tag." }
+            $cells = $row.Split('|')
+            if ($cells.Count -lt 4 -or [string]::IsNullOrWhiteSpace($cells[3])) {
+              throw "README.md release note for $tag is empty."
+            }
+            $notesFile = Join-Path $env:RUNNER_TEMP "Jvedio-$tag-notes.md"
+            [IO.File]::WriteAllText($notesFile, $cells[3].Trim(), [Text.UTF8Encoding]::new($false))
+            gh release create $tag $zip --repo $env:GITHUB_REPOSITORY --draft --verify-tag --notes-file $notesFile --title "自改$tag"
             if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
           }
 

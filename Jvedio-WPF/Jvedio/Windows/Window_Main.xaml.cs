@@ -702,7 +702,9 @@ namespace Jvedio
             try {
                 await Task.Delay(UpgradeHelper.AUTO_CHECK_UPGRADE_DELAY);
                 (string LatestVersion, string ReleaseDate, string ReleaseNote) result = await UpgradeHelper.GetUpgradeInfo();
-                if (UpgradeHelper.HasNewVersion(result.LatestVersion))
+                bool hasUpdate = UpgradeHelper.HasNewVersion(result.LatestVersion);
+                UpdateBadge.Visibility = hasUpdate ? Visibility.Visible : Visibility.Collapsed;
+                if (hasUpdate)
                     UpgradeHelper.OpenWindow();
             } catch (Exception ex) {
                 Logger.Error(ex);

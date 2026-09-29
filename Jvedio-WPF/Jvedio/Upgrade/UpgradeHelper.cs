@@ -10,6 +10,8 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using static Jvedio.App;
 
 namespace Jvedio.Upgrade
@@ -52,11 +54,38 @@ namespace Jvedio.Upgrade
                     LocalVersion = App.GetLocalVersion(false)
                 };
                 Dialog.Closed += (sender, args) => WindowClosed = true;
+                Dialog.ContentRendered += (sender, args) => WrapReleaseNote(Dialog);
+                Dialog.PropertyChanged += (sender, args) => {
+                    if (args.PropertyName == nameof(Dialog.LatestVersion)) {
+                        bool newer = false;
+                        if (!string.IsNullOrWhiteSpace(Dialog.LatestVersion)) {
+                            try {
+                                newer = HasNewVersion(Dialog.LatestVersion);
+                            } catch (FormatException ex) {
+                                Logger.Error(ex);
+                            }
+                        }
+                        Dialog.CanUpgrade = newer;
+                    }
+                };
                 Dialog.OnExitApp += () => Application.Current.Shutdown();
                 WindowClosed = false;
             }
 
             Dialog?.ShowDialog();
+        }
+
+        private static void WrapReleaseNote(DependencyObject root)
+        {
+            if (root is TextBox textBox && textBox.ActualHeight > 100) {
+                textBox.TextWrapping = TextWrapping.Wrap;
+                textBox.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
+                textBox.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+                return;
+            }
+
+            for (int index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+                WrapReleaseNote(VisualTreeHelper.GetChild(root, index));
         }
 
         public static bool HasNewVersion(string latestVersion)

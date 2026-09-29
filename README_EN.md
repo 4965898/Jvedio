@@ -124,6 +124,7 @@ Users : [User Guide](Jvedio-WPF/Document/Wiki/5.0/02-Beginning.md)
 | 5.4.1.49 (Jvedio29.57) | 2026-09-21 | Fixed two task-scheduler bugs on the sync-info / translate task pages: ① "Cancel All" stopped working after clicking "Restart All" (the restart loop kept pulling canceled tasks back in batches — now cancel/clear-list aborts the restart chain immediately, with a double-click guard); ② after completing tasks, clearing the list and adding new ones left them stuck in "Waiting" forever (a dispatcher exit race / dead work loop orphaned the queue — added a 4s liveness fallback that re-kicks the dispatcher) |
 | 5.4.1.50 (Jvedio29.58) | 2026-09-29 | Update checks now use this repository's Releases; About, Feedback and Help open this repository or its maintained documentation; a lock protects both task enqueue and worker shutdown, eliminating the queue race and the 4-second fallback; CI builds, verifies and publishes the complete ZIP automatically |
 | 5.4.1.51 (Jvedio29.59) | 2026-09-29 | Restored the original upgrade dialog. Its latest version, download link, and update files now come from this repository's Releases; CI also publishes the dialog's compatible update feed. |
+| 5.4.1.52 (Jvedio29.60) | 2026-09-29 | Release details in the original dialog wrap and scroll vertically, Release notes state the changes directly, and a red dot appears on the settings gear when an update is available; Start Update is disabled when the remote version is not newer. |
 
 
 # Software Characteristics

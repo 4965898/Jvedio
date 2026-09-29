@@ -7,7 +7,7 @@ The workflow refuses to republish a version already tagged at a different commit
 To pack locally after building the application, BusCrawler, and DBCrawler in Release mode:
 
 ```powershell
-./scripts/pack-release.ps1 -Version 5.4.1.51
+./scripts/pack-release.ps1 -Version 5.4.1.52
 ```
 
 The package is written to `artifacts/`, which Git ignores.

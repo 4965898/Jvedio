@@ -87,7 +87,7 @@ try {
     }
 
     $releaseNote = if ($latest.body) { [string]$latest.body } else { "Jvedio $Version" }
-    $published = ([DateTimeOffset]$latest.published_at).ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+    $published = ([DateTimeOffset]$latest.published_at).ToOffset([TimeSpan]::FromHours(8)).ToString('yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
     @{
         LatestVersion = $Version
         ReleaseDate = $published
