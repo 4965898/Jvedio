@@ -15,6 +15,7 @@ $dbDll = Join-Path $repoRoot 'Jvedio-WPF\Jvedio\Core\Crawler\Db2\DbCrawler\bin\R
 $stage = Join-Path $artifacts ('.stage-' + [guid]::NewGuid().ToString('N'))
 $package = Join-Path $stage ('Jvedio-' + $Version)
 $zip = Join-Path $artifacts ('Jvedio-' + $Version + '.zip')
+$exe = Join-Path $artifacts ('Jvedio-' + $Version + '.exe')
 
 function Assert-StagePath([string]$Path) {
     $full = [IO.Path]::GetFullPath($Path)
@@ -105,7 +106,13 @@ try {
         $archive.Dispose()
     }
 
-    Write-Output (Get-Item -LiteralPath $zip)
+    Copy-Item -LiteralPath (Join-Path $package 'Jvedio.exe') -Destination $exe -Force
+    if ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -ne
+        (Get-FileHash -LiteralPath (Join-Path $package 'Jvedio.exe') -Algorithm SHA256).Hash) {
+        throw 'Standalone EXE differs from the verified ZIP content.'
+    }
+
+    Get-Item -LiteralPath $zip, $exe
 } finally {
     $stageFull = [IO.Path]::GetFullPath($stage)
     $artifactPrefix = [IO.Path]::GetFullPath($artifacts) + [IO.Path]::DirectorySeparatorChar

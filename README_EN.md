@@ -34,7 +34,7 @@ Capture video pictures based on `FFmpeg`, smooth and beautiful application softw
 
 Project：[Jvedio](https://github.com/4965898/Jvedio) | Download：[Latest Version](https://github.com/4965898/Jvedio/releases)
 
-The original in-app upgrade window reads this repository's latest Release and can update from its files. After a new version passes the build on `master`, CI publishes a complete ZIP with runtime dependencies and crawler plugins, then refreshes the upgrade feed. You can also download and extract the ZIP.
+The original in-app upgrade window reads this repository's latest Release and can update from its files. After a new version passes the build on `master`, CI publishes a complete ZIP with runtime dependencies and crawler plugins, a matching compiled EXE, and the upgrade feed. Use the ZIP for a first installation; the separate EXE requires an existing complete installation.
 
 ---
 
@@ -125,6 +125,7 @@ Users : [User Guide](Jvedio-WPF/Document/Wiki/5.0/02-Beginning.md)
 | 5.4.1.50 (Jvedio29.58) | 2026-09-29 | Update checks now use this repository's Releases; About, Feedback and Help open this repository or its maintained documentation; a lock protects both task enqueue and worker shutdown, eliminating the queue race and the 4-second fallback; CI builds, verifies and publishes the complete ZIP automatically |
 | 5.4.1.51 (Jvedio29.59) | 2026-09-29 | Restored the original upgrade dialog. Its latest version, download link, and update files now come from this repository's Releases; CI also publishes the dialog's compatible update feed. |
 | 5.4.1.52 (Jvedio29.60) | 2026-09-29 | Release details in the original dialog wrap and scroll vertically, Release notes state the changes directly, and a red dot appears on the settings gear when an update is available; Start Update is disabled when the remote version is not newer. |
+| 5.4.1.53 (Jvedio29.61) | 2026-09-29 | Releases now include both a verified complete ZIP and a matching compiled EXE; use the EXE to update an existing complete installation, and the ZIP for a first installation. |
 
 
 # Software Characteristics

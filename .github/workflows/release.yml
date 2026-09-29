@@ -86,7 +86,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Jvedio-${{ env.RELEASE_VERSION }}
-          path: artifacts/Jvedio-${{ env.RELEASE_VERSION }}.zip
+          path: |
+            artifacts/Jvedio-${{ env.RELEASE_VERSION }}.zip
+            artifacts/Jvedio-${{ env.RELEASE_VERSION }}.exe
           if-no-files-found: error
 
       - name: Publish verified GitHub Release
@@ -97,6 +99,8 @@ jobs:
         run: |
           $tag = $env:RELEASE_VERSION
           $zip = "artifacts/Jvedio-$tag.zip"
+          $exe = "artifacts/Jvedio-$tag.exe"
+          $expectedAssets = @("Jvedio-$tag.zip", "Jvedio-$tag.exe")
           if ($env:GITHUB_REF_TYPE -ne 'tag') {
             git fetch origin master --no-tags
             if ($LASTEXITCODE -ne 0) { throw 'Could not refresh master.' }
@@ -132,13 +136,13 @@ jobs:
             $release = $existing[0]
             if (-not $release.isDraft) {
               $assetNames = @(gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name')
-              if ($LASTEXITCODE -ne 0 -or "Jvedio-$tag.zip" -notin $assetNames) {
-                throw "Published release $tag is missing its ZIP."
+              if ($LASTEXITCODE -ne 0 -or @($expectedAssets | Where-Object { $_ -notin $assetNames }).Count -gt 0) {
+                throw "Published release $tag is missing its ZIP or EXE."
               }
               Write-Host "Release $tag is already published."
               exit 0
             }
-            gh release upload $tag $zip --repo $env:GITHUB_REPOSITORY --clobber
+            gh release upload $tag $zip $exe --repo $env:GITHUB_REPOSITORY --clobber
             if ($LASTEXITCODE -ne 0) { throw 'Draft release asset upload failed.' }
           } else {
             $row = Get-Content README.md -Encoding utf8 |
@@ -151,13 +155,13 @@ jobs:
             }
             $notesFile = Join-Path $env:RUNNER_TEMP "Jvedio-$tag-notes.md"
             [IO.File]::WriteAllText($notesFile, $cells[3].Trim(), [Text.UTF8Encoding]::new($false))
-            gh release create $tag $zip --repo $env:GITHUB_REPOSITORY --draft --verify-tag --notes-file $notesFile --title "自改$tag"
+            gh release create $tag $zip $exe --repo $env:GITHUB_REPOSITORY --draft --verify-tag --notes-file $notesFile --title "自改$tag"
             if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
           }
 
           $assetNames = @(gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name')
-          if ($LASTEXITCODE -ne 0 -or "Jvedio-$tag.zip" -notin $assetNames) {
-            throw 'Uploaded ZIP could not be verified.'
+          if ($LASTEXITCODE -ne 0 -or @($expectedAssets | Where-Object { $_ -notin $assetNames }).Count -gt 0) {
+            throw 'Uploaded ZIP and EXE could not be verified.'
           }
           gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
