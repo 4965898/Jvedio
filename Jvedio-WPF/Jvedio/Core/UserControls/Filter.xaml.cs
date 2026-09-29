@@ -729,10 +729,8 @@ namespace Jvedio.Core.UserControls
 
         private async void SetPlayable(object sender, RoutedEventArgs e)
         {
-            // 「可播放/不可播放」筛选依赖资源存在性索引（metadata.PathExist），而索引只是
-            // 上次重建时的快照：文件被外部增删/移动、或建立索引时移动硬盘/网络盘未就绪，
-            // 都会让索引与磁盘实际状态相反（可播放筛出不可播放、不可播放筛出可播放）。
-            // 因此选中「不可播放/可播放」时，先按当前磁盘状态现场重建索引，再应用筛选。
+            // 文件状态索引复用近期校验结果，避免每次点击都等待整库扫描。
+            // 移动硬盘状态变化后可用面板上的按钮强制重新校验。
             if (sender is RadioButton button &&
                 playWrapPanel.Children.OfType<RadioButton>().ToList() is List<RadioButton> plays &&
                 plays.IndexOf(button) > 0) {
@@ -740,12 +738,12 @@ namespace Jvedio.Core.UserControls
                 VideoList.onWaiting?.Invoke(LangManager.GetValueByKey("VerifyingFileStatus"), true);
                 bool ok = false;
                 try {
-                    ok = await DataIndexManager.RebuildAsync();
+                    ok = await DataIndexManager.EnsureFreshAsync();
                 } finally {
                     VideoList.onWaiting?.Invoke("", false);
                 }
                 if (ok && !ConfigManager.Settings.PlayableIndexCreated) {
-                    // 现场重建成功，索引已可用，无需用户再手动到【选项-库】建立
+                    // 校验成功，索引已可用，无需用户再手动到【选项-库】建立。
                     ConfigManager.Settings.PlayableIndexCreated = true;
                     ConfigManager.Settings.Save();
                 }
@@ -810,8 +808,7 @@ namespace Jvedio.Core.UserControls
 
         private async void SetSubtitleExist(object sender, RoutedEventArgs e)
         {
-            // 与「可播放」同理：字幕索引（metadata.SubtitleExist）只是上次重建时的快照，
-            // 点击「有字幕/无字幕」时先按当前磁盘状态现场重建，再应用筛选
+            // 字幕筛选同样复用最近一次文件状态校验。
             RadioButton clicked = sender as RadioButton;
             if (clicked == _lastCheckedSubRadio) {
                 clicked.IsChecked = false;
@@ -820,13 +817,25 @@ namespace Jvedio.Core.UserControls
                 _lastCheckedSubRadio = clicked;
             }
 
+            if (clicked != null && clicked.IsChecked == true) {
+                VideoList.onWaiting?.Invoke(LangManager.GetValueByKey("VerifyingFileStatus"), true);
+                try {
+                    await DataIndexManager.EnsureFreshAsync();
+                } finally {
+                    VideoList.onWaiting?.Invoke("", false);
+                }
+            }
+            ApplyFilter();
+        }
+
+        private async void RefreshFileIndex(object sender, RoutedEventArgs e)
+        {
             VideoList.onWaiting?.Invoke(LangManager.GetValueByKey("VerifyingFileStatus"), true);
             try {
-                await DataIndexManager.RebuildAsync();
+                if (await DataIndexManager.RebuildAsync()) ApplyFilter();
             } finally {
                 VideoList.onWaiting?.Invoke("", false);
             }
-            ApplyFilter();
         }
 
         

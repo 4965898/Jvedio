@@ -25,6 +25,7 @@ namespace Jvedio.Core.WindowConfig
             Prefix = string.Empty;
             AutoBackupPeriodIndex = DEFAULT_BACKUP_PERIOD_INDEX;
             AutoBackup = true;
+            ProtectExistingScrapeFields = true;
             DetailShowBg = true;
             CurrentLanguage = "zh-CN";
             DownloadWhenTitleNull = true;
@@ -132,6 +133,26 @@ SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
         public bool AutoBackup { get; set; }
 
         public long AutoBackupPeriodIndex { get; set; }
+
+        /// <summary>留空时沿用原有用户目录下的 backup 文件夹。</summary>
+        public string BackupDirectory { get; set; }
+
+        /// <summary>None、WebDAV 或 S3。在线备份保留带时间戳的快照及 latest.json。</summary>
+        public string BackupRemoteType { get; set; }
+        public string BackupWebDavUrl { get; set; }
+        public string BackupWebDavUser { get; set; }
+        public string BackupWebDavPasswordProtected { get; set; }
+        public string BackupS3Endpoint { get; set; }
+        public string BackupS3Region { get; set; }
+        public string BackupS3Bucket { get; set; }
+        public string BackupS3Prefix { get; set; }
+        public string BackupS3AccessKey { get; set; }
+        public string BackupS3SecretKeyProtected { get; set; }
+
+        /// <summary>默认仅显示红点；用户仍可从齿轮菜单打开升级窗口。</summary>
+        public bool OpenUpgradeWindowAutomatically { get; set; }
+        public string IgnoredUpgradeVersion { get; set; }
+        public bool ProtectExistingScrapeFields { get; set; }
 
         // 是否建立可播放索引
         public bool PlayableIndexCreated { get; set; }

@@ -1,4 +1,5 @@
 using Jvedio.Core.Config;
+using Jvedio.Core.Backup;
 using Jvedio.Core.Crawler;
 using Jvedio.Core.Enums;
 using Jvedio.Core.Global;
@@ -79,6 +80,7 @@ namespace Jvedio
         private CrawlerServer currentCrawlerServer { get; set; }
 
         private bool IndexCanceled { get; set; } = false;
+        private bool _BackupBusy;
 
 
         #endregion
@@ -260,6 +262,7 @@ namespace Jvedio
             this.DataContext = vieModel;
 
             Init();
+            LoadBackupSettings();
 
         }
 
@@ -967,6 +970,7 @@ namespace Jvedio
             ConfigManager.Settings.IgnoreCertVal = vieModel.IgnoreCertVal;
             ConfigManager.Settings.AutoBackup = vieModel.AutoBackup;
             ConfigManager.Settings.AutoBackupPeriodIndex = vieModel.AutoBackupPeriodIndex;
+            SaveBackupSettings();
             ConfigManager.Settings.SyncConcurrency = vieModel.SyncConcurrency;
             if (vieModel.AutoRebuildImageIndexCount < 0)
                 vieModel.AutoRebuildImageIndexCount = 0;
@@ -1361,6 +1365,122 @@ namespace Jvedio
             }
             if (success)
                 MessageCard.Success($"{LangManager.GetValueByKey("ExportSuccess")} {count}");
+        }
+
+        private void LoadBackupSettings()
+        {
+            var s = ConfigManager.Settings;
+            BackupDirectoryBox.Text = s.BackupDirectory ?? string.Empty;
+            BackupRemoteTypeBox.SelectedIndex = s.BackupRemoteType == "WebDAV" ? 1 : s.BackupRemoteType == "S3" ? 2 : 0;
+            BackupWebDavUrlBox.Text = s.BackupWebDavUrl ?? string.Empty;
+            BackupWebDavUserBox.Text = s.BackupWebDavUser ?? string.Empty;
+            BackupS3EndpointBox.Text = s.BackupS3Endpoint ?? string.Empty;
+            BackupS3RegionBox.Text = s.BackupS3Region ?? string.Empty;
+            BackupS3BucketBox.Text = s.BackupS3Bucket ?? string.Empty;
+            BackupS3PrefixBox.Text = s.BackupS3Prefix ?? string.Empty;
+            BackupS3AccessKeyBox.Text = s.BackupS3AccessKey ?? string.Empty;
+            try {
+                BackupWebDavPasswordBox.Password = RemoteBackupStore.Unprotect(s.BackupWebDavPasswordProtected);
+                BackupS3SecretBox.Password = RemoteBackupStore.Unprotect(s.BackupS3SecretKeyProtected);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                BackupStatusText.Text = LangManager.GetValueByKey("BackupDecryptFailed");
+            }
+        }
+
+        private void SaveBackupSettings()
+        {
+            var s = ConfigManager.Settings;
+            s.BackupDirectory = BackupDirectoryBox.Text?.Trim();
+            s.BackupRemoteType = BackupRemoteTypeBox.SelectedIndex == 1 ? "WebDAV" :
+                BackupRemoteTypeBox.SelectedIndex == 2 ? "S3" : "None";
+            s.BackupWebDavUrl = BackupWebDavUrlBox.Text?.Trim();
+            s.BackupWebDavUser = BackupWebDavUserBox.Text?.Trim();
+            s.BackupWebDavPasswordProtected = RemoteBackupStore.Protect(BackupWebDavPasswordBox.Password);
+            s.BackupS3Endpoint = BackupS3EndpointBox.Text?.Trim();
+            s.BackupS3Region = BackupS3RegionBox.Text?.Trim();
+            s.BackupS3Bucket = BackupS3BucketBox.Text?.Trim();
+            s.BackupS3Prefix = BackupS3PrefixBox.Text?.Trim();
+            s.BackupS3AccessKey = BackupS3AccessKeyBox.Text?.Trim();
+            s.BackupS3SecretKeyProtected = RemoteBackupStore.Protect(BackupS3SecretBox.Password);
+        }
+
+        private void SelectBackupDirectory(object sender, RoutedEventArgs e)
+        {
+            using (var dialog = new System.Windows.Forms.FolderBrowserDialog()) {
+                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    BackupDirectoryBox.Text = dialog.SelectedPath;
+            }
+        }
+
+        private async void CreateBackupNow(object sender, RoutedEventArgs e)
+        {
+            if (_BackupBusy) return;
+            _BackupBusy = true;
+            BackupStatusText.Text = LangManager.GetValueByKey("BackupCreating");
+            try {
+                SaveSettings();
+                ConfigManager.Settings.Save();
+                string folder = await BackupService.CreateAsync(true);
+                BackupStatusText.Text = string.Format(LangManager.GetValueByKey("BackupCreated"), folder);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                BackupStatusText.Text = string.Format(LangManager.GetValueByKey("BackupFailed"), ex.Message);
+            } finally {
+                _BackupBusy = false;
+            }
+        }
+
+        private async void RestoreBackupZip(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "Jvedio 备份 ZIP (*.zip)|*.zip" };
+            if (dialog.ShowDialog() == true) await StageBackupRestore(dialog.FileName);
+        }
+
+        private async void RestoreBackupFolder(object sender, RoutedEventArgs e)
+        {
+            using (var dialog = new System.Windows.Forms.FolderBrowserDialog()) {
+                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    await StageBackupRestore(dialog.SelectedPath);
+            }
+        }
+
+        private async void RestoreRemoteBackup(object sender, RoutedEventArgs e)
+        {
+            if (_BackupBusy) return;
+            _BackupBusy = true;
+            string archive = null;
+            try {
+                SaveSettings();
+                ConfigManager.Settings.Save();
+                BackupStatusText.Text = LangManager.GetValueByKey("BackupDownloading");
+                archive = await RemoteBackupStore.DownloadLatestAsync(BackupService.LocalRoot);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                BackupStatusText.Text = string.Format(LangManager.GetValueByKey("RemoteRestoreFailed"), ex.Message);
+            } finally {
+                _BackupBusy = false;
+            }
+            if (!string.IsNullOrEmpty(archive)) await StageBackupRestore(archive);
+        }
+
+        private async Task StageBackupRestore(string source)
+        {
+            if (_BackupBusy) return;
+            if (new MsgBox(LangManager.GetValueByKey("RestoreConfirm")).ShowDialog(this) != true)
+                return;
+            _BackupBusy = true;
+            BackupStatusText.Text = LangManager.GetValueByKey("RestorePreparing");
+            try {
+                await Task.Run(() => BackupService.StageRestore(source));
+                BackupStatusText.Text = LangManager.GetValueByKey("RestoreReady");
+                Application.Current.Shutdown();
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                BackupStatusText.Text = string.Format(LangManager.GetValueByKey("RestoreStageFailed"), ex.Message);
+            } finally {
+                _BackupBusy = false;
+            }
         }
 
         private static Jvedio.Core.Export.ExportHelper.ExportFormat GetExportFormat(int filterIndex)

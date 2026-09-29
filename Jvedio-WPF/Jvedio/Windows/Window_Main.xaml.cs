@@ -87,6 +87,7 @@ namespace Jvedio
 
         private Window_Server window_Server { get; set; }
         private bool CanDragTabItem { get; set; } = false;
+        private string _LatestAvailableVersion;
 
         private FrameworkElement CurrentDragElement { get; set; }
 
@@ -703,8 +704,11 @@ namespace Jvedio
                 await Task.Delay(UpgradeHelper.AUTO_CHECK_UPGRADE_DELAY);
                 (string LatestVersion, string ReleaseDate, string ReleaseNote) result = await UpgradeHelper.GetUpgradeInfo();
                 bool hasUpdate = UpgradeHelper.HasNewVersion(result.LatestVersion);
-                UpdateBadge.Visibility = hasUpdate ? Visibility.Visible : Visibility.Collapsed;
-                if (hasUpdate)
+                _LatestAvailableVersion = hasUpdate ? result.LatestVersion : null;
+                bool notify = hasUpdate && !string.Equals(result.LatestVersion,
+                    ConfigManager.Settings.IgnoredUpgradeVersion, StringComparison.OrdinalIgnoreCase);
+                UpdateBadge.Visibility = notify ? Visibility.Visible : Visibility.Collapsed;
+                if (notify && ConfigManager.Settings.OpenUpgradeWindowAutomatically)
                     UpgradeHelper.OpenWindow();
             } catch (Exception ex) {
                 Logger.Error(ex);
@@ -735,6 +739,11 @@ namespace Jvedio
         {
             vieModel.TabItemManager
                 .Add(TabType.GeoTask, LangManager.GetValueByKey("TranslateTask"), TaskType.Translate);
+        }
+
+        private void ShowLibraryHealth(object sender, MouseButtonEventArgs e)
+        {
+            new Windows.Window_LibraryHealth(ConfigManager.Main.CurrentDBId) { Owner = this }.ShowDialog();
         }
 
         private void ShowMsgScanPopup(object sender, MouseButtonEventArgs e)
@@ -1067,6 +1076,14 @@ namespace Jvedio
         private void ShowUpgradeWindow(object sender, RoutedEventArgs e)
         {
             UpgradeHelper.OpenWindow();
+        }
+
+        private void IgnoreCurrentUpgrade(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_LatestAvailableVersion)) return;
+            ConfigManager.Settings.IgnoredUpgradeVersion = _LatestAvailableVersion;
+            ConfigManager.Settings.Save();
+            UpdateBadge.Visibility = Visibility.Collapsed;
         }
 
         private void ShowAbout(object sender, RoutedEventArgs e)

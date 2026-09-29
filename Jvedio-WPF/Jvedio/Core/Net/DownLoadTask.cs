@@ -1,4 +1,6 @@
 using Jvedio.Core.Enums;
+using Jvedio.Core.Crawler;
+using Jvedio.Windows;
 using Jvedio.Core.Exceptions;
 using Jvedio.Core.Utils;
 using Jvedio.Entity;
@@ -16,6 +18,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows;
 using static Jvedio.MapperManager;
 
 namespace Jvedio.Core.Net
@@ -39,6 +42,8 @@ namespace Jvedio.Core.Net
         public DataType DataType { get; set; }
 
         public bool OverrideInfo { get; set; }// 强制下载覆盖信息
+        public bool PreviewInfo { get; set; }
+        private HashSet<string> _AllowedMetadataFields;
 
         #endregion
 
@@ -273,6 +278,8 @@ namespace Jvedio.Core.Net
 
         public async Task<bool> DownloadActors(Video video, Dictionary<string, object> dict, VideoDownLoader downLoader, RequestHeader header)
         {
+            if (_AllowedMetadataFields != null && !_AllowedMetadataFields.Contains("ActorNames"))
+                return true;
             object names = GetInfoFromExist("ActorNames", video, dict);
             object urls = GetInfoFromExist("ActressImageUrl", video, dict);
             object enNames = GetInfoFromExist("ActorNameEN", video, dict);
@@ -454,7 +461,27 @@ namespace Jvedio.Core.Net
                 StatusText = "2.1 同步信息成功";
             }
 
-            bool downloadInfo = video.ParseDictInfo(dict); // 是否从网络上刮削了信息
+            bool protect = ConfigManager.Settings.ProtectExistingScrapeFields;
+            HashSet<string> selected = new HashSet<string>(ScrapeFieldPolicy.Available(dict)
+                .Where(field => !protect || !ScrapeFieldPolicy.HasExistingValue(video, field)));
+            if (PreviewInfo) {
+                Func<HashSet<string>> showPreview = () => {
+                    var window = new Window_ScrapePreview(video, dict, protect) {
+                        Owner = Application.Current.MainWindow
+                    };
+                    return window.ShowDialog() == true ? window.SelectedFields : null;
+                };
+                selected = Application.Current.Dispatcher.Invoke(showPreview);
+                if (selected == null) {
+                    Message = "用户取消刮削结果预览";
+                    FinalizeWithCancel();
+                    return false;
+                }
+            }
+            _AllowedMetadataFields = selected;
+            Dictionary<string, object> merge = ScrapeFieldPolicy.MergeDictionary(dict, selected);
+            if (merge.Count == 0) return true;
+            bool downloadInfo = video.ParseDictInfo(merge); // 只写入用户选中的字段，保留本地识别码和路径
             if (downloadInfo) {
                 StatusText = LangManager.GetValueByKey("SaveToLibrary");
                 // 并发锁
@@ -605,9 +632,10 @@ namespace Jvedio.Core.Net
         }
 
         #region "对外静态方法"
-        public static void DownloadVideo(Video video)
+        public static void DownloadVideo(Video video, bool previewInfo = false)
         {
-            DownLoadTask downloadTask = new DownLoadTask(video, ConfigManager.DownloadConfig.DownloadPreviewImage, ConfigManager.DownloadConfig.OverrideInfo);
+            DownLoadTask downloadTask = new DownLoadTask(video, ConfigManager.DownloadConfig.DownloadPreviewImage,
+                previewInfo || ConfigManager.DownloadConfig.OverrideInfo) { PreviewInfo = previewInfo };
 
             if (App.DownloadManager.Exists(downloadTask)) {
                 MessageNotify.Warning(LangManager.GetValueByKey("TaskExists"));

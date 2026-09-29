@@ -526,6 +526,7 @@
                             <Grid.ContextMenu>
                                 <ContextMenu Opacity="0.8" PreviewKeyUp="ContextMenu_PreviewKeyUp">
                                     <MenuItem Click="DownLoad" Header="{DynamicResource Menu_SyncInfo}" />
+                                    <MenuItem Click="PreviewAndDownLoad" Header="{DynamicResource PreviewScrapeInfo}" />
                                     <MenuItem Header="{DynamicResource Menu_Advance}">
                                         <MenuItem Click="GetScreenShot" Header="{DynamicResource Menu_GenerateScreenShot}" />
                                         <MenuItem Click="GetScreenGif" Header="{DynamicResource Menu_GenerateGif}" />

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
 using static Jvedio.App;
 using static Jvedio.MapperManager;
 
@@ -21,6 +22,9 @@ namespace Jvedio.Core.Tasks
         private static bool _Rebuilding = false;
 
         private static bool _PendingRebuild = false;
+        private static readonly SemaphoreSlim RebuildGate = new SemaphoreSlim(1, 1);
+        private static DateTime _LastVerifiedUtc = DateTime.MinValue;
+        public static DateTime LastVerifiedLocal => _LastVerifiedUtc == DateTime.MinValue ? DateTime.MinValue : _LastVerifiedUtc.ToLocalTime();
 
         /// <summary>
         /// 全量静默重建 metadata.PathExist（与「选项-库」手动建立资源存在索引逻辑一致）。
@@ -35,12 +39,14 @@ namespace Jvedio.Core.Tasks
                 }
                 _Rebuilding = true;
             }
-            Task.Run(() => {
+            Task.Run(async () => {
+                await RebuildGate.WaitAsync();
                 try {
                     RebuildOnce();
                 } catch (Exception ex) {
                     Logger.Error(ex);
                 } finally {
+                    RebuildGate.Release();
                     lock (LockObj)
                         _Rebuilding = false;
                     bool rerun = false;
@@ -61,9 +67,11 @@ namespace Jvedio.Core.Tasks
             // 只取 DataID + Path 两列原始数据，避免把整表映射成 MetaData 实体
             // （MetaData 的 Genre/Label 等 setter 会为每行构建 ObservableCollection，数万行映射非常重，
             //   且 metaDataMapper.SelectList 全列读取长时间占住 Mapper 锁，会与筛选查询撞车导致卡顿）
-            List<Dictionary<string, object>> rows = metaDataMapper.Select("select DataID, Path from metadata");
-            if (rows == null || rows.Count == 0)
+            List<Dictionary<string, object>> rows = metaDataMapper.Select("select DataID, Path, PathExist, SubtitleExist from metadata");
+            if (rows == null || rows.Count == 0) {
+                _LastVerifiedUtc = DateTime.UtcNow;
                 return;
+            }
 
             List<long> exist = new List<long>(rows.Count);
             List<long> missing = new List<long>();
@@ -81,15 +89,15 @@ namespace Jvedio.Core.Tasks
                 if (!long.TryParse(idObj.ToString(), out long id) || id <= 0)
                     continue;
                 string path = row.TryGetValue("Path", out object pathObj) ? pathObj?.ToString() : null;
-                if (string.IsNullOrEmpty(path) || !File.Exists(path)) {
-                    missing.Add(id);
-                    noSub.Add(id); // 视频文件不存在时字幕状态无意义，按无字幕处理
-                } else {
-                    exist.Add(id);
-                    if (HasSubtitleCached(path, srtDirCache))
-                        hasSub.Add(id);
-                    else
-                        noSub.Add(id);
+                bool fileExists = !string.IsNullOrEmpty(path) && File.Exists(path);
+                bool subtitleExists = fileExists && HasSubtitleCached(path, srtDirCache);
+                int oldPath = row.TryGetValue("PathExist", out object oldPathValue) && int.TryParse(oldPathValue?.ToString(), out int p) ? p : -1;
+                int oldSub = row.TryGetValue("SubtitleExist", out object oldSubValue) && int.TryParse(oldSubValue?.ToString(), out int s) ? s : -1;
+                if (oldPath != (fileExists ? 1 : 0)) {
+                    if (fileExists) exist.Add(id); else missing.Add(id);
+                }
+                if (oldSub != (subtitleExists ? 1 : 0)) {
+                    if (subtitleExists) hasSub.Add(id); else noSub.Add(id);
                 }
             }
 
@@ -100,6 +108,7 @@ namespace Jvedio.Core.Tasks
             UpdateChunked(missing, "PathExist", 0, CHUNK);
             UpdateChunked(hasSub, "SubtitleExist", 1, CHUNK);
             UpdateChunked(noSub, "SubtitleExist", 0, CHUNK);
+            _LastVerifiedUtc = DateTime.UtcNow;
             Logger.Info($"data index auto rebuilt silently, {rows.Count} rows");
         }
 
@@ -138,11 +147,7 @@ namespace Jvedio.Core.Tasks
             for (int i = 0; i < ids.Count; i += chunkSize) {
                 int count = Math.Min(chunkSize, ids.Count - i);
                 List<long> chunk = ids.GetRange(i, count);
-                try {
-                    videoMapper.ExecuteNonQuery($"update metadata set {field}={value} where DataID in ({string.Join(",", chunk)});");
-                } catch (Exception ex) {
-                    Logger.Error(ex);
-                }
+                videoMapper.ExecuteNonQuery($"update metadata set {field}={value} where DataID in ({string.Join(",", chunk)});");
             }
         }
 
@@ -152,17 +157,33 @@ namespace Jvedio.Core.Tasks
         /// 移动硬盘/网络盘尚未就绪，都会让索引与实际相反（可播放筛出不可播放、反之亦然）。
         /// 现场重建保证筛选结果与点击那一刻的磁盘状态一致。
         /// </summary>
-        public static Task<bool> RebuildAsync()
+        public static async Task<bool> RebuildAsync()
         {
-            return Task.Run(() => {
-                try {
-                    RebuildOnce();
-                    return true;
-                } catch (Exception ex) {
-                    Logger.Error(ex);
-                    return false;
-                }
-            });
+            await RebuildGate.WaitAsync();
+            try {
+                await Task.Run(() => RebuildOnce());
+                return true;
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                return false;
+            } finally {
+                RebuildGate.Release();
+            }
+        }
+
+        /// <summary>普通切换复用近期校验结果；用户可从筛选页显式要求立即校验。</summary>
+        public static async Task<bool> EnsureFreshAsync()
+        {
+            if (DateTime.UtcNow - _LastVerifiedUtc < TimeSpan.FromMinutes(5)) return true;
+            await RebuildGate.WaitAsync();
+            try {
+                if (DateTime.UtcNow - _LastVerifiedUtc < TimeSpan.FromMinutes(5)) return true;
+                await Task.Run(() => RebuildOnce());
+                return true;
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                return false;
+            } finally { RebuildGate.Release(); }
         }
 
         /// <summary>

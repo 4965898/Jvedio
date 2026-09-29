@@ -439,6 +439,13 @@ namespace Jvedio
             DownLoadTask.DownloadVideo(video);
         }
 
+        private void PreviewAndDownLoad(object sender, RoutedEventArgs e)
+        {
+            Video video = vieModel.CurrentVideo;
+            if (video == null || video.DataID <= 0) return;
+            DownLoadTask.DownloadVideo(video, true);
+        }
+
 
 
         public void OnDownloadPreview(long dataID, string path, byte[] fileByte)

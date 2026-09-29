@@ -175,6 +175,9 @@
                                     Content="{DynamicResource NotShowLibrary}"
                                     IsChecked="{Binding OpenDataBaseDefault, Mode=TwoWay}" />
                                 <CheckBox Content="{DynamicResource ScanDirWhenStartUp}" IsChecked="{Binding ScanOnStartUp, Mode=TwoWay}" />
+                                <CheckBox
+                                    Content="{DynamicResource AutoUpgradeDialog}"
+                                    IsChecked="{Binding OpenUpgradeWindowAutomatically, Mode=TwoWay, Source={x:Static config:ConfigManager.Settings}}" />
 
                             </StackPanel>
 
@@ -510,6 +513,7 @@
 
                                 </StackPanel>
 
+
                             </StackPanel>
                         </Grid>
 
@@ -752,6 +756,7 @@
                                     <CheckBox Content="标题为空才同步信息" IsChecked="{Binding DownloadWhenTitleNull, Mode=TwoWay}" />
                                     <CheckBox Content="{DynamicResource SkipDownloadImage}" IsChecked="{Binding SkipExistImage, Mode=TwoWay}" />
                                     <CheckBox Content="{DynamicResource ForcedFetchInfo}" IsChecked="{Binding OverrideInfo, Source={x:Static config:ConfigManager.DownloadConfig}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <CheckBox Content="{DynamicResource ProtectScrapeFields}" IsChecked="{Binding ProtectExistingScrapeFields, Mode=TwoWay, Source={x:Static config:ConfigManager.Settings}}" />
 
                                     <StackPanel Margin="5" Orientation="Horizontal">
                                         <TextBlock
@@ -2080,6 +2085,50 @@
                                     </ComboBox>
                                 </StackPanel>
 
+                                <TextBlock Margin="5,8,5,2" Text="{DynamicResource BackupDirectoryLabel}" />
+                                <DockPanel Margin="5">
+                                    <Button DockPanel.Dock="Right" Click="SelectBackupDirectory" Content="{DynamicResource Browse}" />
+                                    <TextBox x:Name="BackupDirectoryBox" MinWidth="320" Style="{StaticResource SettingBaseTextBox}" />
+                                </DockPanel>
+                                <TextBlock Margin="5,8,5,2" Text="{DynamicResource BackupRemoteLabel}" />
+                                <ComboBox x:Name="BackupRemoteTypeBox" Width="200" Margin="5" HorizontalAlignment="Left" Style="{StaticResource BorderComboBox}">
+                                    <ComboBoxItem Content="{DynamicResource BackupRemoteNone}" />
+                                    <ComboBoxItem Content="WebDAV" />
+                                    <ComboBoxItem Content="S3" />
+                                </ComboBox>
+                                <Expander Margin="5" Header="WebDAV">
+                                    <StackPanel Margin="5">
+                                        <TextBlock Text="URL（HTTPS）" />
+                                        <TextBox x:Name="BackupWebDavUrlBox" Style="{StaticResource SettingBaseTextBox}" />
+                                        <TextBlock Text="{DynamicResource BackupUserLabel}" />
+                                        <TextBox x:Name="BackupWebDavUserBox" Style="{StaticResource SettingBaseTextBox}" />
+                                        <TextBlock Text="{DynamicResource BackupPasswordLabel}" />
+                                        <PasswordBox x:Name="BackupWebDavPasswordBox" />
+                                    </StackPanel>
+                                </Expander>
+                                <Expander Margin="5" Header="S3">
+                                    <StackPanel Margin="5">
+                                        <TextBlock Text="Endpoint（HTTPS，留空使用 AWS）" />
+                                        <TextBox x:Name="BackupS3EndpointBox" Style="{StaticResource SettingBaseTextBox}" />
+                                        <TextBlock Text="Region" />
+                                        <TextBox x:Name="BackupS3RegionBox" Style="{StaticResource SettingBaseTextBox}" />
+                                        <TextBlock Text="Bucket" />
+                                        <TextBox x:Name="BackupS3BucketBox" Style="{StaticResource SettingBaseTextBox}" />
+                                        <TextBlock Text="Prefix" />
+                                        <TextBox x:Name="BackupS3PrefixBox" Style="{StaticResource SettingBaseTextBox}" />
+                                        <TextBlock Text="Access Key ID" />
+                                        <TextBox x:Name="BackupS3AccessKeyBox" Style="{StaticResource SettingBaseTextBox}" />
+                                        <TextBlock Text="Secret Access Key" />
+                                        <PasswordBox x:Name="BackupS3SecretBox" />
+                                    </StackPanel>
+                                </Expander>
+                                <WrapPanel Margin="5">
+                                    <Button Margin="2" Click="CreateBackupNow" Content="{DynamicResource BackupNow}" />
+                                    <Button Margin="2" Click="RestoreBackupZip" Content="{DynamicResource RestoreBackupZip}" />
+                                    <Button Margin="2" Click="RestoreBackupFolder" Content="{DynamicResource RestoreBackupFolder}" />
+                                    <Button Margin="2" Click="RestoreRemoteBackup" Content="{DynamicResource RestoreRemoteBackup}" />
+                                </WrapPanel>
+                                <TextBlock x:Name="BackupStatusText" Margin="5" TextWrapping="Wrap" />
                             </StackPanel>
                         </Grid>
                         <Grid>

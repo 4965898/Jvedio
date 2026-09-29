@@ -234,6 +234,7 @@
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Net.Http" />
+    <Reference Include="System.Security" />
     <Reference Include="System.Xaml">
       <RequiredTargetFramework>4.0</RequiredTargetFramework>
     </Reference>
@@ -428,6 +429,11 @@
     <Compile Include="Core\Tasks\DownloadManager.cs" />
     <Compile Include="Core\Tasks\ImageIndexManager.cs" />
     <Compile Include="Core\Tasks\DataIndexManager.cs" />
+    <Compile Include="Core\Services\BackupService.cs" />
+    <Compile Include="Core\Services\RemoteBackupStore.cs" />
+    <Compile Include="Core\Services\ScrapeFieldPolicy.cs" />
+    <Compile Include="Windows\Window_LibraryHealth.cs" />
+    <Compile Include="Windows\Window_ScrapePreview.cs" />
     <Compile Include="Core\Tasks\DurationIndexManager.cs" />
     <Compile Include="Core\Tasks\TranslateTaskManager.cs" />
     <Compile Include="Core\Translation\TranslateManager.cs" />

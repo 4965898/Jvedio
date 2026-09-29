@@ -805,11 +805,20 @@
                 Margin="5"
                 Background="{DynamicResource Window.Side.Background}">
 
+                <StackPanel Orientation="Horizontal">
                 <Button
                     MinWidth="100"
                     Click="ApplyFilter"
                     Content="{DynamicResource Apply}"
                     Style="{StaticResource ButtonPrimary}" />
+                <Button
+                    MinWidth="100"
+                    Margin="8,0,0,0"
+                    Click="RefreshFileIndex"
+                    Content="{DynamicResource RefreshFileStatus}"
+                    ToolTip="{DynamicResource RefreshFileStatusTip}"
+                    Style="{StaticResource ButtonPrimary}" />
+                </StackPanel>
 
             </Grid>
         </Grid>

@@ -1,5 +1,6 @@
 ﻿using Jvedio.Core.Config;
 using Jvedio.Core.DataBase;
+using Jvedio.Core.Backup;
 using Jvedio.Core.Enums;
 using Jvedio.Core.Exceptions;
 using Jvedio.Core.Global;
@@ -128,6 +129,14 @@ namespace Jvedio
 
             EnsureFileExists();
             EnsureDirExists();
+
+            // 数据库连接建立前应用经校验的待恢复快照。
+            try {
+                BackupService.ApplyPendingRestore();
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                MessageCard.Error(string.Format(LangManager.GetValueByKey("StartupRestoreFailed"), ex.Message));
+            }
 
             InitMapper(); // 初始化数据库
             ConfigManager.Init(() => SetLang()); // 从数据库加载应用配置
@@ -262,43 +271,27 @@ namespace Jvedio
 
         private async Task<bool> BackupData()
         {
-            if (ConfigManager.Settings.AutoBackup) {
-                int period = Jvedio.Core.WindowConfig.Settings.BackUpPeriods[(int)ConfigManager.Settings.AutoBackupPeriodIndex];
-                bool backup = false;
-                string[] arr = DirHelper.TryGetDirList(PathManager.BackupPath);
-                if (arr != null && arr.Length > 0) {
-                    string dirname = arr[arr.Length - 1];
-                    if (Directory.Exists(dirname)) {
-                        string dirName = Path.GetFileName(dirname);
-                        DateTime before = DateTime.Now.AddDays(1);
-                        DateTime now = DateTime.Now;
-                        DateTime.TryParse(dirName, out before);
-                        if (now.CompareTo(before) < 0 || (now - before).TotalDays > period) {
-                            backup = true;
-                        }
-                    }
-                } else {
-                    backup = true;
-                }
-
-                if (backup) {
-                    string dir = Path.Combine(BackupPath, DateHelper.NowDate());
-                    DirHelper.TryCreateDirectory(dir, (Action<Exception>)((err) => {
-                        Logger.Error(err);
-                        return;
-                    }));
-                    string target1 = Path.Combine(dir, "app_configs.sqlite");
-                    string target2 = Path.Combine(dir, "app_datas.sqlite");
-                    string target3 = Path.Combine(dir, "image");
-                    FileHelper.TryCopyFile(SqlManager.DEFAULT_SQLITE_CONFIG_PATH, target1);
-                    FileHelper.TryCopyFile(SqlManager.DEFAULT_SQLITE_PATH, target2);
-                    string origin = Path.Combine(CurrentUserFolder, "image");
-                    DirHelper.TryCopy(origin, target3);
-                }
+            if (!ConfigManager.Settings.AutoBackup) return true;
+            try {
+                int index = (int)ConfigManager.Settings.AutoBackupPeriodIndex;
+                int period = Jvedio.Core.WindowConfig.Settings.BackUpPeriods[Math.Max(0,
+                    Math.Min(index, Jvedio.Core.WindowConfig.Settings.BackUpPeriods.Count - 1))];
+                string root = BackupService.LocalRoot;
+                DateTime latest = Directory.Exists(root)
+                    ? Directory.EnumerateDirectories(root).Select(Path.GetFileName)
+                        .Select(name => DateTime.TryParseExact(name,
+                            new[] { "yyyy-MM-dd_HHmmss_fff", "yyyy-MM-dd_HHmmss", "yyyy-MM-dd" },
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.DateTimeStyles.None, out DateTime value) ? value : DateTime.MinValue)
+                        .DefaultIfEmpty(DateTime.MinValue).Max()
+                    : DateTime.MinValue;
+                if ((DateTime.Now - latest).TotalDays >= period)
+                    await BackupService.CreateAsync(true);
+                return true;
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                return false;
             }
-
-            await Task.Delay(1);
-            return false;
         }
 
         private async Task<bool> MoveOldFiles()

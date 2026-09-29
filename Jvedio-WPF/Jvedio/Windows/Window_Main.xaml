@@ -200,6 +200,7 @@
                 Click="ShowUpgradeWindow"
                 Header="{DynamicResource CheckUpgrade}"
                 Icon="/Resources/Picture/update.png" />
+            <MenuItem Click="IgnoreCurrentUpgrade" Header="{DynamicResource IgnoreThisUpdate}" />
 
         </ContextMenu>
 
@@ -908,6 +909,12 @@
                         </Border>
 
                     </Grid>
+                    <!--  资料体检中心：与任务图标同为 30x30，位于翻译任务左侧  -->
+                    <super:PathMsg
+                        MouseLeftButtonUp="ShowLibraryHealth"
+                        Path="M512 48L864 184V468C864 708 724 868 512 968C300 868 160 708 160 468V184L512 48ZM512 146L248 248V468C248 652 348 784 512 870C676 784 776 652 776 468V248L512 146ZM454 632L348 526L397 477L454 534L630 358L679 407L454 632Z"
+                        Style="{StaticResource NormalPathMsg}"
+                        ToolTip="{DynamicResource LibraryHealth}" />
                     <!--  翻译任务（文+T 图标），点击打开翻译任务页  -->
                     <Border
                         Name="msgTranslate"

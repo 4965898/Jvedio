@@ -27,6 +27,7 @@ namespace Jvedio.Core.Tasks
         public bool DownloadPreview { get; set; }
 
         public bool OverrideInfo { get; set; }
+        public bool PreviewInfo { get; set; }
 
         public int Status { get; set; }
 
@@ -291,6 +292,7 @@ namespace Jvedio.Core.Tasks
                 Title = task.Title,
                 DownloadPreview = task.DownloadPreview,
                 OverrideInfo = task.OverrideInfo,
+                PreviewInfo = task.PreviewInfo,
                 Status = (int)task.Status,
                 CreateTime = task.CreateTime,
             };
@@ -355,6 +357,7 @@ namespace Jvedio.Core.Tasks
                         Title = record.Title,
                         DownloadPreview = record.DownloadPreview,
                         OverrideInfo = record.OverrideInfo,
+                        PreviewInfo = record.PreviewInfo,
                         CreateTime = record.CreateTime,
                     };
                     task.onCompleted += OnTaskPersistCompleted;
