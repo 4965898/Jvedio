@@ -111,6 +111,10 @@
     <sys:String x:Key="BackupDirectoryLabel">本地备份目录（留空沿用默认目录）</sys:String>
     <sys:String x:Key="Browse">浏览</sys:String>
     <sys:String x:Key="BackupRemoteLabel">在线备份</sys:String>
+    <sys:String x:Key="BackupWebDavFolderLabel">在线备份子文件夹（相对于 WebDAV URL）</sys:String>
+    <sys:String x:Key="BackupWebDavFolderTip">例如 Jvedio/备份；留空则直接存入上方 URL 指向的文件夹。</sys:String>
+    <sys:String x:Key="BackupS3FolderLabel">在线备份文件夹（存储桶内）</sys:String>
+    <sys:String x:Key="BackupS3FolderTip">例如 Jvedio/备份；留空则存入存储桶根目录，无需提前创建。</sys:String>
     <sys:String x:Key="BackupRemoteNone">不使用</sys:String>
     <sys:String x:Key="BackupUserLabel">用户名</sys:String>
     <sys:String x:Key="BackupPasswordLabel">密码</sys:String>

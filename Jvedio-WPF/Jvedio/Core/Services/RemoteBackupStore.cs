@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Runtime.ExceptionServices;
@@ -42,6 +43,7 @@ namespace Jvedio.Core.Backup
             if (type != "WebDAV" && type != "S3") return;
             string hash = HashFile(archive);
             using (var client = new HttpClient { Timeout = TimeSpan.FromMinutes(30) }) {
+                if (type == "WebDAV") await EnsureWebDavFolderAsync(client);
                 await SendFileAsync(client, type, fileName, archive);
                 byte[] pointer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new LatestPointer {
                     FileName = fileName,
@@ -66,6 +68,7 @@ namespace Jvedio.Core.Backup
             Exception testFailure = null;
             using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) }) {
                 try {
+                    if (type == "WebDAV") await EnsureWebDavFolderAsync(client);
                     await SendBytesAsync(client, type, name, expected);
                     uploaded = true;
                     byte[] actual = await GetBytesAsync(client, type, name);
@@ -150,19 +153,62 @@ namespace Jvedio.Core.Backup
             using (var response = await client.SendAsync(request)) response.EnsureSuccessStatusCode();
         }
 
+        private static string[] FolderSegments(string folder)
+        {
+            if (string.IsNullOrWhiteSpace(folder)) return Array.Empty<string>();
+            if (folder.Contains("://") || folder.Contains(":\\"))
+                throw new InvalidOperationException("在线备份文件夹请填写相对路径，不要填写完整 URL 或本地路径");
+            string[] segments = folder.Replace('\\', '/').Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Any(segment => segment == "." || segment == ".."))
+                throw new InvalidOperationException("在线备份文件夹不能包含 . 或 .. 路径段");
+            return segments;
+        }
+
+        private static string WebDavBaseUrl()
+        {
+            Uri root = RequireHttps(ConfigManager.Settings.BackupWebDavUrl);
+            if (!string.IsNullOrEmpty(root.Query) || !string.IsNullOrEmpty(root.Fragment))
+                throw new InvalidOperationException("WebDAV URL 不能包含查询参数或片段");
+            return root.GetLeftPart(UriPartial.Path).TrimEnd('/');
+        }
+
+        private static HttpRequestMessage CreateWebDavRequest(HttpMethod method, Uri url)
+        {
+            var settings = ConfigManager.Settings;
+            var request = new HttpRequestMessage(method, url);
+            if (!string.IsNullOrEmpty(settings.BackupWebDavUser)) {
+                string credential = settings.BackupWebDavUser + ":" + Unprotect(settings.BackupWebDavPasswordProtected);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
+                    Convert.ToBase64String(Encoding.UTF8.GetBytes(credential)));
+            }
+            return request;
+        }
+
+        private static async Task EnsureWebDavFolderAsync(HttpClient client)
+        {
+            string[] segments = FolderSegments(ConfigManager.Settings.BackupWebDavFolder);
+            if (segments.Length == 0) return;
+            string current = WebDavBaseUrl();
+            var mkcol = new HttpMethod("MKCOL");
+            foreach (string segment in segments) {
+                current += "/" + Uri.EscapeDataString(segment);
+                using (var request = CreateWebDavRequest(mkcol, new Uri(current + "/")))
+                using (var response = await client.SendAsync(request)) {
+                    // An existing WebDAV collection responds with 405 per RFC 4918.
+                    if (response.StatusCode != HttpStatusCode.MethodNotAllowed)
+                        response.EnsureSuccessStatusCode();
+                }
+            }
+        }
+
         private static HttpRequestMessage CreateRequest(string type, HttpMethod method, string name, string hash)
         {
             var settings = ConfigManager.Settings;
             if (type == "WebDAV") {
-                Uri root = RequireHttps(settings.BackupWebDavUrl);
-                Uri url = new Uri(root.ToString().TrimEnd('/') + "/" + Uri.EscapeDataString(name));
-                var request = new HttpRequestMessage(method, url);
-                if (!string.IsNullOrEmpty(settings.BackupWebDavUser)) {
-                    string credential = settings.BackupWebDavUser + ":" + Unprotect(settings.BackupWebDavPasswordProtected);
-                    request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
-                        Convert.ToBase64String(Encoding.UTF8.GetBytes(credential)));
-                }
-                return request;
+                string url = WebDavBaseUrl();
+                foreach (string segment in FolderSegments(settings.BackupWebDavFolder))
+                    url += "/" + Uri.EscapeDataString(segment);
+                return CreateWebDavRequest(method, new Uri(url + "/" + Uri.EscapeDataString(name)));
             }
             if (type != "S3") throw new InvalidOperationException("未知备份类型");
             if (string.IsNullOrWhiteSpace(settings.BackupS3Bucket) || string.IsNullOrWhiteSpace(settings.BackupS3AccessKey))
@@ -173,10 +219,8 @@ namespace Jvedio.Core.Backup
             Uri rootUri = RequireHttps(endpoint);
             if (rootUri.AbsolutePath != "/")
                 throw new InvalidOperationException("S3 Endpoint 请填写服务器根地址，不包含路径");
-            string key = (settings.BackupS3Prefix ?? string.Empty).Trim('/') + "/" + name;
-            key = key.TrimStart('/');
             string encodedPath = "/" + Uri.EscapeDataString(settings.BackupS3Bucket.Trim()) + "/" +
-                string.Join("/", key.Split('/').Select(Uri.EscapeDataString));
+                string.Join("/", FolderSegments(settings.BackupS3Prefix).Concat(new[] { name }).Select(Uri.EscapeDataString));
             Uri urlS3 = new Uri(rootUri.ToString().TrimEnd('/') + encodedPath);
             var s3Request = new HttpRequestMessage(method, urlS3);
             DateTime now = DateTime.UtcNow;

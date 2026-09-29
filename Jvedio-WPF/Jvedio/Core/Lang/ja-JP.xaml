@@ -111,6 +111,10 @@
     <sys:String x:Key="BackupDirectoryLabel">ローカルバックアップ先（空欄なら既定）</sys:String>
     <sys:String x:Key="Browse">参照</sys:String>
     <sys:String x:Key="BackupRemoteLabel">オンラインバックアップ</sys:String>
+    <sys:String x:Key="BackupWebDavFolderLabel">バックアップ用サブフォルダー（WebDAV URL からの相対パス）</sys:String>
+    <sys:String x:Key="BackupWebDavFolderTip">例：Jvedio/バックアップ。空欄なら上の URL のフォルダーを使用します。</sys:String>
+    <sys:String x:Key="BackupS3FolderLabel">バックアップ用フォルダー（バケット内）</sys:String>
+    <sys:String x:Key="BackupS3FolderTip">例：Jvedio/バックアップ。空欄ならバケットのルートを使用します。事前作成は不要です。</sys:String>
     <sys:String x:Key="BackupRemoteNone">使用しない</sys:String>
     <sys:String x:Key="BackupUserLabel">ユーザー名</sys:String>
     <sys:String x:Key="BackupPasswordLabel">パスワード</sys:String>

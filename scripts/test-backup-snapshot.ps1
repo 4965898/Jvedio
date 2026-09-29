@@ -115,6 +115,7 @@ $port = ([System.Net.IPEndPoint]$tcp.LocalEndpoint).Port
 $tcp.Stop()
 $storeRoot = Join-Path $scratch 'object-store'
 New-Item -ItemType Directory -Path $storeRoot | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $storeRoot 'dav') | Out-Null
 $server = Start-Job -ArgumentList $port, $storeRoot -ScriptBlock {
     param($listenPort, $root)
     $listener = New-Object System.Net.HttpListener
@@ -130,11 +131,23 @@ $server = Start-Job -ArgumentList $port, $storeRoot -ScriptBlock {
                 $file = Join-Path $root ($key.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
                 if ($context.Request.Url.AbsolutePath -eq '/__ready' -or $stop) {
                     $context.Response.StatusCode = 200
+                } elseif ($context.Request.HttpMethod -eq 'MKCOL') {
+                    $collection = $file.TrimEnd([System.IO.Path]::DirectorySeparatorChar)
+                    if ([System.IO.Directory]::Exists($collection)) { $context.Response.StatusCode = 405 }
+                    elseif ([System.IO.Directory]::Exists([System.IO.Path]::GetDirectoryName($collection))) {
+                        [System.IO.Directory]::CreateDirectory($collection) | Out-Null
+                        $context.Response.StatusCode = 201
+                    } else { $context.Response.StatusCode = 409 }
                 } elseif ($context.Request.HttpMethod -eq 'PUT') {
-                    [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($file)) | Out-Null
-                    $output = [System.IO.File]::Create($file)
-                    try { $context.Request.InputStream.CopyTo($output) } finally { $output.Dispose() }
-                    $context.Response.StatusCode = 201
+                    $parent = [System.IO.Path]::GetDirectoryName($file)
+                    if ($key.StartsWith('dav/') -and -not [System.IO.Directory]::Exists($parent)) {
+                        $context.Response.StatusCode = 409
+                    } else {
+                        [System.IO.Directory]::CreateDirectory($parent) | Out-Null
+                        $output = [System.IO.File]::Create($file)
+                        try { $context.Request.InputStream.CopyTo($output) } finally { $output.Dispose() }
+                        $context.Response.StatusCode = 201
+                    }
                 } elseif ($context.Request.HttpMethod -eq 'GET' -and [System.IO.File]::Exists($file)) {
                     $bytes = [System.IO.File]::ReadAllBytes($file)
                     $context.Response.ContentLength64 = $bytes.Length
@@ -168,8 +181,10 @@ for ($attempt = 0; $attempt -lt 40; $attempt++) {
 }
 try {
     $remote = $assembly.GetType('Jvedio.Core.Backup.RemoteBackupStore', $true)
+    $folderName = -join @([char]0x5728, [char]0x7EBF, [char]0x5907, [char]0x4EFD)
     $settingsType.GetProperty('BackupRemoteType').SetValue($settings, 'WebDAV')
     $settingsType.GetProperty('BackupWebDavUrl').SetValue($settings, "http://127.0.0.1:$port/dav")
+    $settingsType.GetProperty('BackupWebDavFolder').SetValue($settings, "Jvedio/$folderName")
     Write-Output 'Testing WebDAV upload'
     $upload = $remote.GetMethod('UploadAsync').Invoke($null, [object[]]@($archive))
     try {
@@ -179,14 +194,22 @@ try {
     Write-Output 'Testing WebDAV download'
     $dav = $remote.GetMethod('DownloadLatestAsync').Invoke($null, [object[]]@([string](Join-Path $scratch 'dav-download'))).GetAwaiter().GetResult()
     if ((Get-FileHash -LiteralPath $dav).Hash -ne (Get-FileHash -LiteralPath $archive).Hash) { throw 'WebDAV download differs' }
+    if (-not (Test-Path -LiteralPath (Join-Path $storeRoot "dav\Jvedio\$folderName\latest.json"))) {
+        throw 'WebDAV backup was not stored in the selected remote folder'
+    }
     $davTest = $remote.GetMethod('TestConnectionAsync').Invoke($null, [object[]]@('WebDAV')).GetAwaiter().GetResult()
     if ($davTest) { throw "WebDAV test object was not removed: $davTest" }
+    $settingsType.GetProperty('BackupWebDavFolder').SetValue($settings, '')
+    $remote.GetMethod('UploadAsync').Invoke($null, [object[]]@($archive)).GetAwaiter().GetResult()
+    if (-not (Test-Path -LiteralPath (Join-Path $storeRoot 'dav\latest.json'))) {
+        throw 'Empty WebDAV subfolder did not preserve the original backup location'
+    }
 
     $settingsType.GetProperty('BackupRemoteType').SetValue($settings, 'S3')
     $settingsType.GetProperty('BackupS3Endpoint').SetValue($settings, "http://127.0.0.1:$port")
     $settingsType.GetProperty('BackupS3Region').SetValue($settings, 'us-east-1')
     $settingsType.GetProperty('BackupS3Bucket').SetValue($settings, 'jvedio-test')
-    $settingsType.GetProperty('BackupS3Prefix').SetValue($settings, 'snapshots')
+    $settingsType.GetProperty('BackupS3Prefix').SetValue($settings, "snapshots/$folderName")
     $settingsType.GetProperty('BackupS3AccessKey').SetValue($settings, 'TESTACCESS')
     $secret = $remote.GetMethod('Protect').Invoke($null, [object[]]@('test-secret'))
     $settingsType.GetProperty('BackupS3SecretKeyProtected').SetValue($settings, $secret)
@@ -195,6 +218,9 @@ try {
     Write-Output 'Testing S3 download'
     $s3 = $remote.GetMethod('DownloadLatestAsync').Invoke($null, [object[]]@([string](Join-Path $scratch 's3-download'))).GetAwaiter().GetResult()
     if ((Get-FileHash -LiteralPath $s3).Hash -ne (Get-FileHash -LiteralPath $archive).Hash) { throw 'S3 download differs' }
+    if (-not (Test-Path -LiteralPath (Join-Path $storeRoot "jvedio-test\snapshots\$folderName\latest.json"))) {
+        throw 'S3 backup was not stored under the selected folder prefix'
+    }
     $s3Test = $remote.GetMethod('TestConnectionAsync').Invoke($null, [object[]]@('S3')).GetAwaiter().GetResult()
     if ($s3Test) { throw "S3 test object was not removed: $s3Test" }
     if (Get-ChildItem -LiteralPath $storeRoot -Filter '.jvedio-connection-test-*' -File -Recurse -Force) {

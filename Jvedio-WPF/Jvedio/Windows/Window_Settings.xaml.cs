@@ -1373,6 +1373,7 @@ namespace Jvedio
             BackupDirectoryBox.Text = s.BackupDirectory ?? string.Empty;
             BackupRemoteTypeBox.SelectedIndex = s.BackupRemoteType == "WebDAV" ? 1 : s.BackupRemoteType == "S3" ? 2 : 0;
             BackupWebDavUrlBox.Text = s.BackupWebDavUrl ?? string.Empty;
+            BackupWebDavFolderBox.Text = s.BackupWebDavFolder ?? string.Empty;
             BackupWebDavUserBox.Text = s.BackupWebDavUser ?? string.Empty;
             BackupS3EndpointBox.Text = s.BackupS3Endpoint ?? string.Empty;
             BackupS3RegionBox.Text = s.BackupS3Region ?? string.Empty;
@@ -1395,6 +1396,7 @@ namespace Jvedio
             s.BackupRemoteType = BackupRemoteTypeBox.SelectedIndex == 1 ? "WebDAV" :
                 BackupRemoteTypeBox.SelectedIndex == 2 ? "S3" : "None";
             s.BackupWebDavUrl = BackupWebDavUrlBox.Text?.Trim();
+            s.BackupWebDavFolder = BackupWebDavFolderBox.Text?.Trim();
             s.BackupWebDavUser = BackupWebDavUserBox.Text?.Trim();
             s.BackupWebDavPasswordProtected = RemoteBackupStore.Protect(BackupWebDavPasswordBox.Password);
             s.BackupS3Endpoint = BackupS3EndpointBox.Text?.Trim();

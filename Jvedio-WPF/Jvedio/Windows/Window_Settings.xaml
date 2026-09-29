@@ -2100,6 +2100,8 @@
                                     <StackPanel Margin="5">
                                         <TextBlock Text="URL（HTTPS）" Foreground="{DynamicResource Window.Foreground}" />
                                         <TextBox x:Name="BackupWebDavUrlBox" Style="{StaticResource SettingBaseTextBox}" />
+                                        <TextBlock Text="{DynamicResource BackupWebDavFolderLabel}" Foreground="{DynamicResource Window.Foreground}" />
+                                        <TextBox x:Name="BackupWebDavFolderBox" Style="{StaticResource SettingBaseTextBox}" ToolTip="{DynamicResource BackupWebDavFolderTip}" />
                                         <TextBlock Text="{DynamicResource BackupUserLabel}" Foreground="{DynamicResource Window.Foreground}" />
                                         <TextBox x:Name="BackupWebDavUserBox" Style="{StaticResource SettingBaseTextBox}" />
                                         <TextBlock Text="{DynamicResource BackupPasswordLabel}" Foreground="{DynamicResource Window.Foreground}" />
@@ -2116,8 +2118,8 @@
                                         <TextBox x:Name="BackupS3RegionBox" Style="{StaticResource SettingBaseTextBox}" />
                                         <TextBlock Text="Bucket" Foreground="{DynamicResource Window.Foreground}" />
                                         <TextBox x:Name="BackupS3BucketBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="Prefix" Foreground="{DynamicResource Window.Foreground}" />
-                                        <TextBox x:Name="BackupS3PrefixBox" Style="{StaticResource SettingBaseTextBox}" />
+                                        <TextBlock Text="{DynamicResource BackupS3FolderLabel}" Foreground="{DynamicResource Window.Foreground}" />
+                                        <TextBox x:Name="BackupS3PrefixBox" Style="{StaticResource SettingBaseTextBox}" ToolTip="{DynamicResource BackupS3FolderTip}" />
                                         <TextBlock Text="Access Key ID" Foreground="{DynamicResource Window.Foreground}" />
                                         <TextBox x:Name="BackupS3AccessKeyBox" Style="{StaticResource SettingBaseTextBox}" />
                                         <TextBlock Text="Secret Access Key" Foreground="{DynamicResource Window.Foreground}" />

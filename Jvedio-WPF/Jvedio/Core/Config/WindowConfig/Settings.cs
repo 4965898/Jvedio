@@ -140,6 +140,8 @@ SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
         /// <summary>None、WebDAV 或 S3。在线备份保留带时间戳的快照及 latest.json。</summary>
         public string BackupRemoteType { get; set; }
         public string BackupWebDavUrl { get; set; }
+        /// <summary>相对于 WebDAV URL 的备份子文件夹；留空沿用原有 URL。</summary>
+        public string BackupWebDavFolder { get; set; }
         public string BackupWebDavUser { get; set; }
         public string BackupWebDavPasswordProtected { get; set; }
         public string BackupS3Endpoint { get; set; }

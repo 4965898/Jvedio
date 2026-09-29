@@ -112,6 +112,10 @@
     <sys:String x:Key="BackupDirectoryLabel">Local backup folder (blank: default folder)</sys:String>
     <sys:String x:Key="Browse">Browse</sys:String>
     <sys:String x:Key="BackupRemoteLabel">Online backup</sys:String>
+    <sys:String x:Key="BackupWebDavFolderLabel">Backup subfolder (relative to WebDAV URL)</sys:String>
+    <sys:String x:Key="BackupWebDavFolderTip">For example, Jvedio/Backups. Leave empty to use the folder named by the URL above.</sys:String>
+    <sys:String x:Key="BackupS3FolderLabel">Backup folder (inside bucket)</sys:String>
+    <sys:String x:Key="BackupS3FolderTip">For example, Jvedio/Backups. Leave empty for the bucket root; no folder creation is needed.</sys:String>
     <sys:String x:Key="BackupRemoteNone">Disabled</sys:String>
     <sys:String x:Key="BackupUserLabel">Username</sys:String>
     <sys:String x:Key="BackupPasswordLabel">Password</sys:String>
