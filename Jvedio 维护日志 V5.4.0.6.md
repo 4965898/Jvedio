@@ -1115,7 +1115,9 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 
 **验证**：Release/AnyCPU 构建通过；`scripts/test-backup-snapshot.ps1` 覆盖 WAL 快照、数据库和图片校验、ZIP 暂存恢复、旧数据回滚保留及本机模拟的 WebDAV/S3 上传下载；`scripts/test-scrape-field-policy.ps1` 确认刮削字段合并不会纳入本地路径和识别码。三份语言资源 XML 有效且新增键一致，`git diff --check` 通过。
 
-**待验证**：尚未用真实 WebDAV/S3 账号做跨服务兼容测试，也未在正式数据目录进行人工界面验收。已按本地部署规则升至 5.4.1.54 / Jvedio29.62；未公开发布，旧 EXE 与用户 `data` 目录保留。
+**本地部署核对**：源码已合并到 `A:\Trae\repository\Jvedio-1`；主工作区构建的 `Jvedio.exe`、`build-output\Jvedio29.62.exe` 和 `E:\Jvedio-5.3.1\Jvedio29.62.exe` 的 SHA-256 均为 `2ED325D38C67650D5E654562AA8342C52CB06F9A7AD0B56B6C00038B7BC3A501`，文件版本均为 5.4.1.54。实际启动部署版后主窗口正常响应；窗口截图已确认右下角盾牌位于“文/T”翻译任务左侧。旧 EXE 与用户 `data` 目录保留。
+
+**待验证**：尚未用真实 WebDAV/S3 账号做跨服务兼容测试；设置页和恢复操作仍需用户在正式界面中验收。尚未公开发布。
 
 ---
 
