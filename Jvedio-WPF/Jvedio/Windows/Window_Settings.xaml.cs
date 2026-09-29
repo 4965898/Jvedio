@@ -1413,6 +1413,35 @@ namespace Jvedio
             }
         }
 
+        private async void TestWebDavConnection(object sender, RoutedEventArgs e)
+        {
+            await TestRemoteConnection("WebDAV", BackupWebDavTestStatusText);
+        }
+
+        private async void TestS3Connection(object sender, RoutedEventArgs e)
+        {
+            await TestRemoteConnection("S3", BackupS3TestStatusText);
+        }
+
+        private async Task TestRemoteConnection(string type, TextBlock status)
+        {
+            if (_BackupBusy) return;
+            _BackupBusy = true;
+            status.Text = string.Format(LangManager.GetValueByKey("BackupTestingConnection"), type);
+            try {
+                SaveBackupSettings();
+                string leftover = await RemoteBackupStore.TestConnectionAsync(type);
+                status.Text = string.IsNullOrEmpty(leftover)
+                    ? string.Format(LangManager.GetValueByKey("BackupConnectionOk"), type)
+                    : string.Format(LangManager.GetValueByKey("BackupConnectionCleanupWarning"), type, leftover);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                status.Text = string.Format(LangManager.GetValueByKey("BackupConnectionFail"), type, ex.Message);
+            } finally {
+                _BackupBusy = false;
+            }
+        }
+
         private async void CreateBackupNow(object sender, RoutedEventArgs e)
         {
             if (_BackupBusy) return;

@@ -139,6 +139,12 @@ $server = Start-Job -ArgumentList $port, $storeRoot -ScriptBlock {
                     $bytes = [System.IO.File]::ReadAllBytes($file)
                     $context.Response.ContentLength64 = $bytes.Length
                     $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
+                } elseif ($context.Request.HttpMethod -eq 'DELETE' -and [System.IO.File]::Exists($file)) {
+                    if ($key -like '*/cleanup-denied/*') { $context.Response.StatusCode = 403 }
+                    else {
+                        [System.IO.File]::Delete($file)
+                        $context.Response.StatusCode = 204
+                    }
                 } else { $context.Response.StatusCode = 404 }
             } catch { $context.Response.StatusCode = 500 }
             finally { $context.Response.Close() }
@@ -173,6 +179,8 @@ try {
     Write-Output 'Testing WebDAV download'
     $dav = $remote.GetMethod('DownloadLatestAsync').Invoke($null, [object[]]@([string](Join-Path $scratch 'dav-download'))).GetAwaiter().GetResult()
     if ((Get-FileHash -LiteralPath $dav).Hash -ne (Get-FileHash -LiteralPath $archive).Hash) { throw 'WebDAV download differs' }
+    $davTest = $remote.GetMethod('TestConnectionAsync').Invoke($null, [object[]]@('WebDAV')).GetAwaiter().GetResult()
+    if ($davTest) { throw "WebDAV test object was not removed: $davTest" }
 
     $settingsType.GetProperty('BackupRemoteType').SetValue($settings, 'S3')
     $settingsType.GetProperty('BackupS3Endpoint').SetValue($settings, "http://127.0.0.1:$port")
@@ -187,6 +195,18 @@ try {
     Write-Output 'Testing S3 download'
     $s3 = $remote.GetMethod('DownloadLatestAsync').Invoke($null, [object[]]@([string](Join-Path $scratch 's3-download'))).GetAwaiter().GetResult()
     if ((Get-FileHash -LiteralPath $s3).Hash -ne (Get-FileHash -LiteralPath $archive).Hash) { throw 'S3 download differs' }
+    $s3Test = $remote.GetMethod('TestConnectionAsync').Invoke($null, [object[]]@('S3')).GetAwaiter().GetResult()
+    if ($s3Test) { throw "S3 test object was not removed: $s3Test" }
+    if (Get-ChildItem -LiteralPath $storeRoot -Filter '.jvedio-connection-test-*' -File -Recurse -Force) {
+        throw 'A connection test object was left behind'
+    }
+    $settingsType.GetProperty('BackupS3Prefix').SetValue($settings, 'cleanup-denied')
+    $denyTest = $remote.GetMethod('TestConnectionAsync').Invoke($null, [object[]]@('S3')).GetAwaiter().GetResult()
+    $denyFile = Join-Path $storeRoot "jvedio-test\cleanup-denied\$denyTest"
+    if (-not $denyTest -or -not (Test-Path -LiteralPath $denyFile)) {
+        throw 'Delete denial was not reported with the remaining test object name'
+    }
+    Remove-Item -LiteralPath $denyFile
 } finally {
     Write-Output "mock state: $($server.State)"
     Receive-Job $server -ErrorAction SilentlyContinue
@@ -194,4 +214,4 @@ try {
     [void](Wait-Job $server -Timeout 3)
     Remove-Job $server -Force -ErrorAction SilentlyContinue
 }
-Write-Output "PASS: WAL snapshot, ZIP restore, WebDAV and S3 transport ($scratch)"
+Write-Output "PASS: WAL snapshot, ZIP restore, WebDAV/S3 transfer and connection tests ($scratch)"

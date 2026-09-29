@@ -148,6 +148,12 @@
     <sys:String x:Key="ScrapePreviewCurrent">現在の値</sys:String>
     <sys:String x:Key="ScrapePreviewIncoming">取得した値</sys:String>
     <sys:String x:Key="BackupDecryptFailed">バックアップ用パスワードを復号できません。再入力してください。</sys:String>
+    <sys:String x:Key="BackupTestConnection">接続を確認</sys:String>
+    <sys:String x:Key="BackupTestConnectionTip">一時ファイルを書き込み・読み取り後に削除します。既存のバックアップには影響しません。</sys:String>
+    <sys:String x:Key="BackupTestingConnection">{0} の接続を確認しています…</sys:String>
+    <sys:String x:Key="BackupConnectionOk">{0} に接続しました。読み書きは正常です。</sys:String>
+    <sys:String x:Key="BackupConnectionFail">{0} の接続に失敗：{1}</sys:String>
+    <sys:String x:Key="BackupConnectionCleanupWarning">{0} の読み書きは正常ですが、テストファイル {1} を削除できませんでした。削除権限または接続を確認してください。</sys:String>
     <sys:String x:Key="BackupCreating">バックアップを作成・検証しています…</sys:String>
     <sys:String x:Key="BackupCreated">バックアップ完了：{0}</sys:String>
     <sys:String x:Key="BackupFailed">バックアップ失敗：{0}</sys:String>

@@ -148,6 +148,12 @@
     <sys:String x:Key="ScrapePreviewCurrent">当前值</sys:String>
     <sys:String x:Key="ScrapePreviewIncoming">刮削值</sys:String>
     <sys:String x:Key="BackupDecryptFailed">在线备份密码无法解密，请重新填写。</sys:String>
+    <sys:String x:Key="BackupTestConnection">检查连接</sys:String>
+    <sys:String x:Key="BackupTestConnectionTip">写入并读回临时文件，随后尝试删除；不影响已有备份。</sys:String>
+    <sys:String x:Key="BackupTestingConnection">正在测试 {0} 连接…</sys:String>
+    <sys:String x:Key="BackupConnectionOk">{0} 连接成功，读写正常。</sys:String>
+    <sys:String x:Key="BackupConnectionFail">{0} 连接失败：{1}</sys:String>
+    <sys:String x:Key="BackupConnectionCleanupWarning">{0} 读写正常，但无法删除测试文件 {1}；请检查删除权限或网络。</sys:String>
     <sys:String x:Key="BackupCreating">正在生成并校验备份…</sys:String>
     <sys:String x:Key="BackupCreated">备份成功：{0}</sys:String>
     <sys:String x:Key="BackupFailed">备份失败：{0}</sys:String>

@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -48,6 +49,41 @@ namespace Jvedio.Core.Backup
                 }));
                 await SendBytesAsync(client, type, "latest.json", pointer);
             }
+        }
+
+        /// <summary>
+        /// Verify the same PUT/GET permissions used by backup and restore. Returns the name of
+        /// a probe object only when reading and writing succeeded but cleanup was denied.
+        /// </summary>
+        public static async Task<string> TestConnectionAsync(string type)
+        {
+            if (type != "WebDAV" && type != "S3")
+                throw new InvalidOperationException("未知备份类型");
+            string name = ".jvedio-connection-test-" + Guid.NewGuid().ToString("N") + ".txt";
+            byte[] expected = Encoding.UTF8.GetBytes("Jvedio backup connection test: " + name);
+            bool uploaded = false;
+            bool cleaned = true;
+            Exception testFailure = null;
+            using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) }) {
+                try {
+                    await SendBytesAsync(client, type, name, expected);
+                    uploaded = true;
+                    byte[] actual = await GetBytesAsync(client, type, name);
+                    if (!actual.SequenceEqual(expected))
+                        throw new InvalidDataException("在线存储返回的测试文件内容不一致");
+                } catch (Exception ex) { testFailure = ex; }
+                if (uploaded) {
+                    try { await DeleteAsync(client, type, name); }
+                    catch { cleaned = false; }
+                }
+            }
+            if (testFailure != null) {
+                if (!cleaned)
+                    throw new InvalidOperationException("连接测试失败，且临时文件 " + name +
+                        " 未能清理：" + testFailure.Message, testFailure);
+                ExceptionDispatchInfo.Capture(testFailure).Throw();
+            }
+            return cleaned ? null : name;
         }
 
         public static async Task<string> DownloadLatestAsync(string localDirectory)
@@ -106,6 +142,12 @@ namespace Jvedio.Core.Backup
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsByteArrayAsync();
             }
+        }
+
+        private static async Task DeleteAsync(HttpClient client, string type, string name)
+        {
+            using (var request = CreateRequest(type, HttpMethod.Delete, name, HashBytes(new byte[0])))
+            using (var response = await client.SendAsync(request)) response.EnsureSuccessStatusCode();
         }
 
         private static HttpRequestMessage CreateRequest(string type, HttpMethod method, string name, string hash)

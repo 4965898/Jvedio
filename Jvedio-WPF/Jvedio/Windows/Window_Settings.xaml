@@ -2104,6 +2104,8 @@
                                         <TextBox x:Name="BackupWebDavUserBox" Style="{StaticResource SettingBaseTextBox}" />
                                         <TextBlock Text="{DynamicResource BackupPasswordLabel}" Foreground="{DynamicResource Window.Foreground}" />
                                         <PasswordBox x:Name="BackupWebDavPasswordBox" Foreground="{DynamicResource Window.Foreground}" Background="{DynamicResource Window.Title.Background}" CaretBrush="{DynamicResource Window.Foreground}" />
+                                        <Button Margin="5" HorizontalAlignment="Left" Click="TestWebDavConnection" Content="{DynamicResource BackupTestConnection}" ToolTip="{DynamicResource BackupTestConnectionTip}" />
+                                        <TextBlock x:Name="BackupWebDavTestStatusText" Margin="5" TextWrapping="Wrap" Foreground="{DynamicResource Window.Foreground}" />
                                     </StackPanel>
                                 </Expander>
                                 <Expander Margin="5" Header="S3" Foreground="{DynamicResource Window.Foreground}">
@@ -2120,6 +2122,8 @@
                                         <TextBox x:Name="BackupS3AccessKeyBox" Style="{StaticResource SettingBaseTextBox}" />
                                         <TextBlock Text="Secret Access Key" Foreground="{DynamicResource Window.Foreground}" />
                                         <PasswordBox x:Name="BackupS3SecretBox" Foreground="{DynamicResource Window.Foreground}" Background="{DynamicResource Window.Title.Background}" CaretBrush="{DynamicResource Window.Foreground}" />
+                                        <Button Margin="5" HorizontalAlignment="Left" Click="TestS3Connection" Content="{DynamicResource BackupTestConnection}" ToolTip="{DynamicResource BackupTestConnectionTip}" />
+                                        <TextBlock x:Name="BackupS3TestStatusText" Margin="5" TextWrapping="Wrap" Foreground="{DynamicResource Window.Foreground}" />
                                     </StackPanel>
                                 </Expander>
                                 <WrapPanel Margin="5">
