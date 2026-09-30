@@ -143,6 +143,23 @@
             <Setter Property="CaretBrush" Value="{DynamicResource Window.Foreground}" />
             <Setter Property="ContextMenu" Value="{DynamicResource PasteOnlyContextMenu}" />
         </Style>
+        <Style x:Key="BackupFieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Foreground" Value="{DynamicResource Window.Foreground}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="5,5,12,5" />
+        </Style>
+        <Style x:Key="BackupFieldTextBox" BasedOn="{StaticResource SettingBaseTextBox}" TargetType="TextBox">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Margin" Value="5,4,5,4" />
+        </Style>
+        <Style x:Key="BackupFieldPasswordBox" BasedOn="{StaticResource SettingBasePasswordBox}" TargetType="PasswordBox">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Margin" Value="5,4,5,4" />
+        </Style>
     </super:BaseWindow.Resources>
 
     <Grid Background="{DynamicResource Window.InnerDialog.Background}">
@@ -2075,87 +2092,111 @@
                                 Margin="5"
                                 Orientation="Vertical">
                                 <CheckBox Content="{DynamicResource AutoBackLibrary}" IsChecked="{Binding AutoBackup, Mode=TwoWay}" />
-                                <TextBlock Margin="5,8,5,2" Text="{DynamicResource BackupModeLabel}" Foreground="{DynamicResource Window.Foreground}" />
-                                <ComboBox x:Name="BackupModeBox" Width="240" Margin="5" HorizontalAlignment="Left" Style="{StaticResource BorderComboBox}">
-                                    <ComboBoxItem Content="{DynamicResource BackupModeLocalOnly}" />
-                                    <ComboBoxItem Content="{DynamicResource BackupModeRemoteOnly}" />
-                                    <ComboBoxItem Content="{DynamicResource BackupModeBoth}" />
-                                </ComboBox>
-                                <TextBlock Margin="5,0,5,8" Text="{DynamicResource BackupRemoteOnlyNote}" TextWrapping="Wrap" Foreground="{DynamicResource Window.Foreground}" />
-                                <StackPanel
-                                    Margin="5"
-                                    Orientation="Horizontal"
-                                    Visibility="{Binding AutoBackup, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}">
-                                    <TextBlock
-                                        HorizontalAlignment="Left"
-                                        Style="{StaticResource BaseTextBlock}"
-                                        Text="{DynamicResource BackUpPeriodDay}"
-                                        TextAlignment="Left" />
-                                    <ComboBox
-                                        Grid.Column="1"
-                                        Height="30"
-                                        MinWidth="200"
-                                        Margin="5"
-                                        HorizontalAlignment="Stretch"
-                                        SelectedIndex="{Binding AutoBackupPeriodIndex}"
-                                        Style="{StaticResource BorderComboBox}">
+                                <Grid Margin="5">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170" />
+                                        <ColumnDefinition Width="*" MinWidth="250" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource BackupModeLabel}" />
+                                    <ComboBox x:Name="BackupModeBox" Grid.Row="0" Grid.Column="1" Width="240" Margin="5" HorizontalAlignment="Left" Style="{StaticResource BorderComboBox}">
+                                        <ComboBoxItem Content="{DynamicResource BackupModeLocalOnly}" />
+                                        <ComboBoxItem Content="{DynamicResource BackupModeRemoteOnly}" />
+                                        <ComboBoxItem Content="{DynamicResource BackupModeBoth}" />
+                                    </ComboBox>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Margin="5,0,5,8" Text="{DynamicResource BackupRemoteOnlyNote}" TextWrapping="Wrap" Foreground="{DynamicResource Window.Foreground}" />
+                                    <TextBlock Grid.Row="2" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource BackUpPeriodDay}"
+                                               Visibility="{Binding AutoBackup, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}" />
+                                    <ComboBox Grid.Row="2" Grid.Column="1" Height="30" Width="200" Margin="5" HorizontalAlignment="Left"
+                                              SelectedIndex="{Binding AutoBackupPeriodIndex}" Style="{StaticResource BorderComboBox}"
+                                              Visibility="{Binding AutoBackup, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}">
                                         <ComboBoxItem Content="1" />
                                         <ComboBoxItem Content="3" />
                                         <ComboBoxItem Content="7" />
                                         <ComboBoxItem Content="15" />
                                         <ComboBoxItem Content="30" />
                                     </ComboBox>
-                                </StackPanel>
-
-                                <TextBlock Margin="5,8,5,2" Text="{DynamicResource BackupDirectoryLabel}" />
-                                <DockPanel Margin="5">
-                                    <Button DockPanel.Dock="Right" Click="SelectBackupDirectory" Content="{DynamicResource Browse}" />
-                                    <TextBox x:Name="BackupDirectoryBox" MinWidth="320" Style="{StaticResource SettingBaseTextBox}" />
-                                </DockPanel>
-                                <StackPanel Margin="5" Orientation="Horizontal">
-                                    <TextBlock VerticalAlignment="Center" Text="{DynamicResource BackupRetentionLabel}" Foreground="{DynamicResource Window.Foreground}" />
-                                    <TextBox x:Name="BackupRetentionBox" Width="70" Height="30" Margin="8,0,0,0" Padding="5" MaxLength="2" TextAlignment="Center"
-                                             VerticalContentAlignment="Center" BorderThickness="0" Background="{DynamicResource Window.Title.Background}"
+                                    <TextBlock Grid.Row="3" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource BackupDirectoryLabel}" />
+                                    <DockPanel Grid.Row="3" Grid.Column="1" Margin="0,4,0,4">
+                                        <Button DockPanel.Dock="Right" Margin="5,0" Click="SelectBackupDirectory" Content="{DynamicResource Browse}" />
+                                        <TextBox x:Name="BackupDirectoryBox" Style="{StaticResource BackupFieldTextBox}" />
+                                    </DockPanel>
+                                    <TextBlock Grid.Row="4" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource BackupRetentionLabel}" />
+                                    <TextBox x:Name="BackupRetentionBox" Grid.Row="4" Grid.Column="1" Width="70" Height="30" Margin="5" Padding="5" MaxLength="2" TextAlignment="Center"
+                                             HorizontalAlignment="Left" VerticalContentAlignment="Center" BorderThickness="0" Background="{DynamicResource Window.Title.Background}"
                                              Foreground="{DynamicResource Window.Foreground}" CaretBrush="{DynamicResource Window.Foreground}"
                                              ToolTip="{DynamicResource BackupRetentionTip}" />
-                                </StackPanel>
-                                <TextBlock Margin="5,8,5,2" Text="{DynamicResource BackupRemoteLabel}" />
-                                <ComboBox x:Name="BackupRemoteTypeBox" Width="200" Margin="5" HorizontalAlignment="Left" Style="{StaticResource BorderComboBox}">
-                                    <ComboBoxItem Content="{DynamicResource BackupRemoteNone}" />
-                                    <ComboBoxItem Content="WebDAV" />
-                                    <ComboBoxItem Content="S3" />
-                                </ComboBox>
+                                    <TextBlock Grid.Row="5" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource BackupRemoteLabel}" />
+                                    <ComboBox x:Name="BackupRemoteTypeBox" Grid.Row="5" Grid.Column="1" Width="200" Margin="5" HorizontalAlignment="Left" Style="{StaticResource BorderComboBox}">
+                                        <ComboBoxItem Content="{DynamicResource BackupRemoteNone}" />
+                                        <ComboBoxItem Content="WebDAV" />
+                                        <ComboBoxItem Content="S3" />
+                                    </ComboBox>
+                                </Grid>
                                 <Expander Margin="5" Header="WebDAV" Foreground="{DynamicResource Window.Foreground}">
-                                    <StackPanel Margin="5">
-                                        <TextBlock Text="URL（HTTPS）" Foreground="{DynamicResource Window.Foreground}" />
-                                        <TextBox x:Name="BackupWebDavUrlBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="{DynamicResource BackupWebDavFolderLabel}" Foreground="{DynamicResource Window.Foreground}" />
-                                        <TextBox x:Name="BackupWebDavFolderBox" Style="{StaticResource SettingBaseTextBox}" ToolTip="{DynamicResource BackupWebDavFolderTip}" />
-                                        <TextBlock Text="{DynamicResource BackupUserLabel}" Foreground="{DynamicResource Window.Foreground}" />
-                                        <TextBox x:Name="BackupWebDavUserBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="{DynamicResource BackupPasswordLabel}" Foreground="{DynamicResource Window.Foreground}" />
-                                        <PasswordBox x:Name="BackupWebDavPasswordBox" Width="{Binding ActualWidth, ElementName=BackupWebDavUserBox}" Style="{StaticResource SettingBasePasswordBox}" />
-                                        <Button Margin="5" HorizontalAlignment="Left" Click="TestWebDavConnection" Content="{DynamicResource BackupTestConnection}" ToolTip="{DynamicResource BackupTestConnectionTip}" />
-                                        <TextBlock x:Name="BackupWebDavTestStatusText" Margin="5" TextWrapping="Wrap" Foreground="{DynamicResource Window.Foreground}" />
-                                    </StackPanel>
+                                    <Grid Margin="5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="*" MinWidth="250" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Style="{StaticResource BackupFieldLabel}" Text="URL（HTTPS）" />
+                                        <TextBox x:Name="BackupWebDavUrlBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource BackupFieldTextBox}" />
+                                        <TextBlock Grid.Row="1" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource BackupWebDavFolderLabel}" />
+                                        <TextBox x:Name="BackupWebDavFolderBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource BackupFieldTextBox}" ToolTip="{DynamicResource BackupWebDavFolderTip}" />
+                                        <TextBlock Grid.Row="2" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource BackupUserLabel}" />
+                                        <TextBox x:Name="BackupWebDavUserBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource BackupFieldTextBox}" />
+                                        <TextBlock Grid.Row="3" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource BackupPasswordLabel}" />
+                                        <PasswordBox x:Name="BackupWebDavPasswordBox" Grid.Row="3" Grid.Column="1" Style="{StaticResource BackupFieldPasswordBox}" />
+                                        <Button Grid.Row="4" Grid.Column="1" Margin="5" HorizontalAlignment="Left" Click="TestWebDavConnection" Content="{DynamicResource BackupTestConnection}" ToolTip="{DynamicResource BackupTestConnectionTip}" />
+                                        <TextBlock x:Name="BackupWebDavTestStatusText" Grid.Row="5" Grid.Column="1" Margin="5" TextWrapping="Wrap" Foreground="{DynamicResource Window.Foreground}" />
+                                    </Grid>
                                 </Expander>
                                 <Expander Margin="5" Header="S3" Foreground="{DynamicResource Window.Foreground}">
-                                    <StackPanel Margin="5">
-                                        <TextBlock Text="Endpoint（HTTPS，留空使用 AWS）" Foreground="{DynamicResource Window.Foreground}" />
-                                        <TextBox x:Name="BackupS3EndpointBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="Region" Foreground="{DynamicResource Window.Foreground}" />
-                                        <TextBox x:Name="BackupS3RegionBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="Bucket" Foreground="{DynamicResource Window.Foreground}" />
-                                        <TextBox x:Name="BackupS3BucketBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="{DynamicResource BackupS3FolderLabel}" Foreground="{DynamicResource Window.Foreground}" />
-                                        <TextBox x:Name="BackupS3PrefixBox" Style="{StaticResource SettingBaseTextBox}" ToolTip="{DynamicResource BackupS3FolderTip}" />
-                                        <TextBlock Text="Access Key ID" Foreground="{DynamicResource Window.Foreground}" />
-                                        <TextBox x:Name="BackupS3AccessKeyBox" Style="{StaticResource SettingBaseTextBox}" />
-                                        <TextBlock Text="Secret Access Key" Foreground="{DynamicResource Window.Foreground}" />
-                                        <PasswordBox x:Name="BackupS3SecretBox" Width="{Binding ActualWidth, ElementName=BackupS3AccessKeyBox}" Style="{StaticResource SettingBasePasswordBox}" />
-                                        <Button Margin="5" HorizontalAlignment="Left" Click="TestS3Connection" Content="{DynamicResource BackupTestConnection}" ToolTip="{DynamicResource BackupTestConnectionTip}" />
-                                        <TextBlock x:Name="BackupS3TestStatusText" Margin="5" TextWrapping="Wrap" Foreground="{DynamicResource Window.Foreground}" />
-                                    </StackPanel>
+                                    <Grid Margin="5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="*" MinWidth="250" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Style="{StaticResource BackupFieldLabel}" Text="Endpoint（HTTPS，留空使用 AWS）" />
+                                        <TextBox x:Name="BackupS3EndpointBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource BackupFieldTextBox}" />
+                                        <TextBlock Grid.Row="1" Style="{StaticResource BackupFieldLabel}" Text="Region" />
+                                        <TextBox x:Name="BackupS3RegionBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource BackupFieldTextBox}" />
+                                        <TextBlock Grid.Row="2" Style="{StaticResource BackupFieldLabel}" Text="Bucket" />
+                                        <TextBox x:Name="BackupS3BucketBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource BackupFieldTextBox}" />
+                                        <TextBlock Grid.Row="3" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource BackupS3FolderLabel}" />
+                                        <TextBox x:Name="BackupS3PrefixBox" Grid.Row="3" Grid.Column="1" Style="{StaticResource BackupFieldTextBox}" ToolTip="{DynamicResource BackupS3FolderTip}" />
+                                        <TextBlock Grid.Row="4" Style="{StaticResource BackupFieldLabel}" Text="Access Key ID" />
+                                        <TextBox x:Name="BackupS3AccessKeyBox" Grid.Row="4" Grid.Column="1" Style="{StaticResource BackupFieldTextBox}" />
+                                        <TextBlock Grid.Row="5" Style="{StaticResource BackupFieldLabel}" Text="Secret Access Key" />
+                                        <PasswordBox x:Name="BackupS3SecretBox" Grid.Row="5" Grid.Column="1" Style="{StaticResource BackupFieldPasswordBox}" />
+                                        <Button Grid.Row="6" Grid.Column="1" Margin="5" HorizontalAlignment="Left" Click="TestS3Connection" Content="{DynamicResource BackupTestConnection}" ToolTip="{DynamicResource BackupTestConnectionTip}" />
+                                        <TextBlock x:Name="BackupS3TestStatusText" Grid.Row="7" Grid.Column="1" Margin="5" TextWrapping="Wrap" Foreground="{DynamicResource Window.Foreground}" />
+                                    </Grid>
                                 </Expander>
                                 <WrapPanel Margin="5">
                                     <Button Margin="2" Click="CreateBackupNow" Content="{DynamicResource BackupNow}" />
