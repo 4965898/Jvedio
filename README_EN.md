@@ -126,6 +126,7 @@ Users : [User Guide](Jvedio-WPF/Document/Wiki/5.0/02-Beginning.md)
 | 5.4.1.51 (Jvedio29.59) | 2026-09-29 | Restored the original upgrade dialog. Its latest version, download link, and update files now come from this repository's Releases; CI also publishes the dialog's compatible update feed. |
 | 5.4.1.52 (Jvedio29.60) | 2026-09-29 | Release details in the original dialog wrap and scroll vertically, Release notes state the changes directly, and a red dot appears on the settings gear when an update is available; Start Update is disabled when the remote version is not newer. |
 | 5.4.1.53 (Jvedio29.61) | 2026-09-29 | Releases now include both a verified complete ZIP and a matching compiled EXE; use the EXE to update an existing complete installation, and the ZIP for a first installation. |
+| 5.4.1.60 (Jvedio29.68) | 2026-09-30 | Backups now use consistent SQLite WAL snapshots and startup restore, with a configurable local folder and 1–10-copy retention, WebDAV/S3 folders and connection checks, local-only/online-only/both modes, and a picker for older remote ZIP backups. File and subtitle filters reuse recent checks with manual refresh. Update dialogs and ignored versions are user-controlled. A library health center adds issue review and double-click ID copying. Scraping adds a field-by-field preview and protection for existing metadata. Backup labels and inputs now align in rows. |
 
 
 # Software Characteristics
