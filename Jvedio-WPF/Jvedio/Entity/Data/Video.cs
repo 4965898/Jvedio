@@ -780,11 +780,16 @@ namespace Jvedio.Entity
             if (!ConfigManager.Settings.SaveInfoToNFO)
                 return;
             string dir = ConfigManager.Settings.NFOSavePath;
-            bool overrideInfo = ConfigManager.DownloadConfig.OverrideInfo;
 
-            string saveName = $"{VID.ToProperFileName()}.nfo";
-            if (string.IsNullOrEmpty(VID))
+            // 媒体库协同命名（Kodi/Jellyfin/Emby 标准：<视频文件名>.nfo 与视频同目录即可被识别）；
+            // 无本地文件时回退 <VID>.nfo
+            string saveName;
+            if (!string.IsNullOrEmpty(Path))
                 saveName = $"{System.IO.Path.GetFileNameWithoutExtension(Path)}.nfo";
+            else if (!string.IsNullOrEmpty(VID))
+                saveName = $"{VID.ToProperFileName()}.nfo";
+            else
+                return;
 
             string saveFileName = string.Empty;
 
@@ -797,7 +802,9 @@ namespace Jvedio.Entity
 
             if (string.IsNullOrEmpty(saveFileName))
                 return;
-            if (overrideInfo || !File.Exists(saveFileName))
+            // 覆盖语义：设置页「覆盖」勾选，或本次刮削为强制同步时覆盖；否则已存在则跳过
+            bool overwrite = ConfigManager.Settings.OverwriteNFO || ConfigManager.DownloadConfig.OverrideInfo;
+            if (overwrite || !File.Exists(saveFileName))
                 SaveToNFO(this, saveFileName);
         }
 

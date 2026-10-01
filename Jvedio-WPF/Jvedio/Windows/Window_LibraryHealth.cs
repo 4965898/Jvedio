@@ -1,3 +1,4 @@
+using Jvedio.Core.Crawler;
 using Jvedio.Core.Tasks;
 using Jvedio.Core.Config;
 using LangManager = SuperControls.Style.LangManager;
@@ -91,7 +92,22 @@ namespace Jvedio.Windows
             AddColumn(LangManager.GetValueByKey("HealthPath"), "Path", 390);
             _Grid.MouseDoubleClick += OnGridDoubleClick;
             root.Children.Add(_Grid);
-            Content = root;
+
+            // 两个页签：资料体检（原有）+ 刮削源体检（逐源诊断卡片）
+            TabControl tabControl = new TabControl();
+            Style flatTab = App.Current.TryFindResource("FlatTabControl") as Style;
+            if (flatTab != null)
+                tabControl.Style = flatTab;
+            Style flatTabItem = App.Current.TryFindResource("FlatTabItem") as Style;
+            TabItem healthTab = new TabItem { Header = LangManager.GetValueByKey("LibraryHealth"), Content = root };
+            TabItem crawlerTab = new TabItem { Header = LangManager.GetValueByKey("CrawlerCheck"), Content = BuildCrawlerCheckTab() };
+            if (flatTabItem != null) {
+                healthTab.Style = flatTabItem;
+                crawlerTab.Style = flatTabItem;
+            }
+            tabControl.Items.Add(healthTab);
+            tabControl.Items.Add(crawlerTab);
+            Content = tabControl;
             Loaded += async (s, e) => await RefreshAsync(true);
         }
 
@@ -193,5 +209,208 @@ namespace Jvedio.Windows
             }
             OpenSelectedPath();
         }
+
+        #region "刮削源体检：逐源诊断卡片（代理 → 镜像可达性 → 人机验证 → Cookie）+ 修复提示"
+
+        private sealed class CheckCard
+        {
+            public string Title;
+            public string StateText;
+            public OnlineSiteState State;   // Unknown=中性提示卡
+            public string Detail;
+            public string Hint;
+        }
+
+        private readonly StackPanel _CrawlerCardPanel = new StackPanel();
+        private readonly TextBlock _CrawlerStatus = new TextBlock { Margin = new Thickness(8), VerticalAlignment = VerticalAlignment.Center };
+        private bool _CrawlerChecking;
+
+        /// <summary>维护中的爬虫默认站点（源码重建的 Bus2/Db2）；fc2/library 为封闭 DLL 无默认地址</summary>
+        private static readonly Dictionary<string, string> DefaultCrawlerUrls = new Dictionary<string, string>() {
+            { "bus", "https://www.busjav.bond" },
+            { "db", "https://javdb.com" },
+        };
+
+        private UIElement BuildCrawlerCheckTab()
+        {
+            DockPanel root = new DockPanel { Margin = new Thickness(12) };
+            StackPanel toolbar = new StackPanel { Orientation = Orientation.Horizontal };
+            DockPanel.SetDock(toolbar, Dock.Top);
+            root.Children.Add(toolbar);
+            Button start = new Button {
+                Content = LangManager.GetValueByKey("CrawlerCheckStart"),
+                Margin = new Thickness(5),
+                MinWidth = 88,
+            };
+            start.Click += async (s, e) => await RunCrawlerCheckAsync();
+            toolbar.Children.Add(start);
+            toolbar.Children.Add(_CrawlerStatus);
+            ScrollViewer viewer = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = _CrawlerCardPanel };
+            root.Children.Add(viewer);
+            return root;
+        }
+
+        private async System.Threading.Tasks.Task RunCrawlerCheckAsync()
+        {
+            if (_CrawlerChecking)
+                return;
+            _CrawlerChecking = true;
+            _CrawlerStatus.Text = LangManager.GetValueByKey("CrawlerCheckWorking");
+            _CrawlerCardPanel.Children.Clear();
+            try {
+                List<CheckCard> cards = await System.Threading.Tasks.Task.Run(() => CollectCrawlerCards());
+                RenderCards(cards);
+                _CrawlerStatus.Text = string.Format(LangManager.GetValueByKey("CrawlerCheckDone"), cards.Count);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                _CrawlerStatus.Text = string.Format(LangManager.GetValueByKey("HealthFailed"), ex.Message);
+            } finally {
+                _CrawlerChecking = false;
+            }
+        }
+
+        private List<CheckCard> CollectCrawlerCards()
+        {
+            var cards = new List<CheckCard>();
+
+            // 1. 代理状态（决定所有探测与刮削的出口）
+            long proxyMode = ConfigManager.ProxyConfig?.ProxyMode ?? 0;
+            string proxyText = proxyMode == 2 ? LangManager.GetValueByKey("CrawlerProxyCustom")
+                : proxyMode == 1 ? LangManager.GetValueByKey("CrawlerProxySystem")
+                : LangManager.GetValueByKey("CrawlerProxyNone");
+            cards.Add(new CheckCard() {
+                Title = LangManager.GetValueByKey("CrawlerProxyCard"),
+                StateText = proxyText,
+                State = OnlineSiteState.Unknown,
+                Detail = proxyMode == 2 ? $"{ConfigManager.ProxyConfig.Server}:{ConfigManager.ProxyConfig.Port}" : string.Empty,
+                Hint = proxyMode == 0 ? LangManager.GetValueByKey("CrawlerProxyNoneHint") : string.Empty,
+            });
+
+            // 2. 逐爬虫源探测
+            var servers = ConfigManager.ServerConfig?.CrawlerServers;
+            if (servers == null || servers.Count == 0) {
+                cards.Add(new CheckCard() {
+                    Title = LangManager.GetValueByKey("CrawlerNoSource"),
+                    StateText = string.Empty,
+                    State = OnlineSiteState.Unknown,
+                    Detail = string.Empty,
+                    Hint = LangManager.GetValueByKey("CrawlerNoSourceHint"),
+                });
+                return cards;
+            }
+
+            foreach (var server in servers) {
+                string name = CrawlerName(server.PluginID);
+                if (!server.Enabled) {
+                    cards.Add(new CheckCard() {
+                        Title = name,
+                        StateText = LangManager.GetValueByKey("CrawlerSourceDisabled"),
+                        State = OnlineSiteState.Unknown,
+                        Detail = string.Empty,
+                        Hint = LangManager.GetValueByKey("CrawlerSourceDisabledHint"),
+                    });
+                    continue;
+                }
+                string url = string.IsNullOrEmpty(server.Url) && DefaultCrawlerUrls.TryGetValue(server.PluginID, out string def) ? def : server.Url;
+                if (string.IsNullOrEmpty(url)) {
+                    cards.Add(new CheckCard() {
+                        Title = name,
+                        StateText = string.Empty,
+                        State = OnlineSiteState.Unknown,
+                        Detail = string.Empty,
+                        Hint = LangManager.GetValueByKey("CrawlerNoUrlHint"),
+                    });
+                    continue;
+                }
+                OnlineSiteState state = OnlineSiteStatus.ProbeUrl(url).GetAwaiter().GetResult();
+                bool hasCookie = !string.IsNullOrEmpty(server.Cookies);
+                cards.Add(new CheckCard() {
+                    Title = name,
+                    StateText = StateText(state),
+                    State = state,
+                    Detail = $"{url}  |  {(hasCookie ? LangManager.GetValueByKey("CrawlerCookieSet") : LangManager.GetValueByKey("CrawlerCookieNotSet"))}",
+                    Hint = HintFor(state, hasCookie),
+                });
+            }
+            return cards;
+        }
+
+        private static string CrawlerName(string pluginId)
+        {
+            switch (pluginId) {
+                case "bus": return "Bus (JavBus)";
+                case "db": return "DB (JavDB)";
+                case "fc2": return "FC2";
+                case "library": return "JavLibrary";
+                default: return string.IsNullOrEmpty(pluginId) ? "?" : pluginId;
+            }
+        }
+
+        private static string StateText(OnlineSiteState state)
+        {
+            switch (state) {
+                case OnlineSiteState.Ok: return LangManager.GetValueByKey("CrawlerStateOk");
+                case OnlineSiteState.MaybeBlocked: return LangManager.GetValueByKey("CrawlerStateBlocked");
+                case OnlineSiteState.Fail: return LangManager.GetValueByKey("CrawlerStateFail");
+                default: return string.Empty;
+            }
+        }
+
+        private static string HintFor(OnlineSiteState state, bool hasCookie)
+        {
+            switch (state) {
+                case OnlineSiteState.Ok:
+                    return hasCookie ? string.Empty : LangManager.GetValueByKey("CrawlerHintOkNoCookie");
+                case OnlineSiteState.MaybeBlocked:
+                    return LangManager.GetValueByKey("CrawlerHintBlocked");
+                case OnlineSiteState.Fail:
+                    return LangManager.GetValueByKey("CrawlerHintFail");
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private void RenderCards(List<CheckCard> cards)
+        {
+            _CrawlerCardPanel.Children.Clear();
+            foreach (CheckCard card in cards) {
+                Color stripe = card.State switch {
+                    OnlineSiteState.Ok => (Color)ColorConverter.ConvertFromString("#67C23A"),
+                    OnlineSiteState.MaybeBlocked => (Color)ColorConverter.ConvertFromString("#E6A23C"),
+                    OnlineSiteState.Fail => (Color)ColorConverter.ConvertFromString("#F56C6C"),
+                    _ => Colors.Gray,
+                };
+                Border border = new Border {
+                    Margin = new Thickness(2, 4, 2, 4),
+                    Padding = new Thickness(10, 8, 10, 8),
+                    CornerRadius = new CornerRadius(4),
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(60, 128, 128, 128)),
+                    BorderThickness = new Thickness(1),
+                };
+                var grid = new Grid();
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var stripeRect = new Border { Background = new SolidColorBrush(stripe), CornerRadius = new CornerRadius(2) };
+                Grid.SetColumn(stripeRect, 0);
+                grid.Children.Add(stripeRect);
+                var textPanel = new StackPanel { Margin = new Thickness(8, 0, 0, 0) };
+                Grid.SetColumn(textPanel, 2);
+                var titleRow = new StackPanel { Orientation = Orientation.Horizontal };
+                titleRow.Children.Add(new TextBlock { Text = card.Title, FontWeight = FontWeights.Bold });
+                if (!string.IsNullOrEmpty(card.StateText))
+                    titleRow.Children.Add(new TextBlock { Text = $"  {card.StateText}", Foreground = new SolidColorBrush(stripe), FontWeight = FontWeights.Bold });
+                textPanel.Children.Add(titleRow);
+                if (!string.IsNullOrEmpty(card.Detail))
+                    textPanel.Children.Add(new TextBlock { Text = card.Detail, TextWrapping = TextWrapping.Wrap, Opacity = 0.85 });
+                if (!string.IsNullOrEmpty(card.Hint))
+                    textPanel.Children.Add(new TextBlock { Text = card.Hint, TextWrapping = TextWrapping.Wrap, Opacity = 0.85 });
+                grid.Children.Add(textPanel);
+                border.Child = grid;
+                _CrawlerCardPanel.Children.Add(border);
+            }
+        }
+
+        #endregion
     }
 }

@@ -32,6 +32,7 @@ namespace Jvedio
         public static ScanManager ScanManager { get; private set; }
         public static DownloadManager DownloadManager { get; private set; }
         public static TranslateTaskManager TranslateTaskManager { get; private set; }
+        public static RenameTaskManager RenameTaskManager { get; private set; }
 
 
         public EventWaitHandle ProgramStarted { get; set; }
@@ -75,6 +76,7 @@ namespace Jvedio
             ScanManager = ScanManager.CreateInstance();
             DownloadManager = DownloadManager.CreateInstance();
             TranslateTaskManager = TranslateTaskManager.CreateInstance();
+            RenameTaskManager = RenameTaskManager.CreateInstance();
 
             // 触发类型初始化：订阅刮削/截图事件，累计阈值后后台静默重建图片索引
             ImageIndexManager.Init();
@@ -114,6 +116,15 @@ namespace Jvedio
                 this.Resources["GlobalFontSize12"] = 12.0 * s;
                 this.Resources["GlobalFontSize13"] = 13.0 * s;
                 this.Resources["GlobalFontSize15"] = 15.0 * s;
+                // 3.36 字号滑条收尾：特殊字号跟随缩放
+                this.Resources["GlobalFontSize7"] = 7.0 * s;
+                this.Resources["GlobalFontSize8"] = 8.0 * s;
+                this.Resources["GlobalFontSize10"] = 10.0 * s;
+                this.Resources["GlobalFontSize16"] = 16.0 * s;
+                this.Resources["GlobalFontSize18"] = 18.0 * s;
+                this.Resources["GlobalFontSize20"] = 20.0 * s;
+                this.Resources["GlobalFontSize24"] = 24.0 * s;
+                this.Resources["GlobalFontSize25"] = 25.0 * s;
             } catch (Exception ex) {
                 Logger.Error(ex);
             }

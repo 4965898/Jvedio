@@ -101,6 +101,7 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="40" />
+                <RowDefinition Height="auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="auto" />
             </Grid.RowDefinitions>
@@ -126,8 +127,45 @@
                     Style="{StaticResource CloseExHoverPath}" />
             </super:SimplePanel>
 
+            <!--  保存的筛选器（智能收藏）：选择即应用；下方输入名称后点保存 = 新建/覆盖  -->
+            <Grid Grid.Row="1" Margin="5,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="auto" />
+                    <ColumnDefinition Width="auto" />
+                </Grid.ColumnDefinitions>
+                <ComboBox
+                    x:Name="SavedFilterComboBox"
+                    MinWidth="120"
+                    Margin="0,2"
+                    SelectionChanged="SavedFilterComboBox_SelectionChanged" />
+                <TextBox
+                    x:Name="SavedFilterNameBox"
+                    Grid.Column="1"
+                    Width="90"
+                    Margin="4,2,0,2"
+                    Padding="3,2"
+                    ToolTip="{DynamicResource SavedFilterNameTip}"
+                    VerticalContentAlignment="Center" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button
+                        MinWidth="34"
+                        Margin="4,2,0,2"
+                        Padding="4,2"
+                        Click="SaveCurrentFilter"
+                        Content="{DynamicResource Save}" />
+                    <Button
+                        MinWidth="34"
+                        Margin="4,2,0,2"
+                        Padding="4,2"
+                        Click="DeleteSelectedFilter"
+                        Content="{DynamicResource Delete}"
+                        ToolTip="{DynamicResource SavedFilterDeleteTip}" />
+                </StackPanel>
+            </Grid>
+
             <ScrollViewer
-                Grid.Row="1"
+                Grid.Row="2"
                 Width="290"
                 Margin="5,0"
                 Style="{StaticResource FlatScrollViewer}"
@@ -801,7 +839,7 @@
 
             </ScrollViewer>
             <Grid
-                Grid.Row="2"
+                Grid.Row="3"
                 Margin="5"
                 Background="{DynamicResource Window.Side.Background}">
 

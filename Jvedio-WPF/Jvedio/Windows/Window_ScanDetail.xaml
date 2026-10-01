@@ -186,7 +186,7 @@
                                 Padding="10,4"
                                 Click="ShowDetail"
                                 Content="{DynamicResource Detail}"
-                                FontSize="10"
+                                FontSize="{DynamicResource GlobalFontSize10}"
                                 Style="{StaticResource ButtonPrimary}"
                                 Tag="{Binding ID}"
                                 Visibility="{Binding ShowDetail, Converter={StaticResource BoolToVisibilityConverter}}" />

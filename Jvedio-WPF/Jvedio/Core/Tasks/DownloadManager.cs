@@ -108,6 +108,17 @@ namespace Jvedio.Core.Tasks
             Dispatcher.BeginWork();
         }
 
+        /// <summary>
+        /// 应用「同步影片信息并发数」设置（1~10，立即生效）。
+        /// 此前 Settings.SyncConcurrency 只存不读，并发恒为常量 2（死配置，见维护日志 六/3.6）。
+        /// </summary>
+        public void ApplyConcurrency(int concurrency)
+        {
+            int value = Math.Max(1, Math.Min(10, concurrency));
+            Dispatcher.UpdateTaskCount(value);
+            Logger.Info($"sync concurrency applied: {value}");
+        }
+
         private DownloadManager() { }
 
         public new static DownloadManager Instance { get; set; }

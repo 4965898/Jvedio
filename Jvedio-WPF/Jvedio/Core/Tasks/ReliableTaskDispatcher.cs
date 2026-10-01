@@ -45,6 +45,15 @@ namespace Jvedio.Core.Tasks
             return new ReliableTaskDispatcher<T>(config);
         }
 
+        /// <summary>
+        /// 运行中更新并发任务数（工作循环每次取任务时读取，立即生效）；值限制在 1~10。
+        /// </summary>
+        public void UpdateTaskCount(int taskCount)
+        {
+            lock (_gate)
+                _config.TaskCount = (uint)Math.Max(1, Math.Min(10, taskCount));
+        }
+
         public void Enqueue(T task)
         {
             if (task == null)

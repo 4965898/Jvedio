@@ -278,6 +278,7 @@ namespace Jvedio.Core.UserControls
             ExpandSeries = ConfigManager.FilterConfig.ExpandSeries;
             ExpandDirector = ConfigManager.FilterConfig.ExpandDirector;
             ExpandStudio = ConfigManager.FilterConfig.ExpandStudio;
+            RefreshSavedFilterList();
         }
 
         public void LoadAll()
@@ -317,6 +318,8 @@ namespace Jvedio.Core.UserControls
                     TagStamps = TagStamp.InitTagStamp(beforeTagStamps);
                     TagStampItemsControl.ItemsSource = null;
                     TagStampItemsControl.ItemsSource = TagStamps;
+                    // 应用筛选方案中保存的标记勾选（若有）
+                    ApplyPendingTags();
                 });
             });
 
@@ -365,7 +368,11 @@ namespace Jvedio.Core.UserControls
             HashSet<string> months = dates.Select(arg => arg.Split('-')[1]).ToHashSet().OrderBy(x => x).ToHashSet();
 
             AddItem(years, yearWrapPanel);
-            AddItem(months, monthWrapPanel, () => CommonLoad = LoadState.Loaded);
+            AddItem(months, monthWrapPanel, () => {
+                CommonLoad = LoadState.Loaded;
+                ApplyPendingChecked(yearWrapPanel);
+                ApplyPendingChecked(monthWrapPanel);
+            });
         }
         private void LoadSingleDataFromMetaData(WrapPanel wrapPanel, string field)
         {
@@ -384,7 +391,7 @@ namespace Jvedio.Core.UserControls
                     set.Add(data);
             AddItem(set, wrapPanel, () => {
                 GenreLoad = LoadState.Loaded;
-                // 加载完成后按当前关键词重新过滤一次（加载期间新加的标签默认全部可见）
+                ApplyPendingChecked(wrapPanel);
                 ApplyGenreFilter();
             }, (value) => GenreProgress = value);
         }
@@ -690,15 +697,24 @@ namespace Jvedio.Core.UserControls
         }
         public void LoadSeries()
         {
-            LoadSingleData(seriesWrapPanel, "Series", () => SeriesLoad = LoadState.Loading, () => SeriesLoad = LoadState.Loaded, (value) => SeriesProgress = value); // 系列
+            LoadSingleData(seriesWrapPanel, "Series", () => SeriesLoad = LoadState.Loading, () => {
+                SeriesLoad = LoadState.Loaded;
+            ApplyPendingChecked(seriesWrapPanel);
+        }, (value) => SeriesProgress = value);
         }
         public void LoadDirector()
         {
-            LoadSingleData(directorWrapPanel, "Director", () => DirectorLoad = LoadState.Loading, () => DirectorLoad = LoadState.Loaded, (value) => DirectorProgress = value); // 系列
+            LoadSingleData(directorWrapPanel, "Director", () => DirectorLoad = LoadState.Loading, () => {
+                DirectorLoad = LoadState.Loaded;
+            ApplyPendingChecked(directorWrapPanel);
+        }, (value) => DirectorProgress = value);
         }
         public void LoadStudio()
         {
-            LoadSingleData(studioWrapPanel, "Studio", () => StudioLoad = LoadState.Loading, () => StudioLoad = LoadState.Loaded, (value) => StudioProgress = value); // 系列
+            LoadSingleData(studioWrapPanel, "Studio", () => StudioLoad = LoadState.Loading, () => {
+                StudioLoad = LoadState.Loaded;
+            ApplyPendingChecked(studioWrapPanel);
+        }, (value) => StudioProgress = value);
         }
 
 
@@ -841,6 +857,7 @@ namespace Jvedio.Core.UserControls
         
         private void ResetToDefault()
         {
+            _PendingState = null;
             OnlyShowSubsection.IsChecked = false;
 
             var playRadios = playWrapPanel.Children.OfType<RadioButton>().ToList();
@@ -1224,6 +1241,282 @@ namespace Jvedio.Core.UserControls
             }
             wrapper.Like(wrappedField, $"{sep}{tags[count - 1]}{sep}").RightBracket();
         }
+
+        #region "保存的筛选器（智能收藏）"
+
+        /// <summary>宿主列表的 ViewModel：保存/恢复搜索词与排序状态（VideoList 构造时注入）</summary>
+        internal Jvedio.Core.UserControls.ViewModels.VieModel_VideoList AttachedVieModel { get; set; }
+
+        private Jvedio.Core.Config.Data.FilterState _PendingState;
+        private bool _SuppressSavedFilterEvent;
+
+        private string CaptureState()
+        {
+            var state = new Jvedio.Core.Config.Data.FilterState();
+            if (TagStamps != null)
+                state.TagIds = TagStamps.Where(t => t.Selected).Select(t => t.TagID).ToList();
+
+            state.PlayRadio = GetCheckedIndex(playWrapPanel);
+            state.VideoTypes = videoTypeWrapPanel.Children.OfType<ToggleButton>()
+                .Select((t, i) => new { t, i }).Where(x => (bool)x.t.IsChecked).Select(x => x.i).ToList();
+            state.OnlySubsection = (bool)OnlyShowSubsection.IsChecked;
+            state.PosterSel = GetCheckedIndex(posterExistWrapPanel);
+            state.ThumbSel = GetCheckedIndex(thumbnailExistWrapPanel);
+            state.ActorSel = GetCheckedIndex(actorExistWrapPanel);
+            state.SubSel = GetCheckedIndex(subtitleExistWrapPanel);
+            state.TimeIndex = GetCheckedIndex(timeWrapPanel);
+            state.SizeIndex = GetCheckedIndex(sizeWrapPanel);
+            state.RateMin = rateSlider.MinValue;
+            state.RateMax = rateSlider.MaxValue;
+
+            state.Years = GetCheckedContents(yearWrapPanel);
+            state.Genres = GetCheckedContents(genreWrapPanel);
+            state.SeriesList = GetCheckedContents(seriesWrapPanel);
+            state.Directors = GetCheckedContents(directorWrapPanel);
+            state.Studios = GetCheckedContents(studioWrapPanel);
+            state.GenreSearch = genreSearchBox?.Text ?? string.Empty;
+
+            if (AttachedVieModel != null) {
+                state.SearchText = AttachedVieModel.SearchText ?? string.Empty;
+                state.SearchFieldIndex = AttachedVieModel.SearchSelectedIndex;
+                state.SortType = AttachedVieModel.SortType;
+                state.SortDescending = AttachedVieModel.SortDescending;
+            }
+            return Newtonsoft.Json.JsonConvert.SerializeObject(state);
+        }
+
+        private static int GetCheckedIndex(Panel panel)
+        {
+            List<RadioButton> radios = panel.Children.OfType<RadioButton>().ToList();
+            if (radios.Count == 0) {
+                // ToggleButton 面板（时长等）：返回选中索引（0 = 全部档）
+                List<ToggleButton> toggles = panel.Children.OfType<ToggleButton>().ToList();
+                for (int i = 0; i < toggles.Count; i++)
+                    if ((bool)toggles[i].IsChecked)
+                        return i;
+                return 0;
+            }
+            for (int i = 0; i < radios.Count; i++)
+                if ((bool)radios[i].IsChecked)
+                    return i;
+            return -1;
+        }
+
+        private static List<string> GetCheckedContents(Panel panel)
+        {
+            return panel.Children.OfType<ToggleButton>()
+                .Where(t => (bool)t.IsChecked)
+                .Select(t => t.Content?.ToString())
+                .Where(s => !string.IsNullOrEmpty(s)).ToList();
+        }
+
+        private void ApplyState(Jvedio.Core.Config.Data.FilterState state)
+        {
+            if (state == null)
+                return;
+            _PendingState = state;
+
+            // 静态面板直接恢复
+            OnlyShowSubsection.IsChecked = state.OnlySubsection;
+            SetRadioByIndex(playWrapPanel, state.PlayRadio, 0);
+            SetTogglesByIndex(videoTypeWrapPanel, state.VideoTypes);
+            SetRadioByIndex(posterExistWrapPanel, state.PosterSel, -1);
+            SetRadioByIndex(thumbnailExistWrapPanel, state.ThumbSel, -1);
+            SetRadioByIndex(actorExistWrapPanel, state.ActorSel, -1);
+            SetRadioByIndex(subtitleExistWrapPanel, state.SubSel, -1);
+            SetRadioByIndex(timeWrapPanel, state.TimeIndex, 0);
+            SetRadioByIndex(sizeWrapPanel, state.SizeIndex, 0);
+            if (state.RateMin >= 0 && state.RateMax >= state.RateMin) {
+                rateSlider.MinValue = state.RateMin;
+                rateSlider.MaxValue = state.RateMax;
+            }
+            if (genreSearchBox != null)
+                genreSearchBox.Text = state.GenreSearch ?? string.Empty;
+
+            // 标记：已加载则立即回填；未加载则展开并触发加载（完成后回调回填）
+            if (state.TagIds != null && state.TagIds.Count > 0 && (TagStamps == null || TagStamps.Count == 0)) {
+                ExpandTag = true;
+                InitTagStamp();
+            } else {
+                ApplyPendingTags();
+            }
+
+            // 惰性面板：展开触发加载，加载完成回调回填勾选（ApplyPendingChecked）
+            EnsurePanelLoaded(state.Years, yearWrapPanel, () => { if (CommonLoad != LoadState.Loaded) SetCommonFilter(); });
+            EnsurePanelLoaded(state.Genres, genreWrapPanel, LoadGenre);
+            EnsurePanelLoaded(state.SeriesList, seriesWrapPanel, LoadSeries);
+            EnsurePanelLoaded(state.Directors, directorWrapPanel, LoadDirector);
+            EnsurePanelLoaded(state.Studios, studioWrapPanel, LoadStudio);
+
+            // 搜索 + 排序：写入 ViewModel 并预生成搜索 wrapper，随后随 ApplyFilter 一起查询
+            if (AttachedVieModel != null) {
+                AttachedVieModel.SearchText = state.SearchText ?? string.Empty;
+                AttachedVieModel.SearchSelectedIndex = state.SearchFieldIndex;
+                AttachedVieModel.SortType = state.SortType;
+                AttachedVieModel.SortDescending = state.SortDescending;
+                AttachedVieModel.SearchWrapper = string.IsNullOrEmpty(state.SearchText)
+                    ? null
+                    : AttachedVieModel.GetSearchWrapper((Jvedio.Core.Enums.SearchField)state.SearchFieldIndex);
+            }
+
+            ApplyFilter();
+        }
+
+        private static void SetRadioByIndex(Panel panel, int index, int defaultIndex)
+        {
+            List<RadioButton> radios = panel.Children.OfType<RadioButton>().ToList();
+            if (radios.Count > 0) {
+                for (int i = 0; i < radios.Count; i++)
+                    radios[i].IsChecked = (i == index);
+                return;
+            }
+            List<ToggleButton> toggles = panel.Children.OfType<ToggleButton>().ToList();
+            for (int i = 0; i < toggles.Count; i++)
+                toggles[i].IsChecked = (i == index);
+        }
+
+        private static void SetTogglesByIndex(Panel panel, List<int> indexes)
+        {
+            List<ToggleButton> toggles = panel.Children.OfType<ToggleButton>().ToList();
+            for (int i = 0; i < toggles.Count; i++)
+                toggles[i].IsChecked = indexes != null && indexes.Contains(i);
+        }
+
+        private void EnsurePanelLoaded(List<string> wanted, WrapPanel panel, Action load)
+        {
+            if (wanted == null || wanted.Count == 0)
+                return;
+            // 面板已加载且包含所有需要的标签时直接回填，否则触发加载
+            if (panel.Children.Count > 0) {
+                ApplyPendingChecked(panel);
+                if (ContainsAll(panel, wanted))
+                    return;
+            }
+            load?.Invoke();
+        }
+
+        private static bool ContainsAll(WrapPanel panel, List<string> wanted)
+        {
+            HashSet<string> existing = panel.Children.OfType<ToggleButton>()
+                .Select(t => t.Content?.ToString()).ToHashSet();
+            return wanted.All(existing.Contains);
+        }
+
+        private void ApplyPendingChecked(WrapPanel panel)
+        {
+            if (_PendingState == null || panel == null)
+                return;
+            List<string> wanted = null;
+            if (panel == genreWrapPanel) wanted = _PendingState.Genres;
+            else if (panel == seriesWrapPanel) wanted = _PendingState.SeriesList;
+            else if (panel == directorWrapPanel) wanted = _PendingState.Directors;
+            else if (panel == studioWrapPanel) wanted = _PendingState.Studios;
+            else if (panel == yearWrapPanel) wanted = _PendingState.Years;
+            if (wanted == null)
+                return;
+            foreach (ToggleButton item in panel.Children.OfType<ToggleButton>())
+                item.IsChecked = wanted.Contains(item.Content?.ToString());
+            if (panel == genreWrapPanel)
+                ApplyGenreFilter();
+        }
+
+        private void ApplyPendingTags()
+        {
+            if (_PendingState == null)
+                return;
+            if (TagStamps == null || TagStamps.Count == 0)
+                return;
+            bool changed = false;
+            foreach (TagStamp stamp in TagStamps) {
+                bool want = _PendingState.TagIds.Contains(stamp.TagID);
+                if (stamp.Selected != want) {
+                    stamp.Selected = want;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                // PathCheckButton 绑定 TagStamps 集合，重新绑定以刷新勾选显示
+                TagStampItemsControl.ItemsSource = null;
+                TagStampItemsControl.ItemsSource = TagStamps;
+            }
+        }
+
+        private void RefreshSavedFilterList()
+        {
+            _SuppressSavedFilterEvent = true;
+            SavedFilterComboBox.Items.Clear();
+            foreach (Jvedio.Core.Config.Data.SavedFilter saved in ConfigManager.FilterConfig.SavedFilters ?? new List<Jvedio.Core.Config.Data.SavedFilter>())
+                SavedFilterComboBox.Items.Add(saved.Name);
+            _SuppressSavedFilterEvent = false;
+        }
+
+        private void SavedFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_SuppressSavedFilterEvent)
+                return;
+            string name = SavedFilterComboBox.SelectedItem as string;
+            if (string.IsNullOrEmpty(name))
+                return;
+            Jvedio.Core.Config.Data.SavedFilter saved = ConfigManager.FilterConfig.SavedFilters
+                .FirstOrDefault(arg => arg.Name == name);
+            if (saved == null)
+                return;
+            try {
+                var state = Newtonsoft.Json.JsonConvert.DeserializeObject<Jvedio.Core.Config.Data.FilterState>(saved.State);
+                ApplyState(state);
+                MessageNotify.Success($"{LangManager.GetValueByKey("SavedFilterApply")}: {name}");
+            } catch (Exception ex) {
+                App.Logger.Error(ex);
+                MessageNotify.Error(LangManager.GetValueByKey("SavedFilterBroken"));
+            }
+        }
+
+        private void SaveCurrentFilter(object sender, RoutedEventArgs e)
+        {
+            string name = SavedFilterNameBox.Text?.Trim();
+            if (string.IsNullOrEmpty(name)) {
+                MessageNotify.Error(LangManager.GetValueByKey("SavedFilterNameEmpty"));
+                return;
+            }
+            // 应用未加载的面板先展开加载（否则只能捕获到已加载面板的状态）
+            var saved = ConfigManager.FilterConfig.SavedFilters.FirstOrDefault(arg => arg.Name == name);
+            string stateJson = CaptureState();
+            if (saved != null) {
+                saved.State = stateJson;
+            } else {
+                ConfigManager.FilterConfig.SavedFilters.Add(new Jvedio.Core.Config.Data.SavedFilter() {
+                    Name = name,
+                    State = stateJson,
+                });
+                _SuppressSavedFilterEvent = true;
+                SavedFilterComboBox.Items.Add(name);
+                _SuppressSavedFilterEvent = false;
+                SavedFilterComboBox.SelectedItem = name;
+            }
+            ConfigManager.FilterConfig.Save();
+            SavedFilterNameBox.Text = string.Empty;
+            MessageNotify.Success($"{LangManager.GetValueByKey("SavedFilterSaved")}: {name}");
+        }
+
+        private void DeleteSelectedFilter(object sender, RoutedEventArgs e)
+        {
+            if (!(SavedFilterComboBox.SelectedItem is string name) || string.IsNullOrEmpty(name)) {
+                MessageNotify.Error(LangManager.GetValueByKey("SavedFilterNameEmpty"));
+                return;
+            }
+            Jvedio.Core.Config.Data.SavedFilter saved = ConfigManager.FilterConfig.SavedFilters
+                .FirstOrDefault(arg => arg.Name == name);
+            if (saved == null)
+                return;
+            if (new MsgBox($"{LangManager.GetValueByKey("IsToDelete")} 【{name}】").ShowDialog() != true)
+                return;
+            ConfigManager.FilterConfig.SavedFilters.Remove(saved);
+            ConfigManager.FilterConfig.Save();
+            RefreshSavedFilterList();
+            MessageNotify.Success($"{LangManager.GetValueByKey("SavedFilterDeleted")}: {name}");
+        }
+
+        #endregion
     }
 
 

@@ -53,6 +53,25 @@ namespace Jvedio.Core.Crawler
         }
 
         /// <summary>
+        /// 站点是否启用（停用的站点不出现在详情页按钮组 / 右键菜单 / 演员页）；
+        /// 开关持久化在 OnlineConfig.DisabledSites
+        /// </summary>
+        public bool Enabled {
+            get {
+                return ConfigManager.OnlineConfig?.DisabledSites == null
+                    || !ConfigManager.OnlineConfig.DisabledSites.Contains(Name);
+            }
+            set {
+                if (ConfigManager.OnlineConfig?.DisabledSites == null)
+                    return;
+                if (value)
+                    ConfigManager.OnlineConfig.DisabledSites.Remove(Name);
+                else
+                    ConfigManager.OnlineConfig.DisabledSites.Add(Name);
+            }
+        }
+
+        /// <summary>
         /// 生效的根地址：优先用户自定义；兼容旧配置（旧格式是完整网址模板，只取协议+域名部分）
         /// </summary>
         private string GetBaseUrl()

@@ -127,6 +127,29 @@ namespace Jvedio.Core.Backup
                 return await DownloadFileAsync(client, type, fileName, localDirectory, null);
         }
 
+        /// <summary>
+        /// 在线保留份数：按修改时间从旧到新删除超出 keep 的历史备份 ZIP。
+        /// latest.json 指针指向最新备份，删除旧 ZIP 不影响它；仅统计本软件命名的 ZIP。
+        /// </summary>
+        public static async Task PruneRemoteAsync(int keep)
+        {
+            IReadOnlyList<RemoteBackupItem> items = await ListBackupsAsync();
+            if (items == null || items.Count <= keep)
+                return;
+            using (var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) }) {
+                foreach (RemoteBackupItem item in items.Skip(keep)) {
+                    if (item == null || string.IsNullOrEmpty(item.FileName) || !SafeArchiveName(item.FileName))
+                        continue;
+                    try {
+                        await DeleteAsync(client, ConfigManager.Settings.BackupRemoteType, item.FileName);
+                    } catch (Exception ex) {
+                        // 单个删除失败不中断剩余清理（权限差异/瞬时占用），留待下次备份再清
+                        Jvedio.Core.Logs.Logger.Instance.Error($"prune remote backup failed: {item.FileName} => {ex.Message}");
+                    }
+                }
+            }
+        }
+
         public static async Task<string> DownloadLatestAsync(string localDirectory)
         {
             string type = ConfigManager.Settings.BackupRemoteType;

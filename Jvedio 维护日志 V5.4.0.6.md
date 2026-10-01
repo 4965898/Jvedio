@@ -1,7 +1,7 @@
 # Jvedio 维护日志 V5.4.0.6
 
 > 本文档沉淀自 2025-12 起对 Jvedio（WPF 本地视频管理软件）的接手维护与二次开发实践，供后续开发参考。
-> 最后更新：2026-09-30
+> 最后更新：2026-10-01
 
 ---
 
@@ -95,6 +95,11 @@
 | 5.4.1.58（Jvedio29.66，本地部署） | 2026-09-29 | 备份方式下拉菜单：仅本地、仅在线、本地及在线；自动与手动备份统一遵循选择（见 3.69） |
 | 5.4.1.59（Jvedio29.67，本地部署） | 2026-09-30 | WebDAV/S3 密码框宽度与普通输入框对齐；本地备份保留份数限制为 1–10；在线恢复改为从远端 ZIP 列表选择（见 3.70） |
 | 5.4.1.60（Jvedio29.68，发布版） | 2026-09-30 | 汇总 5.4.1.54–60 的备份/恢复、筛选、更新提醒、资料体检、刮削和设置排版改进；完整 ZIP 与同版 EXE 由 Release 工作流发布（见 3.65–3.71） |
+| 5.4.1.61（Jvedio29.69，并入 5.4.1.65 发布） | 2026-10-01 | 体验与功能集中迭代：i18n 防回归检查进 CI、同步并发数校验并接通实际消费、字号滑条全覆盖、深色主题对比度收尾、右键菜单分组分隔线与作用范围标注、在线站点开关+可达性预检、设置页站内搜索、批量编辑、保存的筛选器、刮削源体检、随库 NFO 修复、翻译补翻、重命名收编任务页、统计仪表盘、Ctrl+K 命令面板、全窗口拖放导入+自动刮削开关、备份真实服务端到端验收（见 3.72）。尚未公开发布 |
+| 5.4.1.62（Jvedio29.70，并入 5.4.1.65 发布） | 2026-10-01 | 修复启动窗口在初始化完成前点击（类型切换等）的 NRE：vieModel 于 Window_Loaded 末尾才创建，前置后台步骤耗时期间的全部处理器加未就绪防护（见 3.73）。尚未公开发布 |
+| 5.4.1.63（Jvedio29.71，并入 5.4.1.65 发布） | 2026-10-01 | 统计图表修复（绑定用字段导致全空）；设置页站内搜索框调高；字号/滚动速度数值改为可输入；在线备份保留份数（远端历史 ZIP 剪枝）；本地备份统一为压缩包（见 3.74）。尚未公开发布 |
+| 5.4.1.64（Jvedio29.72，并入 5.4.1.65 发布） | 2026-10-01 | 修复快捷键 S/W 无反应（菜单 Header 文本与查找 key 不一致）+ 同步信息菜单显示手势 S；站内搜索框显式固定高度与拉伸（见 3.75）。尚未公开发布 |
+| 5.4.1.65（Jvedio29.73，发布版） | 2026-10-01 | 同步信息菜单的快捷键提示改内嵌文案「同步信息 (S)」（SuperControls 菜单模板不渲染 InputGestureText，见 3.76）。尚未公开发布 |
 
 > 这些发布说明与本地 diff 吻合，可互相印证。5.4.0.5 的 Release Body 已于 2026-08-09 更新为「下载指引 + 相对原版 5.4 的改进总结 + 原记录」三段式，源码也已同步 commit（见 1.2、第五章）。
 
@@ -1124,6 +1129,7 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 **本地部署核对**：源码已合并到 `A:\Trae\repository\Jvedio-1`；主工作区构建的 `Jvedio.exe`、`build-output\Jvedio29.62.exe` 和 `E:\Jvedio-5.3.1\Jvedio29.62.exe` 的 SHA-256 均为 `2ED325D38C67650D5E654562AA8342C52CB06F9A7AD0B56B6C00038B7BC3A501`，文件版本均为 5.4.1.54。实际启动部署版后主窗口正常响应；窗口截图已确认右下角盾牌位于“文/T”翻译任务左侧。旧 EXE 与用户 `data` 目录保留。
 
 **待验证**：尚未用真实 WebDAV/S3 账号做跨服务兼容测试；设置页和恢复操作仍需用户在正式界面中验收。尚未公开发布。
+> **2026-10-01 补充**：已用本地真实服务（rclone WebDAV/S3 网关，带鉴权与多级子目录/前缀）对应用真实备份代码完成端到端验收（见 3.72）；用户自己的云账号配置后仍应点「检查连接」确认。
 
 **使用说明**：“可播放/不可播放”和“有字幕/无字幕”筛选复用最近五分钟的文件校验，避免每次点选都扫描整库；首次或超过五分钟仍会校验，外部移动文件或重新连接硬盘后可点“重新校验文件”立即刷新。“强制同步信息”控制已有资料时是否仍从网站抓取，“保留已有资料”控制抓到结果后是否覆盖已填写字段；两项同开表示重新抓取但只补空字段，图片下载仍按各自开关处理。
 
@@ -1170,6 +1176,90 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 - 新增备份字段专用普通输入框/密码框样式，统一右列的伸展方式、内边距和外边距；移除密码框绑定相邻控件实际宽度的旧做法，避免位置偏左或尺寸变化后错位。测试按钮和状态文字也与右列对齐。
 
 **验证与部署**：Release/AnyCPU 主工作区构建及 XAML 编译通过，`git diff --check` 通过；`E:\Jvedio-5.3.1\Jvedio29.68.exe` 文件版本 5.4.1.60，SHA-256 为 `FA75C97402E15BE881B131B8749555DF73E7CAADF8905711E3AA9A0FBACAE29E`，与主工作区构建产物一致。部署时前台为游戏，未自动打开应用干扰用户；随后用户确认布局无问题。本版按仓库工作流从 `master` 自动发布完整 ZIP 与同版 EXE，正式资产以 CI 校验结果为准。真实 WebDAV/S3 服务仍待账号配置后验收。
+
+---
+
+### 3.72 体验与功能集中迭代（2026-10-01，5.4.1.61 / Jvedio29.69）
+
+按用户采纳清单完成的 16 项改进（未采纳项未动）。要点与位置：
+
+**遗留账清理**
+- **i18n 防回归**：新增 `scripts/check-i18n-keys.ps1`（三语 key 集合必须一致，FAIL 阻断；代码 `GetValueByKey` 与 XAML `DynamicResource` 引用缺失 key 仅警告——部分 key 在 SuperControls.Style 字典内），接入 `release.yml` 构建前检查；当前 251 key 三语一致。
+- **SyncConcurrency 校验并接通**：`VieModel_Settings` 限制 1–10；发现该设置历史上**只存不读**（死配置，同 `DataExistsIndexAfterScan`），`ReliableTaskDispatcher.UpdateTaskCount` + `DownloadManager.ApplyConcurrency` 让其立即生效（ConfigManager.Init 与设置页保存两处调用）。
+- **字号滑条收尾**：补 `GlobalFontSize7/8/10/16/18/20/24/25` 资源，21 处硬编码字号全部跟随缩放（启动、滑条 ValueChanged 同步更新；默认 1.0 档无任何视觉变化）。
+- **深色主题对比度专项**：全库审计仅一处正文级硬编码灰字（设置页在线站点默认网址提示 `#909399`），改 `Window.Foreground` + Opacity 0.55。
+- **真实 WebDAV/S3 验收**：本地起真实服务（`rclone serve webdav` 带鉴权 + `rclone serve s3` SigV4），用独立 net472 harness 直接驱动应用真实备份代码：检查连接（PUT/GET/DELETE、WebDAV 多级 MKCOL 子目录、S3 多级前缀）、备份（本地快照+上传+latest.json 指针）、远端历史列表、恢复下载（SHA-256 校验）、暂存恢复（ZIP 与数据库完整性校验）全部通过，服务端工件逐一核对。**用户真实云账号与鉴权（坚果云/Nextcloud/AWS 等）仍需用户自行配置「检查连接」验证；设置页表单与恢复选择器的 UI 层验收待用户完成。**
+
+**交互一致性与可发现性**
+- **右键菜单分组**：海报右键与空白右键菜单加分组分隔线，高频项补既有图标资产（download/label/openwebsite/edit/translate/openfolder/selectall）。
+- **三态范围标注**：两个菜单顶部新增禁用态说明行「作用范围：选中的影片 / 当前结果集」（i18n `MenuScopeSelected` / `MenuScopeCurrentResults`），呼应 3.30/3.33/3.52 的语义划分。
+- **在线站点开关 + 可达性预检**：`OnlineConfig.DisabledSites`（站点停用后不出现在详情页/演员页/右键菜单，设置页每行 Checkbox 即存即落盘）+ `OnlineSiteStatus`（后台探测走「选项-网络」代理，绿=可达、橙=疑似 CF/风控、红=连不上，10 分钟缓存，6 并发防风控；详情页按钮旁小圆点，事件驱动刷新）。3.16 遗留的「站点启用开关、可达性预检」至此补齐（「无码/字幕」标签仍按需再做）。
+- **设置页站内搜索**：顶部搜索框按标签文案模糊匹配（逻辑树遍历含未激活页签），结果弹层回车/双击跳转对应页签并 BringIntoView + TextBlock 黄底闪烁。
+- **批量编辑**：`Window_BatchEdit`（多选右键「批量编辑」）：勾选字段（制作商/发行商/导演/系列，metadata_video 单值列）统一赋值 + 追加标记（`metadata_to_tagstamp` 批量 insert or replace），完成后刷新列表。
+- **保存的筛选器**：Filter 面板顶部「方案下拉 + 名称框 + 保存/删除」；状态快照（`FilterState` JSON 存 `FilterConfig.SavedFilters`）覆盖标记/存在性/类型/时长/大小/评分/年份/类别/系列/导演/制作商/类别搜索 + 搜索词/字段/排序；惰性面板应用时自动展开加载后回填（`_PendingState` + 加载完成回调）；重置时清 pending。
+
+**功能补齐**
+- **随库自动写 NFO 修复**：开关本已存在（`SaveInfoToNFO`），本次修复两点——文件名改按 Kodi/Jellyfin/Emby 标准 `<视频文件名>.nfo`（无本地文件回退 `<VID>.nfo`）；设置页「覆盖」勾选此前**从未被消费**，现 `OverwriteNFO || DownloadConfig.OverrideInfo` 才覆盖。
+- **翻译补翻**：高级菜单新增「补翻未翻译标题」，只翻选中影片中「有原文无 TitleCN」的（失败重试 + 从未翻译两者都覆盖）；任务页「重启所有失败」3.41 起已有。
+- **重命名收编任务页**：`RenameTask`/`RenameTaskManager`（一部一任务，本地 IO 并发 4），选中/全库重命名均入队，进度/取消/失败重启与下载/翻译同构；状态栏新增「A→」图标；删除了原 UI 线程同步循环的死代码。
+- **统计仪表盘**：`Window_Statistics`（状态栏条形图图标打开）：影片/收藏/容量/总时长卡片 + 年份/评分/类别（内存拆分多值列）/片商/系列/演员 Top 条形图，纯 WPF 绘制零依赖，SQL 聚合后台执行。
+- **Ctrl+K 命令面板**：`Window_CommandPalette`（主窗口 PreviewKeyDown 注册）：番号/标题/中文标题空格分词直达详情页（复用主列表 `onShowDetailData`）+ 设置/统计/体检/打开数据目录命令。
+- **拖放导入补全**：拖放此前只挂在内容区，扩展为**整窗可拖放**（Drop 置 Handled 防重复入队）；新增 `ScanConfig.ScrapeAfterScan`（默认关）——扫描/拖放导入完成后对新增影片自动开始同步信息。
+
+**验证**：Release 编译通过（仅预存在 MSB3270/MSB3177）；三语 251 key 一致；备份真实服务验收见上。部署 `E:\Jvedio-5.3.1\Jvedio29.69.exe`。**待用户实测**：在线站点预检的代理联动与误报率、保存的筛选器跨库行为、批量编辑大选中性能、Ctrl+K 搜索相关性、字号大档位布局、拖放导入+自动刮削全流程。
+
+**经验**：①「只存不读」的死配置在接手仓库里不止一个（`DataExistsIndexAfterScan`、`OverwriteNFO`、`SyncConcurrency`）——加设置项时必须把「谁消费」写进同一提交；②代码生成的 WPF 界面尽量用 StackPanel/ItemsControl 而非手工 Grid 工厂（`ColumnDefinitionCollection` 无公共构造器）；③ net472 没有 `CollectionExtensions.GetValueOrDefault`，跨目标版本写代码前先确认 BCL 面；④ 独立 harness 驱动应用的静态服务类（BackupService/RemoteBackupStore）时，绕开 ORM 反射初始化、直接构造其消费的配置单例，是「不启动 UI 也能验收」的最短路径。
+
+---
+### 3.73 启动窗口初始化完成前点击的 NRE 修复（2026-10-01，5.4.1.62 / Jvedio29.70）
+
+**现象**（用户报告，升级 5.4.1.61 后）：启动窗口（选择库界面）点击「视频/图片」类型切换按钮直接报 `NullReferenceException`，堆栈顶 `WindowStartUp.ChangeDataType`。
+
+**根因**：`ChangeDataType` 使用的 `vieModel` 在 `Window_Loaded` **末尾**的 `InitContext()` 才创建（DataContext 同步设置），而它之前排着 `await MoveOldFiles / InitAppData / await BackupData / await MovePlugins / CrawlerManager.Init(true) / ConfigManager.ServerConfig.Read()` 等步骤——数据目录大/备份到期时这些步骤耗时数秒。当日日志实锤：配置读取完成于 20:33:17.786，用户点击于 20:33:21.744（4 秒后），此时 `InitContext` 尚未执行，`vieModel` 为 null → `vieModel.CurrentSideIdx = idx` NRE。**原有竞态**（非 3.72 的 16 项引入；此前用户未在启动后几秒内点过类型切换）。
+
+**修复**（WindowStartUp.xaml.cs）：新增 `StartUpNotReady()`（`vieModel == null` 时记一条 `Logger.Info` 并返回 true），给全部在 `InitContext` 之前可达的处理器加防护：`ChangeDataType` / `LoadDataBase()`（void 重载，覆盖点击与双击两入口）/ `SearchText_Changed`（搜索框也是启动界面静态控件，提前输入同样会 NRE）/ `NewDatabase` / `SortDatabases` / `DelSqlite` / `RenameSqlite` / `SetImage` / `ShowHideDataBase` / `HideDataBase` / `RefreshDatabase` / `RestoreDatabase`；`Dispose()` 同样补 `vieModel == null` 守卫（初始化完成前关闭窗口会在 `vieModel.Tile` NRE）。
+
+**语义**：未就绪期间的点击被静默忽略并记日志——`InitContext` 完成后 `InitMainWindow` 会按保存的 `SideIdx` 恢复单选状态，点击意图不丢失（用户再点一次或默认状态即正确）。
+
+**验证**：Release 编译通过；部署 `E:\Jvedio-5.3.1\Jvedio29.70.exe`（归档 build-output\Jvedio29.70.exe，SHA-256 三方一致）。待用户实测：启动后立即连点类型切换不再报错。
+
+**教训**：`Window_Loaded` 里「重活在前、DataContext/vieModel 在末尾」的窗口，其静态控件（单选/搜索框/按钮）在重活期间就是可点的——所有触达 `vieModel` 的处理器都要有未就绪防护；这类 NRE 的日志特征是「配置读取完成后数秒」+ 堆栈顶为处理器本身（无更深业务帧）。
+
+---
+### 3.74 统计图表修复 + 备份压缩包统一 + 五项体验改进（2026-10-01，5.4.1.63 / Jvedio29.71）
+
+**统计界面没有显示任何图表（上一版 bug）**：`Window_Statistics.BarItem` 用了**公有字段**而非属性——WPF Binding 不支持公有字段，`{Binding Label}` 等全部静默失败，条形图渲染为空。改为 get/set 属性后恢复。教训：给 DataTemplate/ItemsControl 绑定的数据类必须用属性，字段不报错但绑定全空，编译期无感知。
+
+**五项用户反馈的改进**：
+1. **设置页站内搜索框调高**：`SettingsSearchBox` 加 `MinHeight=34` + `Padding 0,7` + 垂直居中，中文不再被裁半。
+2. **在线备份保留份数**：`Settings.RemoteMaxBackups`（1–30，默认 10）+ 设置页「在线保留份数」输入框；`RemoteBackupStore.PruneRemoteAsync(keep)` 上传成功后按修改时间从旧到新删除远端多余历史 ZIP（latest.json 指针指向最新不受影响；单个删除失败记日志不中断剩余清理）；失败经 `BackupResult.RemoteRetentionError` 在设置页报告（复用 BackupRetentionWarning 文案）。
+3. **字号/滚动速度数值可输入**：两行的只读 Label 改为输入框（双向绑定 `DpiConfig.UiFontScale` / `ConfigManager.Main.ScrollSpeedFactor`，失焦提交）；提交后滑条联动更新并触发全局字号刷新；`ScrollSpeedFactor` setter 补 0.1–3.0 收敛（手动越界防滚轮异常）。
+4. **本地备份统一为压缩包**：`CreateAsync` 本地及在线模式的本地快照改为「快照文件夹 → 同名 ZIP → 删除文件夹」，只保留 ZIP（与在线备份一致）；本地及在线模式直接上传该 ZIP 不重复压缩，ZIP 即本地备份本体不再删除；压缩失败退回文件夹形态（原有行为）。`PruneLocalSnapshots` 同步识别日期命名的 ZIP（文件夹 + ZIP 按同一保留份数清理，旧日期文件夹自然过渡）；此前删除失败遗留的孤立 ZIP 也被纳入清理。恢复链路零改动（`StageRestore` 本就支持 ZIP/文件夹双形态）。
+5. 另：设置页站内搜索框上一版 `Padding 0,4` 过矮的问题并入第 1 项。
+
+**验证**：真实服务回归（rclone WebDAV/S3，独立 harness 直接驱动应用备份代码）**13/13 全部通过**——检查连接（多级子目录/前缀）、两次备份、本地 ZIP 形态（文件夹清理后只留 ZIP）、远端剪枝（4 个历史 ZIP + keep=1 → 剪到 1 个）、远端历史列表、恢复下载（SHA-256）、暂存恢复（ZIP 与数据库完整性校验）。Release 编译通过；三语 255 key 一致。部署 `E:\Jvedio-5.3.1\Jvedio29.71.exe`（归档 build-output\Jvedio29.71.exe，SHA-256 三方一致）。**待用户实测**：统计图表各分布是否正常显示、搜索框/数值输入框观感、下一次备份后备份目录是否只留 ZIP。
+
+**经验**：① WPF 绑定对「字段 vs 属性」的静默失败是代码生成 UI 的高发坑，数据类一律属性；② 改备份产物形态（文件夹→ZIP）时，保留清理、恢复入口、远端上传三条链路要一起过：恢复（StageRestore 双形态）零改动是此前"在线恢复走 ZIP"设计的红利；③ 远端剪枝挂在"上传成功后"而非独立定时任务，一次遍历完成 list+prune，失败降级为日志（下次备份再清），符合"备份失败不影响主流程"的底线。
+
+---
+### 3.75 快捷键 S/W 修复 + 搜索框宽度核查（2026-10-01，5.4.1.64 / Jvedio29.72）
+
+**右键菜单快捷键 S（同步信息）无反应**：`ContextMenu_PreviewKeyUp` 的 S 分支早已存在（原作者设计：菜单开着按 S/D/T/E/W/C/X 直接触发对应项），但查找用 `GetValueByKey("Menu_SyncInfo")`（SuperControls 字典值「立即同步(S)」），而菜单项实际 Header 是 `{DynamicResource SyncInfo}`（「同步信息」）——`GetMenuItem` 按 Header 文本匹配查不到，静默无反应。**独立验证**（KeyCheck 程序加载真实 SuperControls 字典）：`Menu_SyncInfo => 立即同步(S)`、`SyncInfo => 同步信息`，两者不一致实锤。同病的 **W（访问网址）**：查 `Menu_OpenWebSite`（「打开网址(W)」）而 Header 是 `ViewWebsite`（「访问所在网址」），一并修复。D/T/E/C/X 各分支的 key 与 Header 一致（逐一核对无误）。**同步信息菜单项补 `InputGestureText="S"`** 显示手势提示。
+
+**站内搜索框"变窄"核查**（用户反馈 5.4.1.63 比之前更窄）：独立复现程序（加载真实 SuperControls.Style.dll + 真实主题，1:1 复刻设置页 Grid 结构）实测 5.4.1.62 属性（Padding 0,4）与 5.4.1.63 属性（MinHeight 34 + Padding 0,7）**宽度完全相同**（同一窗口内均为 702.2px 全列宽）——高度改动不影响宽度，"更窄"为观感差异（高度增加 + 内边距变化的视觉错觉）或字体缩放设置的观感变化。稳妥起见：`Height="34"` 显式固定（替代 MinHeight+auto 组合）、移除 Padding 覆盖（恢复样式默认 5,0 水平内边距）、`HorizontalAlignment="Stretch"` 显式声明。
+
+**验证**：Release 编译通过；部署 `E:\Jvedio-5.3.1\Jvedio29.72.exe`（SHA-256 三方一致）。待用户实测：菜单开着按 S 同步当前/选中影片、按 W 打开网址；搜索框观感。
+
+**教训**：「按 Header 文本查找菜单项」的快捷键分发依赖 key 值与 Header 严格一致——Header 键被换（3.56 就因 SuperControls 键不可改而换过键）时，所有按旧键值查找的地方都静默失效；这类「按了没反应」先核对「查找的文案 == 菜单显示的文案」。
+
+---
+### 3.76 同步信息快捷键手势提示改走菜单文案（2026-10-01，5.4.1.65 / Jvedio29.73）
+
+**现象**（用户反馈）：5.4.1.64 给同步信息菜单项设了 `InputGestureText="S"`，但界面上看不到。**根因**：SuperControls.Style 的菜单 ControlTemplate 不渲染 InputGestureText——原作者的快捷键设计是把 "(S)" 直接内嵌在菜单文案里（SuperControls 字典中 `Menu_SyncInfo => 立即同步(S)`、`Menu_OpenWebSite => 打开网址(W)` 即为证据）。独立程序取三语 `SyncInfo` 原文：zh「同步信息」/ en「Sync Info」/ ja「同期メッセージ」。
+
+**修复**：新增 `SyncInfoGesture` key（zh「同步信息 (S)」/ en「Sync Info (S)」/ ja「同期メッセージ (S)」），菜单项 Header 改用该 key（`(S)` 内嵌进文案，任何主题模板都能显示）；快捷键 S 分支的 Header 查找同步改用 `SyncInfoGesture`（保持「查找文案 == 菜单显示文案」一致，见 3.75 教训）；`InputGestureText="S"` 保留（无害，未来主题若支持即显示）。
+
+**验证**：Release 编译通过；三语 256 key 一致；部署 `E:\Jvedio-5.3.1\Jvedio29.73.exe`（SHA-256 三方一致）。待用户实测：右键菜单同步信息项显示「同步信息 (S)」，菜单开着按 S 触发同步。
 
 ---
 
@@ -1347,9 +1437,9 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 
 | 优先级 | 问题 | 建议 |
 |---|---|---|
-| 中 | en-US 漏 3 个 i18n key | 补齐，并加构建前 key 对比检查 |
+| ~~已实现~~ | ~~en-US 漏 3 个 i18n key~~ | ✅ 已实现（2026-10-01，见 3.72）：三语 key 集合当前一致（251 key），`scripts/check-i18n-keys.ps1` 构建前对比检查已接入 release.yml，不一致即阻断 |
 | 中 | 部分新文案硬编码未走 `DynamicResource` | 统一走资源字典 |
-| 中 | `SyncConcurrency` 无范围校验 | 加 `Min=1, Max=10` 校验，防用户填 0 或过大被封 |
+| ~~已实现~~ | ~~`SyncConcurrency` 无范围校验~~ | ✅ 已实现（2026-10-01，见 3.72）：设置项限制 1–10；且该设置此前只存不读，已通过 `DownloadManager.ApplyConcurrency` 接通实际消费 |
 | ~~已实现~~ | ~~刮削获得海报/缩略图后，`common_picture_exist` 索引不及时~~ | ✅ 已实现（2026-08-10，见 3.10）：`Core/Tasks/ImageIndexManager.cs` 静默累计刮削/截图成功数，达阈值（`Settings.AutoRebuildImageIndexCount`，默认 10，选项-库可改，0=关闭）后在后台整库重建图片索引，单飞防并发 + 阈值防抖，失败仅记日志 |
 | ~~已实现~~ | ~~「可播放/不可播放」筛选残留过期结果（下载本地文件后仍被判不可播放，须手动重建索引）~~ | ✅ 已实现（2026-08-19，见 3.39）：`Core/Tasks/DataIndexManager.cs` 扫描完成后后台静默重建 `metadata.PathExist`（受 `DataExistsIndexAfterScan` 开关控制，默认开），删除/移动/改路径时增量同步，无需手动点「建立资源存在索引」 |
 | ~~已实现~~ | ~~启动时索引「库关联目录」耗几秒~十几秒，阻塞进入主界面~~ | ✅ 已实现（2026-08-10，见 3.11）：`WindowStartUp.LoadDataBase` 不再 `while` 等待，扫描任务注册进 `App.ScanManager` 后台运行，主窗口立即打开；完成后回调静默刷新统计/加载；右下角扫描按钮状态圈：运行中=旋转高亮圆圈，完成=绿圈白勾 |

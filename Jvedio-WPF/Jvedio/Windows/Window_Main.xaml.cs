@@ -124,6 +124,13 @@ namespace Jvedio
         public Main()
         {
             InitializeComponent();
+            // Ctrl+K 命令面板
+            this.PreviewKeyDown += (s, e) => {
+                if (e.Key == Key.K && Keyboard.Modifiers == ModifierKeys.Control) {
+                    OpenCommandPalette();
+                    e.Handled = true;
+                }
+            };
             Init();
         }
 
@@ -741,9 +748,34 @@ namespace Jvedio
                 .Add(TabType.GeoTask, LangManager.GetValueByKey("TranslateTask"), TaskType.Translate);
         }
 
+        public void ShowRenamePopup(object sender, MouseButtonEventArgs e)
+        {
+            vieModel.TabItemManager
+                .Add(TabType.GeoTask, LangManager.GetValueByKey("RenameTask"), TaskType.Rename);
+        }
+
         private void ShowLibraryHealth(object sender, MouseButtonEventArgs e)
         {
             new Windows.Window_LibraryHealth(ConfigManager.Main.CurrentDBId) { Owner = this }.ShowDialog();
+        }
+
+        private void ShowStatistics(object sender, MouseButtonEventArgs e)
+        {
+            new Windows.Window_Statistics(ConfigManager.Main.CurrentDBId) { Owner = this }.Show();
+        }
+
+        public void OpenCommandPalette()
+        {
+            Windows.Window_CommandPalette palette = new Windows.Window_CommandPalette(this) { Owner = this };
+            palette.Show();
+        }
+
+        /// <summary>
+        /// 从命令面板等处按 DataID 打开详情页（与主列表点击卡片同一入口）
+        /// </summary>
+        public void OpenVideoDetails(long dataID)
+        {
+            vieModel.TabItemManager.onShowDetailData(dataID);
         }
 
         private void ShowMsgScanPopup(object sender, MouseButtonEventArgs e)
@@ -757,6 +789,7 @@ namespace Jvedio
         {
             string[] dragdropFiles = (string[])e.Data.GetData(DataFormats.FileDrop);
             vieModel.DragInFile = false;
+            e.Handled = true; // 内容区已处理，阻止事件冒泡到根 Grid 的同名处理器造成重复入队
             AddScanTask(dragdropFiles);
         }
 
@@ -820,12 +853,31 @@ namespace Jvedio
                         ScreenShotAfterImport(insertVideos);
                     }
 
+                    // 按设置自动刮削新增影片（扫描/拖放导入共用，默认关闭）
+                    if (ConfigManager.ScanConfig.ScrapeAfterScan) {
+                        ScrapeAfterImport(insertVideos);
+                    }
+
                     // 扫描后后台静默重建资源存在性（可播放）索引，避免「不可播放」筛选残留过期结果
                     if (ConfigManager.ScanConfig.DataExistsIndexAfterScan)
                         DataIndexManager.RebuildSilently();
                 });
             }
             scanTask.Running = false;
+        }
+
+        /// <summary>
+        /// 对导入的影片自动开始同步信息（复用主 tab 的批量刮削逻辑，走下载任务队列）
+        /// </summary>
+        private void ScrapeAfterImport(List<Video> import)
+        {
+            if (import == null || import.Count == 0)
+                return;
+            VideoList videoList = vieModel.TabItemManager.GetVideoListByType(TabType.GeoVideo);
+            if (videoList != null) {
+                MessageCard.Info($"{LangManager.GetValueByKey("SyncInfo")}: {import.Count}");
+                videoList.DownLoadVideo(import);
+            }
         }
 
 

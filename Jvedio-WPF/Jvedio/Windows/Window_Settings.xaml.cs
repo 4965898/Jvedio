@@ -937,6 +937,15 @@ namespace Jvedio
                 App.Current.Resources["GlobalFontSize12"] = 12.0 * s;
                 App.Current.Resources["GlobalFontSize13"] = 13.0 * s;
                 App.Current.Resources["GlobalFontSize15"] = 15.0 * s;
+                // 3.36 字号滑条收尾：特殊字号跟随缩放
+                App.Current.Resources["GlobalFontSize7"] = 7.0 * s;
+                App.Current.Resources["GlobalFontSize8"] = 8.0 * s;
+                App.Current.Resources["GlobalFontSize10"] = 10.0 * s;
+                App.Current.Resources["GlobalFontSize16"] = 16.0 * s;
+                App.Current.Resources["GlobalFontSize18"] = 18.0 * s;
+                App.Current.Resources["GlobalFontSize20"] = 20.0 * s;
+                App.Current.Resources["GlobalFontSize24"] = 24.0 * s;
+                App.Current.Resources["GlobalFontSize25"] = 25.0 * s;
             }
         }
 
@@ -973,6 +982,8 @@ namespace Jvedio
             ConfigManager.Settings.AutoBackupPeriodIndex = vieModel.AutoBackupPeriodIndex;
             SaveBackupSettings();
             ConfigManager.Settings.SyncConcurrency = vieModel.SyncConcurrency;
+            // 并发数立即生效（此前该设置只存不读，见维护日志 六）
+            App.DownloadManager.ApplyConcurrency(vieModel.SyncConcurrency);
             if (vieModel.AutoRebuildImageIndexCount < 0)
                 vieModel.AutoRebuildImageIndexCount = 0;
             ConfigManager.Settings.AutoRebuildImageIndexCount = vieModel.AutoRebuildImageIndexCount;
@@ -990,6 +1001,7 @@ namespace Jvedio
             ConfigManager.ScanConfig.LoadDataAfterScan = vieModel.LoadDataAfterScan;
             ConfigManager.ScanConfig.DataExistsIndexAfterScan = vieModel.DataExistsIndexAfterScan;
             ConfigManager.ScanConfig.ImageExistsIndexAfterScan = vieModel.ImageExistsIndexAfterScan;
+            ConfigManager.ScanConfig.ScrapeAfterScan = vieModel.ScrapeAfterScan;
             ConfigManager.ScanConfig.ScanOnStartUp = vieModel.ScanOnStartUp;
             ConfigManager.ScanConfig.CopyNFOOverwriteImage = vieModel.CopyNFOOverwriteImage;
             ConfigManager.ScanConfig.CopyNFOPicture = vieModel.CopyNFOPicture;
@@ -1152,6 +1164,15 @@ namespace Jvedio
                 site.UrlOverride = string.Empty;
             RefreshOnlineSitesList();
             MessageNotify.Success(LangManager.GetValueByKey("ResetDefault") + " - " + LangManager.GetValueByKey("OnlineJump"));
+        }
+
+        private void OnlineSiteEnabled_Click(object sender, RoutedEventArgs e)
+        {
+            // 开关即时落盘，避免异常退出丢失；同时清掉该站的探测缓存
+            if ((sender as System.Windows.Controls.CheckBox)?.DataContext is OnlineSite site) {
+                OnlineSiteStatus.Invalidate(site.Name);
+                ConfigManager.OnlineConfig.Save();
+            }
         }
 
         private void FillDefaultOnlineSite(object sender, RoutedEventArgs e)
@@ -1374,6 +1395,7 @@ namespace Jvedio
             BackupModeBox.SelectedIndex = s.BackupMode == "RemoteOnly" ? 1 : s.BackupMode == "Both" ? 2 : 0;
             BackupDirectoryBox.Text = s.BackupDirectory ?? string.Empty;
             BackupRetentionBox.Text = Math.Max(1, Math.Min(10, s.MaxLocalBackups)).ToString();
+            RemoteRetentionBox.Text = Math.Max(1, Math.Min(30, s.RemoteMaxBackups)).ToString();
             BackupRemoteTypeBox.SelectedIndex = s.BackupRemoteType == "WebDAV" ? 1 : s.BackupRemoteType == "S3" ? 2 : 0;
             BackupWebDavUrlBox.Text = s.BackupWebDavUrl ?? string.Empty;
             BackupWebDavFolderBox.Text = s.BackupWebDavFolder ?? string.Empty;
@@ -1401,6 +1423,9 @@ namespace Jvedio
             s.MaxLocalBackups = Math.Max(1, Math.Min(10,
                 int.TryParse(BackupRetentionBox.Text, out int retention) ? retention : 10));
             BackupRetentionBox.Text = s.MaxLocalBackups.ToString();
+            s.RemoteMaxBackups = Math.Max(1, Math.Min(30,
+                int.TryParse(RemoteRetentionBox.Text, out int remoteRetention) ? remoteRetention : 10));
+            RemoteRetentionBox.Text = s.RemoteMaxBackups.ToString();
             s.BackupRemoteType = BackupRemoteTypeBox.SelectedIndex == 1 ? "WebDAV" :
                 BackupRemoteTypeBox.SelectedIndex == 2 ? "S3" : "None";
             s.BackupWebDavUrl = BackupWebDavUrlBox.Text?.Trim();
@@ -1466,6 +1491,8 @@ namespace Jvedio
                     warnings += " " + string.Format(LangManager.GetValueByKey("BackupCleanupWarning"), result.CleanupError);
                 if (!string.IsNullOrEmpty(result.RetentionError))
                     warnings += " " + string.Format(LangManager.GetValueByKey("BackupRetentionWarning"), result.RetentionError);
+                if (!string.IsNullOrEmpty(result.RemoteRetentionError))
+                    warnings += " " + string.Format(LangManager.GetValueByKey("BackupRetentionWarning"), result.RemoteRetentionError);
                 if (!string.IsNullOrEmpty(result.RemoteError)) {
                     string failure = string.IsNullOrEmpty(result.LocalFolder)
                         ? string.Format(LangManager.GetValueByKey("BackupFailed"), result.RemoteError)
@@ -1864,5 +1891,173 @@ namespace Jvedio
             ImageCache.Clear();
             MessageNotify.Success(LangManager.GetValueByKey("Message_Success"));
         }
+
+        #region "设置页站内搜索：按标签文案模糊匹配，跳转到对应页签并定位高亮"
+
+        private sealed class SettingsSearchEntry
+        {
+            public TabItem Tab;
+            public string TabHeader;
+            public string Text;
+            public FrameworkElement Element;
+        }
+
+        private List<SettingsSearchEntry> _SettingsSearchEntries;
+        private System.Windows.Threading.DispatcherTimer _SearchFlashTimer;
+        private FrameworkElement _SearchFlashingElement;
+
+        private string GetTabHeaderText(TabItem tab)
+        {
+            try {
+                return tab.Header?.ToString() ?? string.Empty;
+            } catch {
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// 遍历逻辑树（未选中的页签不在可视树中，Content 实例已随 InitializeComponent 创建）收集可搜索文案
+        /// </summary>
+        private void BuildSettingsSearchIndex()
+        {
+            _SettingsSearchEntries = new List<SettingsSearchEntry>();
+            foreach (object item in TabControl.Items) {
+                if (!(item is TabItem tab))
+                    continue;
+                string header = GetTabHeaderText(tab);
+                if (tab.Content is DependencyObject root)
+                    WalkSettingsSearch(root, tab, header);
+            }
+        }
+
+        private void WalkSettingsSearch(DependencyObject node, TabItem tab, string header)
+        {
+            foreach (object child in System.Windows.LogicalTreeHelper.GetChildren(node)) {
+                if (!(child is DependencyObject dp))
+                    continue;
+                if (child is TextBlock tb && !string.IsNullOrWhiteSpace(tb.Text)) {
+                    _SettingsSearchEntries.Add(new SettingsSearchEntry() { Tab = tab, TabHeader = header, Text = tb.Text, Element = tb });
+                } else if (child is System.Windows.Controls.Primitives.ToggleButton toggle &&
+                           toggle.Content is string content && !string.IsNullOrWhiteSpace(content)) {
+                    // CheckBox / RadioButton：勾选项的文案本身就是设置项标签
+                    _SettingsSearchEntries.Add(new SettingsSearchEntry() { Tab = tab, TabHeader = header, Text = content, Element = toggle });
+                } else if (child is System.Windows.Controls.GroupBox groupBox &&
+                           !string.IsNullOrWhiteSpace(groupBox.Header?.ToString())) {
+                    _SettingsSearchEntries.Add(new SettingsSearchEntry() { Tab = tab, TabHeader = header, Text = groupBox.Header.ToString(), Element = groupBox });
+                }
+                WalkSettingsSearch(dp, tab, header);
+            }
+        }
+
+        private void RunSettingsSearch(string query)
+        {
+            if (_SettingsSearchEntries == null)
+                BuildSettingsSearchIndex();
+            SettingsSearchResults.Items.Clear();
+            string keyword = query?.Trim();
+            if (string.IsNullOrEmpty(keyword)) {
+                SettingsSearchCount.Text = string.Empty;
+                SettingsSearchPopup.IsOpen = false;
+                return;
+            }
+            string lower = keyword.ToLower();
+            int matches = 0;
+            foreach (SettingsSearchEntry entry in _SettingsSearchEntries) {
+                if (entry.Text.ToLower().Contains(lower)) {
+                    ListBoxItem item = new ListBoxItem() {
+                        Content = $"{entry.TabHeader} › {entry.Text}",
+                        Tag = entry,
+                        ToolTip = entry.Text,
+                    };
+                    SettingsSearchResults.Items.Add(item);
+                    matches++;
+                    if (matches >= 50)
+                        break;
+                }
+            }
+            SettingsSearchCount.Text = $"{matches}";
+            if (matches > 0) {
+                SettingsSearchPopup.IsOpen = true;
+            } else {
+                SettingsSearchPopup.IsOpen = false;
+            }
+        }
+
+        private async void GoToSettingsEntry(SettingsSearchEntry entry)
+        {
+            if (entry?.Tab == null)
+                return;
+            SettingsSearchPopup.IsOpen = false;
+            entry.Tab.IsSelected = true;
+            // 页签内容切换是异步的，等一拍再定位
+            await System.Threading.Tasks.Task.Delay(80);
+            try {
+                if (entry.Element != null) {
+                    entry.Element.BringIntoView();
+                    FlashSettingsElement(entry.Element);
+                }
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+        }
+
+        private void FlashSettingsElement(FrameworkElement element)
+        {
+            // 只对 TextBlock 做背景闪烁高亮（其他控件类型不宜改背景）
+            if (!(element is TextBlock textBlock))
+                return;
+            if (_SearchFlashTimer == null) {
+                _SearchFlashTimer = new System.Windows.Threading.DispatcherTimer() {
+                    Interval = TimeSpan.FromMilliseconds(1200),
+                };
+                _SearchFlashTimer.Tick += (s, e) => {
+                    if (_SearchFlashingElement is TextBlock old)
+                        old.Background = Brushes.Transparent;
+                    _SearchFlashTimer.Stop();
+                };
+            }
+            if (_SearchFlashingElement is TextBlock previous)
+                previous.Background = Brushes.Transparent;
+            _SearchFlashingElement = textBlock;
+            textBlock.Background = new SolidColorBrush(Color.FromArgb(110, 255, 226, 90));
+            _SearchFlashTimer.Stop();
+            _SearchFlashTimer.Start();
+        }
+
+        private void SettingsSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            RunSettingsSearch(SettingsSearchBox.Text);
+        }
+
+        private void SettingsSearchBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter && SettingsSearchResults.Items.Count > 0) {
+                if (SettingsSearchResults.Items[0] is ListBoxItem item && item.Tag is SettingsSearchEntry entry)
+                    GoToSettingsEntry(entry);
+                e.Handled = true;
+            } else if (e.Key == Key.Escape) {
+                SettingsSearchBox.Text = string.Empty;
+                SettingsSearchPopup.IsOpen = false;
+                e.Handled = true;
+            }
+        }
+
+        private void SettingsSearchResults_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter &&
+                SettingsSearchResults.SelectedItem is ListBoxItem item &&
+                item.Tag is SettingsSearchEntry entry) {
+                GoToSettingsEntry(entry);
+                e.Handled = true;
+            }
+        }
+
+        private void SettingsSearchResults_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (SettingsSearchResults.SelectedItem is ListBoxItem item && item.Tag is SettingsSearchEntry entry)
+                GoToSettingsEntry(entry);
+        }
+
+        #endregion
     }
 }

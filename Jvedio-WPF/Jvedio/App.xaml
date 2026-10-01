@@ -15,6 +15,15 @@
             <sys:Double x:Key="GlobalFontSize12">12</sys:Double>
             <sys:Double x:Key="GlobalFontSize13">13</sys:Double>
             <sys:Double x:Key="GlobalFontSize15">15</sys:Double>
+            <!-- 3.36 字号滑条收尾：特殊字号也跟随缩放 -->
+            <sys:Double x:Key="GlobalFontSize7">7</sys:Double>
+            <sys:Double x:Key="GlobalFontSize8">8</sys:Double>
+            <sys:Double x:Key="GlobalFontSize10">10</sys:Double>
+            <sys:Double x:Key="GlobalFontSize16">16</sys:Double>
+            <sys:Double x:Key="GlobalFontSize18">18</sys:Double>
+            <sys:Double x:Key="GlobalFontSize20">20</sys:Double>
+            <sys:Double x:Key="GlobalFontSize24">24</sys:Double>
+            <sys:Double x:Key="GlobalFontSize25">25</sys:Double>
             <ResourceDictionary.MergedDictionaries>
                 <!--  Lang  -->
                 <ResourceDictionary Source="pack://application:,,,/SuperControls.Style;Component/Lang/zh-CN.xaml" />

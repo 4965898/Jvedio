@@ -26,5 +26,16 @@ namespace Jvedio.Core.Config
         /// 站点名 → 覆盖网址模板（含 {{code}} 占位符）；留空/删除 = 使用内置默认网址
         /// </summary>
         public Dictionary<string, string> UrlOverrides { get; set; } = new Dictionary<string, string>();
+
+        /// <summary>
+        /// 停用的站点名集合（27 个站点太多，用户可隐藏不用的）；
+        /// 不在集合中 = 启用
+        /// </summary>
+        public HashSet<string> DisabledSites { get; set; } = new HashSet<string>();
+
+        /// <summary>
+        /// 跳转按钮可达性预检（绿/黄/红标记）；关闭后不发起探测请求
+        /// </summary>
+        public bool ReachabilityPrecheck { get; set; } = true;
     }
 }

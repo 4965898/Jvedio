@@ -1,4 +1,5 @@
 ﻿using Jvedio.Core.Config.Base;
+using System;
 using System.Windows;
 
 namespace Jvedio.Core.WindowConfig
@@ -121,7 +122,8 @@ namespace Jvedio.Core.WindowConfig
         public double ScrollSpeedFactor {
             get { return _ScrollSpeedFactor; }
             set {
-                _ScrollSpeedFactor = value;
+                // 与滑条范围一致（0.1~3.0），手动输入越界时收敛，防滚轮速度异常
+                _ScrollSpeedFactor = Math.Min(3.0, Math.Max(0.1, value));
                 RaisePropertyChanged();
             }
         }

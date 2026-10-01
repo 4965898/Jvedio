@@ -216,7 +216,8 @@
         </Style>
 
     </super:BaseWindow.Resources>
-    <Grid AllowDrop="True">
+    <!--  全窗口可拖放：拖视频文件/文件夹到窗口任意位置即可导入扫描（内容区自身的 Drop 处理器会置 Handled，不会重复入队）  -->
+    <Grid AllowDrop="True" DragLeave="OnDragFileLeave" DragOver="OnDragFileOver" Drop="OnDragFileDrop">
         <!--  托盘图标  -->
         <Popup
             x:Name="notiIconPopup"
@@ -427,7 +428,7 @@
                                     Grid.Row="1"
                                     Margin="20"
                                     FontFamily="楷体"
-                                    FontSize="25"
+                                    FontSize="{DynamicResource GlobalFontSize25}"
                                     FontWeight="Bold"
                                     Style="{StaticResource BaseTextBlock}"
                                     Text="{DynamicResource ThanksUseJvedio}">
@@ -778,7 +779,7 @@
                                         Margin="10,30"
                                         Source="/Resources/Picture/导入_128.png" />
                                     <TextBlock
-                                        FontSize="20"
+                                        FontSize="{DynamicResource GlobalFontSize20}"
                                         FontWeight="Bold"
                                         Style="{StaticResource BaseTextBlock}"
                                         Text="{DynamicResource ImportVideo}" />
@@ -824,7 +825,7 @@
                                 <TextBlock
                                     Margin="20,0"
                                     VerticalAlignment="Center"
-                                    FontSize="20"
+                                    FontSize="{DynamicResource GlobalFontSize20}"
                                     Style="{StaticResource BaseTextBlock}"
                                     Text="{DynamicResource DragFileInOr}" />
                                 <Button Click="ImportVideo" Content="{DynamicResource Scan}" />
@@ -915,6 +916,12 @@
                         Path="M512 48L864 184V468C864 708 724 868 512 968C300 868 160 708 160 468V184L512 48ZM512 146L248 248V468C248 652 348 784 512 870C676 784 776 652 776 468V248L512 146ZM454 632L348 526L397 477L454 534L630 358L679 407L454 632Z"
                         Style="{StaticResource NormalPathMsg}"
                         ToolTip="{DynamicResource LibraryHealth}" />
+                    <!--  统计仪表盘（条形图图标）  -->
+                    <super:PathMsg
+                        MouseLeftButtonUp="ShowStatistics"
+                        Path="M128 960V128h96v832h-96z m240 0V416h96v544h-96z m240 0V256h96v704h-96z m240 0V544h96v416h-96z m-720 96h944v64H80v-64z"
+                        Style="{StaticResource NormalPathMsg}"
+                        ToolTip="{DynamicResource Statistics}" />
                     <!--  翻译任务（文+T 图标），点击打开翻译任务页  -->
                     <Border
                         Name="msgTranslate"
@@ -941,20 +948,57 @@
                             VerticalAlignment="Center"
                             Orientation="Horizontal">
                             <TextBlock
-                                FontSize="10"
+                                FontSize="{DynamicResource GlobalFontSize10}"
                                 FontWeight="Bold"
                                 Foreground="{DynamicResource Window.Foreground}"
                                 Text="文" />
                             <TextBlock
-                                FontSize="10"
+                                FontSize="{DynamicResource GlobalFontSize10}"
                                 FontWeight="Bold"
                                 Foreground="{DynamicResource Window.Foreground}"
                                 Text="/" />
                             <TextBlock
-                                FontSize="10"
+                                FontSize="{DynamicResource GlobalFontSize10}"
                                 FontWeight="Bold"
                                 Foreground="{DynamicResource Window.Foreground}"
                                 Text="T" />
+                        </StackPanel>
+                    </Border>
+                    <!--  重命名任务（A→ 图标），点击打开重命名任务页  -->
+                    <Border
+                        Name="msgRename"
+                        Width="30"
+                        Height="30"
+                        Margin="0"
+                        MouseLeftButtonUp="ShowRenamePopup"
+                        ToolTip="{DynamicResource RenameTask}">
+                        <Border.Style>
+                            <Style BasedOn="{StaticResource FlatBorderStyle}" TargetType="Border">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource Window.StatusBar.Hover.Background}" />
+                                    </Trigger>
+                                    <DataTrigger Binding="{Binding Running, Source={x:Static local:App.RenameTaskManager}}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource Window.StatusBar.Hover.Background}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal">
+                            <TextBlock
+                                FontSize="{DynamicResource GlobalFontSize10}"
+                                FontWeight="Bold"
+                                Foreground="{DynamicResource Window.Foreground}"
+                                Text="A" />
+                            <TextBlock
+                                FontSize="{DynamicResource GlobalFontSize10}"
+                                FontWeight="Bold"
+                                Foreground="{DynamicResource Window.Foreground}"
+                                Text="→" />
                         </StackPanel>
                     </Border>
                     <super:PathMsg

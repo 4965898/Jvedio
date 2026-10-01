@@ -277,7 +277,7 @@
                                 </ProgressBar>
                                 <TextBlock
                                     Margin="5"
-                                    FontSize="10"
+                                    FontSize="{DynamicResource GlobalFontSize10}"
                                     Text="{Binding Progress, StringFormat=\{0\} %}">
                                     <TextBlock.Style>
                                         <Style BasedOn="{StaticResource BaseTextBlock}" TargetType="TextBlock">

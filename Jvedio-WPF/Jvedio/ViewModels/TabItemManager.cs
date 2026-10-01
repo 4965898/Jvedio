@@ -407,6 +407,29 @@ taskList.onRestart += App.DownloadManager.Restart;
 
                     break;
 
+                case TaskType.Rename:
+                    taskList.TaskStatusList = App.RenameTaskManager.CurrentTasks;
+                    taskList.onRemoveAll += () => App.RenameTaskManager.RemoveTask(TaskStatus.Canceled | TaskStatus.RanToCompletion);
+                    taskList.onRemoveCancel += () => App.RenameTaskManager.RemoveTask(TaskStatus.Canceled);
+                    taskList.onRemoveComplete += () => App.RenameTaskManager.RemoveTask(TaskStatus.RanToCompletion);
+                    taskList.onCancel += App.RenameTaskManager.CancelTask;
+                    taskList.onCancelAll += App.RenameTaskManager.CancelAll;
+                    taskList.onRestart += App.RenameTaskManager.Restart;
+                    taskList.onRestartAll += App.RenameTaskManager.RestartAllFailed;
+                    taskList.onShowDetail += (tList, id) => {
+                        string logs = App.RenameTaskManager.GetTaskLogs(id);
+                        tList.SetLogs(logs);
+                        tList.ShowLog = true;
+                    };
+
+                    App.RenameTaskManager.onRunning += () => {
+                        TaskList list = GetTaskListByType(type);
+                        if (list != null)
+                            list.AllTaskProgress = App.RenameTaskManager.Progress;
+                    };
+
+                    break;
+
                 default:
 
                     break;

@@ -296,6 +296,10 @@
     <Compile Include="Core\Crawler\ActorSearch.cs" />
     <Compile Include="Core\Crawler\CrawlerHeader.cs" />
     <Compile Include="Core\Crawler\OnlineSites.cs" />
+    <Compile Include="Core\Crawler\OnlineSiteStatus.cs" />
+    <Compile Include="Core\Tasks\RenameTask.cs" />
+    <Compile Include="Core\Tasks\RenameTaskManager.cs" />
+    <Compile Include="Windows\Window_BatchEdit.cs" />
     <Compile Include="Core\CustomEventArgs\PreviewImageEventArgs.cs" />
     <Compile Include="Core\Enums\AssociationType.cs" />
     <Compile Include="Core\Enums\DownLoadState.cs" />
@@ -433,6 +437,8 @@
     <Compile Include="Core\Services\RemoteBackupStore.cs" />
     <Compile Include="Core\Services\ScrapeFieldPolicy.cs" />
     <Compile Include="Windows\Window_LibraryHealth.cs" />
+    <Compile Include="Windows\Window_Statistics.cs" />
+    <Compile Include="Windows\Window_CommandPalette.cs" />
     <Compile Include="Windows\Window_RemoteBackupPicker.cs" />
     <Compile Include="Windows\Window_ScrapePreview.cs" />
     <Compile Include="Core\Tasks\DurationIndexManager.cs" />

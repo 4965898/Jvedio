@@ -26,6 +26,7 @@ namespace Jvedio.Core.WindowConfig
             AutoBackupPeriodIndex = DEFAULT_BACKUP_PERIOD_INDEX;
             AutoBackup = true;
             MaxLocalBackups = 10;
+            RemoteMaxBackups = 10;
             ProtectExistingScrapeFields = true;
             DetailShowBg = true;
             CurrentLanguage = "zh-CN";
@@ -147,6 +148,9 @@ SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
         }
         public System.DateTime LastSuccessfulBackupUtc { get; set; }
         public int MaxLocalBackups { get; set; }
+
+        /// <summary>在线备份保留份数：上传成功后清理远端多余的历史 ZIP（1–30）。</summary>
+        public int RemoteMaxBackups { get; set; }
 
         /// <summary>留空时沿用原有用户目录下的 backup 文件夹。</summary>
         public string BackupDirectory { get; set; }

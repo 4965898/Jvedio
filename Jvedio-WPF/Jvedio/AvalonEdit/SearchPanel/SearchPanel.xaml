@@ -81,7 +81,7 @@
                                         <TextBlock
                                             Canvas.Left="-6"
                                             Canvas.Top="-7"
-                                            FontSize="10">
+                                            FontSize="{DynamicResource GlobalFontSize10}">
                                             ab
                                         </TextBlock>
 
@@ -166,7 +166,7 @@
                                             Canvas.Left="-10"
                                             Canvas.Top="4"
                                             Panel.ZIndex="5"
-                                            FontSize="7"
+                                            FontSize="{DynamicResource GlobalFontSize7}"
                                             FontWeight="Bold"
                                             Foreground="{DynamicResource Window.Sub.Foreground}"
                                             Text="All" />

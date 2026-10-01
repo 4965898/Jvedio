@@ -9,6 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using static Jvedio.MapperManager;
 
 namespace Jvedio.Core.UserControls
@@ -90,6 +91,7 @@ namespace Jvedio.Core.UserControls
         /// <summary>
         /// 在线搜索：按当前演员名生成各站搜索跳转按钮（位置：爱好下方，样式同影片详情页在线观看按钮）。
         /// 与影片详情页共用 OnlineSites.Sites 站点列表与「选项-网络」自定义网址（联动）。
+        /// 停用的站点不出现；按钮带可达性小圆点（与影片详情页同款）。
         /// </summary>
         private void LoadActorOnlineJumpButtons()
         {
@@ -101,14 +103,40 @@ namespace Jvedio.Core.UserControls
                 return;
             string encodedName = Uri.EscapeDataString(name);
             foreach (OnlineSite site in OnlineSites.Sites) {
+                if (!site.Enabled)
+                    continue;
                 string url = site.GetSearchUrl(encodedName);
                 Button button = new Button() {
-                    Content = site.Name,
                     Style = (Style)FindResource("OnlineJumpButton"),
+                    Tag = site.Name,
                     ToolTip = url,
                 };
+                StackPanel content = new StackPanel() { Orientation = Orientation.Horizontal };
+                content.Children.Add(new TextBlock() { Text = site.Name });
+                Border dot = new Border() {
+                    Name = "stateDot",
+                    Width = 7,
+                    Height = 7,
+                    Margin = new Thickness(5, 0, 0, 0),
+                    CornerRadius = new CornerRadius(3.5),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Background = new SolidColorBrush(GetOnlineStateColor(OnlineSiteStatus.Get(site.Name))),
+                };
+                content.Children.Add(dot);
+                button.Content = content;
                 button.Click += (s, e) => FileHelper.TryOpenUrl(url);
                 actorOnlineJumpPanel.Children.Add(button);
+            }
+            OnlineSiteStatus.ProbeAll(OnlineSites.Sites);
+        }
+
+        private static System.Windows.Media.Color GetOnlineStateColor(OnlineSiteState state)
+        {
+            switch (state) {
+                case OnlineSiteState.Ok: return (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#67C23A");
+                case OnlineSiteState.MaybeBlocked: return (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#E6A23C");
+                case OnlineSiteState.Fail: return (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F56C6C");
+                default: return System.Windows.Media.Colors.Gray;
             }
         }
 

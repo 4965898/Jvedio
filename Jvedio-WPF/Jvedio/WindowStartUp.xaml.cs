@@ -89,7 +89,7 @@ namespace Jvedio
 
         public void Dispose()
         {
-            if (ConfigManager.StartUp == null)
+            if (ConfigManager.StartUp == null || vieModel == null)
                 return;
             ConfigManager.StartUp.Tile = vieModel.Tile;
             ConfigManager.StartUp.ShowHideItem = vieModel.ShowHideItem;
@@ -460,8 +460,23 @@ namespace Jvedio
             }
         }
 
+        /// <summary>
+        /// 启动未就绪保护：vieModel 在 Window_Loaded 末尾的 InitContext() 才创建，
+        /// 其前的后台步骤（旧文件迁移/备份/插件迁移/CrawlerManager.Init）耗时期间，
+        /// 用户点击界面会踩 NRE（2026-10-01 ChangeDataType 实测）。
+        /// </summary>
+        private bool StartUpNotReady()
+        {
+            if (vieModel != null)
+                return false;
+            Logger.Info("startup not ready, click ignored (InitContext pending)");
+            return true;
+        }
+
         private void DelSqlite(object sender, RoutedEventArgs e)
         {
+            if (StartUpNotReady())
+                return;
             if (listBox.SelectedIndex >= vieModel.CurrentDatabases.Count || listBox.SelectedIndex < 0) {
                 MessageNotify.Error(LangManager.GetValueByKey("InnerError"));
                 return;
@@ -488,6 +503,8 @@ namespace Jvedio
 
         private void RenameSqlite(object sender, RoutedEventArgs e)
         {
+            if (StartUpNotReady())
+                return;
             if (listBox.SelectedIndex >= vieModel.CurrentDatabases.Count || listBox.SelectedIndex < 0) {
                 MessageNotify.Error(LangManager.GetValueByKey("InnerError"));
                 return;
@@ -512,6 +529,8 @@ namespace Jvedio
 
         private void SortDatabases(object sender, RoutedEventArgs e)
         {
+            if (StartUpNotReady())
+                return;
             MenuItem menuItem = sender as MenuItem;
             if (menuItem != null) {
                 string header = menuItem.Header.ToString();
@@ -523,6 +542,8 @@ namespace Jvedio
 
         private void SearchText_Changed(object sender, RoutedEventArgs e)
         {
+            if (StartUpNotReady())
+                return;
             SuperControls.Style.SearchBox textBox = sender as SuperControls.Style.SearchBox;
             if (textBox == null)
                 return;
@@ -532,6 +553,8 @@ namespace Jvedio
 
         private void NewDatabase(object sender, RoutedEventArgs e)
         {
+            if (StartUpNotReady())
+                return;
             vieModel.CurrentSearch = string.Empty;
             vieModel.Sort = true;
             vieModel.SortType = LangManager.GetValueByKey("CreatedDate");
@@ -553,11 +576,15 @@ namespace Jvedio
 
         public void RefreshDatabase()
         {
+            if (StartUpNotReady())
+                return;
             vieModel.ReadFromDataBase();
         }
 
         private void ChangeDataType(object sender, RoutedEventArgs e)
         {
+            if (StartUpNotReady())
+                return;
             RadioButton radioButton = sender as RadioButton;
             StackPanel stackPanel = radioButton.Parent as StackPanel;
             int idx = stackPanel.Children.OfType<RadioButton>().ToList().IndexOf(radioButton);
@@ -569,6 +596,8 @@ namespace Jvedio
 
         public void LoadDataBase()
         {
+            if (StartUpNotReady())
+                return;
             if (vieModel.CurrentDatabases == null || vieModel.CurrentDatabases.Count <= 0) {
                 ConfigManager.Settings.OpenDataBaseDefault = false;
                 vieModel.Loading = false;
@@ -685,6 +714,8 @@ namespace Jvedio
 
         private void SetImage(object sender, RoutedEventArgs e)
         {
+            if (StartUpNotReady())
+                return;
             if (listBox.SelectedIndex >= vieModel.CurrentDatabases.Count || listBox.SelectedIndex < 0) {
                 MessageNotify.Error(LangManager.GetValueByKey("InnerError"));
                 return;
@@ -730,11 +761,15 @@ namespace Jvedio
 
         private void ShowHideDataBase(object sender, RoutedEventArgs e)
         {
+            if (StartUpNotReady())
+                return;
             vieModel.ReadFromDataBase();
         }
 
         private void HideDataBase(object sender, RoutedEventArgs e)
         {
+            if (StartUpNotReady())
+                return;
             if (listBox.SelectedIndex >= vieModel.CurrentDatabases.Count || listBox.SelectedIndex < 0) {
                 MessageNotify.Error(LangManager.GetValueByKey("InnerError"));
                 return;
@@ -767,6 +802,8 @@ namespace Jvedio
 
         private async void RestoreDatabase(object sender, RoutedEventArgs e)
         {
+            if (StartUpNotReady())
+                return;
             if (new MsgBox(LangManager.GetValueByKey("IsToRestore")).ShowDialog(this) == true) {
                 vieModel.Restoring = true;
 

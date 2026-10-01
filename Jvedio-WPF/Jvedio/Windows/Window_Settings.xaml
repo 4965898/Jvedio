@@ -166,17 +166,60 @@
 
 
         <Grid.RowDefinitions>
+            <RowDefinition Height="auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="auto" />
         </Grid.RowDefinitions>
 
+        <!--  站内搜索：按标签文案模糊匹配设置项，回车/点击结果跳转到对应页签并定位高亮  -->
+        <Grid Grid.Row="0" Margin="8,8,8,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="auto" />
+            </Grid.ColumnDefinitions>
+            <super:SearchBox
+                x:Name="SettingsSearchBox"
+                Height="34"
+                HorizontalAlignment="Stretch"
+                VerticalContentAlignment="Center"
+                KeyDown="SettingsSearchBox_KeyDown"
+                PlaceHolder="{DynamicResource SettingsSearchTip}"
+                TextChanged="SettingsSearchBox_TextChanged" />
+            <TextBlock
+                x:Name="SettingsSearchCount"
+                Grid.Column="1"
+                Margin="8,0,0,0"
+                VerticalAlignment="Center"
+                Style="{StaticResource BaseTextBlock}"
+                Text="" />
+            <Popup
+                x:Name="SettingsSearchPopup"
+                AllowsTransparency="True"
+                PlacementTarget="{Binding ElementName=SettingsSearchBox}"
+                StaysOpen="False">
+                <Border
+                    MinWidth="360"
+                    MaxHeight="320"
+                    Background="{DynamicResource Window.InnerDialog.Background}"
+                    BorderBrush="{DynamicResource Window.Foreground}"
+                    BorderThickness="1"
+                    CornerRadius="4">
+                    <ListBox
+                        x:Name="SettingsSearchResults"
+                        MaxHeight="300"
+                        BorderThickness="0"
+                        KeyDown="SettingsSearchResults_KeyDown"
+                        MouseDoubleClick="SettingsSearchResults_Click" />
+                </Border>
+            </Popup>
+        </Grid>
 
 
 
 
         <TabControl
             x:Name="TabControl"
-            Grid.Row="0"
+            Grid.Row="1"
             Margin="5"
             Background="Transparent"
             BorderBrush="{DynamicResource Window.Foreground}"
@@ -570,6 +613,10 @@
                                 Orientation="Vertical">
                                 <CheckBox Content="{DynamicResource FetchVID}" IsChecked="{Binding FetchVID, Mode=TwoWay}" />
                                 <CheckBox Content="{DynamicResource LoadDataAfterScan}" IsChecked="{Binding LoadDataAfterScan, Mode=TwoWay}" />
+                                <CheckBox
+                                    Content="{DynamicResource ScrapeAfterScan}"
+                                    IsChecked="{Binding ScrapeAfterScan, Mode=TwoWay}"
+                                    ToolTip="{DynamicResource ScrapeAfterScanTip}" />
                                 <StackPanel
                                     Margin="5"
                                     Orientation="Horizontal"
@@ -1054,6 +1101,11 @@
                                     Style="{StaticResource BaseTextBlock}"
                                     Text="{DynamicResource OnlineJumpTip}"
                                     TextWrapping="Wrap" />
+                                <CheckBox
+                                    Margin="0,0,0,5"
+                                    Content="{DynamicResource ReachabilityPrecheck}"
+                                    IsChecked="{Binding ReachabilityPrecheck, Mode=TwoWay, Source={x:Static config:ConfigManager.OnlineConfig}}"
+                                    ToolTip="{DynamicResource ReachabilityPrecheckTip}" />
                                 <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
                                     <ItemsControl
                                         x:Name="onlineSitesItemsControl"
@@ -1062,22 +1114,30 @@
                                             <DataTemplate>
                                                 <Grid Margin="0,3">
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="90" />
+                                                        <ColumnDefinition Width="auto" />
+                                                        <ColumnDefinition Width="110" />
                                                         <ColumnDefinition Width="*" />
                                                     </Grid.ColumnDefinitions>
                                                     <Grid.RowDefinitions>
                                                         <RowDefinition Height="auto" />
                                                         <RowDefinition Height="auto" />
                                                     </Grid.RowDefinitions>
-                                                    <TextBlock
+                                                    <CheckBox
                                                         Grid.Row="0"
                                                         Grid.Column="0"
+                                                        VerticalAlignment="Center"
+                                                        IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                                        Click="OnlineSiteEnabled_Click"
+                                                        ToolTip="{DynamicResource OnlineSiteEnableTip}" />
+                                                    <TextBlock
+                                                        Grid.Row="0"
+                                                        Grid.Column="1"
                                                         VerticalAlignment="Center"
                                                         Style="{StaticResource BaseTextBlock}"
                                                         Text="{Binding Name}" />
                                                     <StackPanel
                                                         Grid.Row="0"
-                                                        Grid.Column="1"
+                                                        Grid.Column="2"
                                                         Orientation="Horizontal">
                                                         <TextBox
                                                             Width="420"
@@ -1093,13 +1153,14 @@
                                                     </StackPanel>
                                                     <RichTextBox
                                                         Grid.Row="1"
-                                                        Grid.Column="1"
+                                                        Grid.Column="2"
                                                         Margin="5,2,0,0"
                                                         Padding="0"
                                                         Background="Transparent"
                                                         BorderThickness="0"
                                                         FontSize="{DynamicResource GlobalFontSize15}"
-                                                        Foreground="#909399"
+                                                        Foreground="{DynamicResource Window.Foreground}"
+                                                        Opacity="0.55"
                                                         HorizontalScrollBarVisibility="Hidden"
                                                         IsReadOnly="True"
                                                         Loaded="OnlineSiteDefaultUrl_Loaded"
@@ -1344,9 +1405,17 @@
                                         ToolTip="{DynamicResource UiFontScaleTip}"
                                         Value="{Binding Path=(cfg:DpiConfig.UiFontScale), Mode=TwoWay}"
                                         ValueChanged="UiFontScale_ValueChanged" />
-                                    <Label
-                                        Content="{Binding Path=(cfg:DpiConfig.UiFontScale), Mode=OneWay, Converter={StaticResource RoundNumberConverter}, ConverterParameter=2}"
-                                        Style="{StaticResource InfoLabel}" />
+                                    <!--  可显示也可手动输入：提交后滑条联动更新（值变化会触发滑条 ValueChanged 刷新全局字号）  -->
+                                    <TextBox
+                                        Width="56"
+                                        Height="28"
+                                        Margin="5,0"
+                                        Padding="4,2"
+                                        VerticalAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        TextAlignment="Center"
+                                        ToolTip="{DynamicResource UiFontScaleInputTip}"
+                                        Text="{Binding Path=(cfg:DpiConfig.UiFontScale), Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat=F2}" />
                                 </WrapPanel>
 
                                 <WrapPanel
@@ -1369,7 +1438,16 @@
                                         Minimum="0.1"
                                         SmallChange="0.2"
                                         Value="{Binding ScrollSpeedFactor, Mode=TwoWay, Source={x:Static config:ConfigManager.Main}}" />
-                                    <Label Content="{Binding ScrollSpeedFactor, Mode=OneWay, Source={x:Static config:ConfigManager.Main}, Converter={StaticResource RoundNumberConverter}, ConverterParameter=2}" Style="{StaticResource InfoLabel}" />
+                                    <TextBox
+                                        Width="56"
+                                        Height="28"
+                                        Margin="5,0"
+                                        Padding="4,2"
+                                        VerticalAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        TextAlignment="Center"
+                                        ToolTip="{DynamicResource ScrollSpeedInputTip}"
+                                        Text="{Binding ScrollSpeedFactor, Mode=TwoWay, UpdateSourceTrigger=LostFocus, Source={x:Static config:ConfigManager.Main}, StringFormat=F2}" />
 
                                 </WrapPanel>
 
@@ -2023,7 +2101,7 @@
                                         Background="{DynamicResource Window.Title.Background}"
                                         CaretBrush="{DynamicResource Window.Foreground}"
                                         ContextMenu="{x:Null}"
-                                        FontSize="18"
+                                        FontSize="{DynamicResource GlobalFontSize18}"
                                         Foreground="{DynamicResource Window.Foreground}"
                                         IsReadOnly="False"
                                         PreviewKeyDown="hotkeyTextBox_PreviewKeyDown"
@@ -2058,7 +2136,7 @@
                                         Padding="10,5"
                                         HorizontalAlignment="Stretch"
                                         Background="{DynamicResource Window.Title.Background}"
-                                        FontSize="18"
+                                        FontSize="{DynamicResource GlobalFontSize18}"
                                         Style="{StaticResource BaseTextBlock}"
                                         Text="{Binding ViewRenameFormat}"
                                         TextAlignment="Left"
@@ -2104,6 +2182,7 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
                                     <TextBlock Grid.Row="0" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource BackupModeLabel}" />
                                     <ComboBox x:Name="BackupModeBox" Grid.Row="0" Grid.Column="1" Width="240" Margin="5" HorizontalAlignment="Left" Style="{StaticResource BorderComboBox}">
@@ -2139,6 +2218,11 @@
                                         <ComboBoxItem Content="WebDAV" />
                                         <ComboBoxItem Content="S3" />
                                     </ComboBox>
+                                    <TextBlock Grid.Row="6" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource RemoteRetentionLabel}" />
+                                    <TextBox x:Name="RemoteRetentionBox" Grid.Row="6" Grid.Column="1" Width="70" Height="30" Margin="5" Padding="5" MaxLength="2" TextAlignment="Center"
+                                             HorizontalAlignment="Left" VerticalContentAlignment="Center" BorderThickness="0" Background="{DynamicResource Window.Title.Background}"
+                                             Foreground="{DynamicResource Window.Foreground}" CaretBrush="{DynamicResource Window.Foreground}"
+                                             ToolTip="{DynamicResource RemoteRetentionTip}" />
                                 </Grid>
                                 <Expander Margin="5" Header="WebDAV" Foreground="{DynamicResource Window.Foreground}">
                                     <Grid Margin="5">
@@ -2601,7 +2685,7 @@
                                                         Click="TestServer"
                                                         Content="{DynamicResource Test}"
                                                         Cursor="Hand"
-                                                        FontSize="10"
+                                                        FontSize="{DynamicResource GlobalFontSize10}"
                                                         Style="{StaticResource ButtonPrimary}"
                                                         Tag="{Binding RelativeSource={RelativeSource AncestorType=DataGridRow}}" />
 
@@ -2828,7 +2912,7 @@
 
         </TabControl>
 
-        <Grid Grid.Row="1" Background="{DynamicResource Window.Title.Background}">
+        <Grid Grid.Row="2" Background="{DynamicResource Window.Title.Background}">
 
             <Button
                 MinWidth="100"

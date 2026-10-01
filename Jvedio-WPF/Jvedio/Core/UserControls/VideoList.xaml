@@ -79,16 +79,41 @@
             Opacity="0.9"
             Placement="Mouse"
             PreviewKeyUp="ContextMenu_PreviewKeyUp">
-            <MenuItem Click="DownLoadSelectMovie" Header="{DynamicResource SyncInfo}" />
+            <!--  三态范围标注：海报右键只对选中的影片生效（见维护日志 3.30/3.33）  -->
+            <MenuItem
+                FontStyle="Italic"
+                Header="{DynamicResource MenuScopeSelected}"
+                IsEnabled="False" />
+            <Separator />
+            <MenuItem
+                Click="DownLoadSelectMovie"
+                Header="{DynamicResource SyncInfoGesture}"
+                InputGestureText="S"
+                Icon="pack://application:,,,/Resources/menuitem/download.png" />
             <MenuItem
                 Click="DownLoadWithUrl"
                 Header="{DynamicResource Menu_CustomUrl}"
                 Visibility="Collapsed" />
-            <MenuItem Name="TagMenuItems" Header="{DynamicResource AddTagStamp}" />
-            <MenuItem Name="OnlineJumpMenuItems" Header="{DynamicResource OnlineJump}" />
-            <MenuItem Click="EditInfo" Header="{DynamicResource Menu_EditInfo}" />
+            <MenuItem
+                Name="TagMenuItems"
+                Header="{DynamicResource AddTagStamp}"
+                Icon="pack://application:,,,/Resources/menuitem/label.png" />
+            <MenuItem
+                Name="OnlineJumpMenuItems"
+                Header="{DynamicResource OnlineJump}"
+                Icon="pack://application:,,,/Resources/menuitem/openwebsite.png" />
+            <MenuItem
+                Click="EditInfo"
+                Header="{DynamicResource Menu_EditInfo}"
+                Icon="pack://application:,,,/Resources/menuitem/edit.png" />
+            <MenuItem Click="BatchEdit" Header="{DynamicResource BatchEdit}" />
+            <Separator />
             <MenuItem Header="{DynamicResource Menu_Advance}">
-                <MenuItem Click="TranslateMovie" Header="{DynamicResource TranslateTitle}" />
+                <MenuItem
+                    Click="TranslateMovie"
+                    Header="{DynamicResource TranslateTitle}"
+                    Icon="pack://application:,,,/Resources/menuitem/translate.png" />
+                <MenuItem Click="TranslateRetryUntranslated" Header="{DynamicResource TranslateRetry}" />
                 <MenuItem Click="AddDataAssociation" Header="{DynamicResource DataAsso}" />
                 <MenuItem Click="GenerateScreenShot" Header="{DynamicResource Menu_GenerateScreenShot}" />
                 <MenuItem Click="GenerateGif" Header="{DynamicResource Menu_GenerateGif}" />
@@ -120,7 +145,9 @@
                 Header="{DynamicResource ViewWebsite}"
                 Icon="pack://application:,,,/Resources/menuitem/openwebsite.png" />
 
-            <MenuItem Header="{DynamicResource OpenPath}">
+            <MenuItem
+                Header="{DynamicResource OpenPath}"
+                Icon="pack://application:,,,/Resources/menuitem/openfolder.png">
                 <MenuItem Click="OpenPath" Header="{DynamicResource Movie}" />
                 <MenuItem Click="OpenPath" Header="{DynamicResource Poster}" />
                 <MenuItem Click="OpenPath" Header="{DynamicResource Thumbnail}" />
@@ -544,10 +571,17 @@
                     Visibility="{Binding DataContext.ShowTable, ElementName=videoList, Converter={StaticResource BoolToOppositeVisibilityConverter}}">
                     <super:SimplePanel.ContextMenu>
                         <ContextMenu Opened="BlankContextMenu_Opened">
+                            <!--  三态范围标注：空白处右键只对当前结果集生效（见维护日志 3.52）  -->
+                            <MenuItem
+                                FontStyle="Italic"
+                                Header="{DynamicResource MenuScopeCurrentResults}"
+                                IsEnabled="False" />
+                            <Separator />
                             <MenuItem
                                 Click="SelectAll"
                                 FontWeight="Bold"
-                                Header="{DynamicResource SelectAll}" />
+                                Header="{DynamicResource SelectAll}"
+                                Icon="pack://application:,,,/Resources/menuitem/selectall.png" />
                             <Separator />
 
                             <MenuItem Header="{DynamicResource AllData}">

@@ -104,6 +104,91 @@ namespace Jvedio
             DataID = dataID;
             CurrentWrapperArg = arg;
             Init();
+            // 站点探测完成后刷新按钮上的可达性小圆点（窗口关闭时退订，防泄漏）
+            OnlineSiteStatus.OnSiteStateChanged += OnOnlineSiteStateChanged;
+            this.Closed += (s, e) => OnlineSiteStatus.OnSiteStateChanged -= OnOnlineSiteStateChanged;
+        }
+
+        private void OnOnlineSiteStateChanged(string siteName)
+        {
+            Dispatcher.BeginInvoke(new Action(() => RefreshOnlineJumpStateDots()));
+        }
+
+        /// <summary>
+        /// 探测完成后只更新按钮上的小圆点，不重建按钮
+        /// </summary>
+        private void RefreshOnlineJumpStateDots()
+        {
+            if (onlineJumpPanel == null)
+                return;
+            foreach (object child in onlineJumpPanel.Children) {
+                if (child is Button button && button.Tag is string siteName)
+                    UpdateOnlineJumpButtonDot(button, siteName);
+            }
+        }
+
+        private static void UpdateOnlineJumpButtonDot(Button button, string siteName)
+        {
+            OnlineSiteState state = OnlineSiteStatus.Get(siteName);
+            if (button.Content is StackPanel panel) {
+                foreach (object child in panel.Children) {
+                    if (child is Border dot && "stateDot".Equals(dot.Name))
+                        dot.Background = new SolidColorBrush(GetOnlineStateColor(state));
+                }
+            }
+        }
+
+        private static System.Windows.Media.Color GetOnlineStateColor(OnlineSiteState state)
+        {
+            switch (state) {
+                case OnlineSiteState.Ok: return (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#67C23A");
+                case OnlineSiteState.MaybeBlocked: return (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#E6A23C");
+                case OnlineSiteState.Fail: return (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F56C6C");
+                default: return System.Windows.Media.Colors.Gray;
+            }
+        }
+
+        /// <summary>
+        /// 在线观看：按当前影片番号生成各站跳转按钮（位置：标签下面）
+        /// </summary>
+        private void LoadOnlineJumpButtons()
+        {
+            if (onlineJumpGrid == null || onlineJumpPanel == null)
+                return;
+            onlineJumpPanel.Children.Clear();
+            string code = vieModel?.CurrentVideo?.VID;
+            if (string.IsNullOrEmpty(code)) {
+                onlineJumpGrid.Visibility = Visibility.Collapsed;
+                return;
+            }
+            onlineJumpGrid.Visibility = Visibility.Visible;
+            foreach (OnlineSite site in OnlineSites.Sites) {
+                if (!site.Enabled)
+                    continue;
+                Button button = new Button() {
+                    Style = (Style)FindResource("OnlineJumpButton"),
+                    Tag = site.Name,
+                    ToolTip = site.GetMovieUrl(code),
+                };
+                StackPanel content = new StackPanel() { Orientation = Orientation.Horizontal };
+                content.Children.Add(new TextBlock() { Text = site.Name });
+                Border dot = new Border() {
+                    Name = "stateDot",
+                    Width = 7,
+                    Height = 7,
+                    Margin = new Thickness(5, 0, 0, 0),
+                    CornerRadius = new CornerRadius(3.5),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Background = new SolidColorBrush(GetOnlineStateColor(OnlineSiteState.Unknown)),
+                };
+                content.Children.Add(dot);
+                button.Content = content;
+                string url = site.GetMovieUrl(code);
+                button.Click += (s, e) => FileHelper.TryOpenUrl(url);
+                onlineJumpPanel.Children.Add(button);
+            }
+            // 后台探测各站点可达性（10 分钟缓存），完成后事件回调刷新小圆点
+            OnlineSiteStatus.ProbeAll(OnlineSites.Sites);
         }
 
         public void Init()
@@ -129,32 +214,6 @@ namespace Jvedio
                     vieModel.LoadingData = false;
                 }
             };
-        }
-
-        /// <summary>
-        /// 在线观看：按当前影片番号生成各站跳转按钮（位置：标签下面）
-        /// </summary>
-        private void LoadOnlineJumpButtons()
-        {
-            if (onlineJumpGrid == null || onlineJumpPanel == null)
-                return;
-            onlineJumpPanel.Children.Clear();
-            string code = vieModel?.CurrentVideo?.VID;
-            if (string.IsNullOrEmpty(code)) {
-                onlineJumpGrid.Visibility = Visibility.Collapsed;
-                return;
-            }
-            onlineJumpGrid.Visibility = Visibility.Visible;
-            foreach (OnlineSite site in OnlineSites.Sites) {
-                Button button = new Button() {
-                    Content = site.Name,
-                    Style = (Style)FindResource("OnlineJumpButton"),
-                    ToolTip = site.GetMovieUrl(code),
-                };
-                string url = site.GetMovieUrl(code);
-                button.Click += (s, e) => FileHelper.TryOpenUrl(url);
-                onlineJumpPanel.Children.Add(button);
-            }
         }
 
         private void Window_ContentRendered(object sender, EventArgs e)

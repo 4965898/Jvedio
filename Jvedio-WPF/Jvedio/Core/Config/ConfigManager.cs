@@ -130,6 +130,12 @@ namespace Jvedio
                 ConfigManager.FFmpegConfig.Path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 
             EnsurePicPaths(); // 必须在配置加载后
+            // 配置读取完成后应用「同步影片信息并发数」（此前该设置只存不读，见维护日志 六）
+            try {
+                DownloadManager.ApplyConcurrency((int)Settings.SyncConcurrency);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
             onLoaded?.Invoke();
             Loaded = true;
         }

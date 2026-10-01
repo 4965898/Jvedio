@@ -38,6 +38,9 @@ namespace Jvedio.Core.Backup
             public string RemoteError { get; internal set; }
             public string CleanupError { get; internal set; }
             public string RetentionError { get; internal set; }
+
+            /// <summary>在线保留份数清理失败的原因（上传成功后清理远端历史 ZIP）。</summary>
+            public string RemoteRetentionError { get; internal set; }
         }
 
         public static string LocalRoot {
@@ -72,9 +75,20 @@ namespace Jvedio.Core.Backup
             string temporaryRoot = null;
             try {
                 string folder;
+                string localArchive = null;
                 if (keepLocal) {
                     folder = await Task.Run(() => CreateLocal());
-                    result.LocalFolder = folder;
+                    // 本地备份统一为压缩包：快照文件夹压成同名 ZIP 后只保留 ZIP（与在线备份一致），
+                    // 压缩失败时退回文件夹形态（原有行为）
+                    try {
+                        localArchive = await Task.Run(() => CreateArchive(folder));
+                        result.LocalFolder = localArchive;
+                        try { Directory.Delete(folder, true); }
+                        catch (Exception ex) { result.CleanupError = ex.Message; }
+                    } catch (Exception ex) {
+                        Jvedio.Core.Logs.Logger.Instance.Error(ex);
+                        result.LocalFolder = folder;
+                    }
                     try {
                         int keep = Math.Max(1, Math.Min(10, ConfigManager.Settings.MaxLocalBackups));
                         await Task.Run(() => PruneLocalSnapshots(LocalRoot, keep));
@@ -86,13 +100,27 @@ namespace Jvedio.Core.Backup
                 }
                 if (uploadRemote) {
                     string archive = null;
+                    bool archiveIsLocalBackup = false;
                     try {
-                        archive = await Task.Run(() => CreateArchive(folder));
+                        if (localArchive != null) {
+                            // 本地及在线模式：直接上传刚生成的本地 ZIP，不再重复压缩
+                            archive = localArchive;
+                            archiveIsLocalBackup = true;
+                        } else {
+                            archive = await Task.Run(() => CreateArchive(folder));
+                        }
                         await RemoteBackupStore.UploadAsync(archive);
+                        // 在线保留份数：上传成功后清理远端多余的历史 ZIP
+                        try {
+                            int remoteKeep = Math.Max(1, Math.Min(30, ConfigManager.Settings.RemoteMaxBackups));
+                            await RemoteBackupStore.PruneRemoteAsync(remoteKeep);
+                        } catch (Exception ex) { result.RemoteRetentionError = ex.Message; }
                     } catch (Exception ex) {
                         result.RemoteError = ex.Message;
                     } finally {
-                        if (archive != null && File.Exists(archive)) {
+                        // 仅在线模式的 ZIP 在临时目录，上传后删除；
+                        // 本地及在线模式的 ZIP 就是本地备份本体，保留
+                        if (archive != null && File.Exists(archive) && !archiveIsLocalBackup) {
                             try { File.Delete(archive); }
                             catch (Exception ex) { result.CleanupError = ex.Message; }
                         }
@@ -117,6 +145,15 @@ namespace Jvedio.Core.Backup
             if (!Directory.Exists(root)) return;
             string rootPrefix = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             var snapshots = new List<Tuple<string, DateTime>>();
+            // 2026-10-01 起本地备份为同名 ZIP；此前的日期文件夹仍按快照参与保留份数清理
+            foreach (string archive in Directory.EnumerateFiles(root, "*.zip")) {
+                string name = Path.GetFileNameWithoutExtension(archive);
+                if (!DateTime.TryParseExact(name,
+                    new[] { "yyyy-MM-dd_HHmmss_fff", "yyyy-MM-dd_HHmmss", "yyyy-MM-dd" },
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out DateTime zipCreated)) continue;
+                snapshots.Add(Tuple.Create(archive, zipCreated));
+            }
             foreach (string folder in Directory.EnumerateDirectories(root)) {
                 var info = new DirectoryInfo(folder);
                 if ((info.Attributes & FileAttributes.ReparsePoint) != 0) continue;
@@ -140,7 +177,10 @@ namespace Jvedio.Core.Backup
                 string full = Path.GetFullPath(old.Item1);
                 if (!full.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("备份清理路径越界");
-                Directory.Delete(full, true);
+                if (Directory.Exists(full))
+                    Directory.Delete(full, true);
+                else if (File.Exists(full))
+                    File.Delete(full);
             }
         }
 

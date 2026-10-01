@@ -64,6 +64,20 @@ namespace Jvedio.Core.Config
         public bool LoadDataAfterScan { get; set; }
         public bool DataExistsIndexAfterScan { get; set; }
         public bool ImageExistsIndexAfterScan { get; set; }
+
+        /// <summary>
+        /// 扫描/拖放导入完成后对新增影片自动开始同步信息（刮削）。
+        /// 默认关闭：避免一次大扫描意外打站点
+        /// </summary>
+        public bool _ScrapeAfterScan;
+        public bool ScrapeAfterScan {
+            get { return _ScrapeAfterScan; }
+            set {
+                _ScrapeAfterScan = value;
+                RaisePropertyChanged();
+            }
+        }
+
         public string NFOParseConfig { get; set; }
         public bool _ScanNfo;
         public bool ScanNfo {

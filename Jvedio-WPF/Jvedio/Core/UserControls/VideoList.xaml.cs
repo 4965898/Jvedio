@@ -6,6 +6,7 @@ using Jvedio.Core.Global;
 using Jvedio.Core.Media;
 using Jvedio.Core.Net;
 using DataIndexManager = Jvedio.Core.Tasks.DataIndexManager;
+using RenameTask = Jvedio.Core.Tasks.RenameTask;
 using Jvedio.Core.UserControls.ViewModels;
 using Jvedio.Entity;
 using Jvedio.Entity.Common;
@@ -119,6 +120,9 @@ namespace Jvedio.Core.UserControls
             vieModel.ExtraWrapper = extraWrapper;
             vieModel.UUID = tabItemEx.UUID;
             TabItemEx = tabItemEx;
+
+            // 保存的筛选器需要读写搜索词与排序状态（见 Filter.CaptureState/ApplyState）
+            filter.AttachedVieModel = vieModel;
 
             SetDataGrid();
 
@@ -759,6 +763,10 @@ namespace Jvedio.Core.UserControls
             return itemsControl.ItemsSource as ObservableCollection<Video>;
         }
 
+        /// <summary>
+        /// 选中影片重命名（右键-拓展功能）：一部影片一个任务入队，进度/取消/失败重启在任务页查看。
+        /// 原实现在 UI 线程同步循环，批量时卡界面（维护日志 3.52 收编任务页）。
+        /// </summary>
         public void RenameFile(object sender, RoutedEventArgs e)
         {
             if (ConfigManager.RenameConfig.FormatString.IndexOf("{") < 0) {
@@ -768,159 +776,61 @@ namespace Jvedio.Core.UserControls
 
             HandleMenuSelected(sender, 1);
 
-            ObservableCollection<Video> videos = GetVideosByMenu(sender as MenuItem, 1);
-            if (videos == null)
-                return;
-
-            List<string> logs = new List<string>();
-            TaskLogger logger = new TaskLogger(logs);
             List<Video> toRename = new List<Video>();
-            foreach (Video video in vieModel.SelectedVideo) {
-                if (File.Exists(video.Path)) {
+            foreach (Video video in vieModel.SelectedVideo?.ToList() ?? new List<Video>()) {
+                if (video != null && video.DataID > 0 && File.Exists(video.Path))
                     toRename.Add(video);
-                } else {
-                    logger.Error(SuperControls.Style.LangManager.GetValueByKey("Message_FileNotExist") + $" => {video.Path}");
-                }
             }
 
-            int totalCount = toRename.Count;
-
-            Dictionary<long, List<string>> dict = new Dictionary<long, List<string>>();
-
-            // 重命名文件
-            int successCount = RenameFile(toRename, logger, ref dict);
-
-            // 更新
-            if (dict.Count > 0) {
-
-                UpdateVideo(dict, ref videos);
-                MessageNotify.Success($"{SuperControls.Style.LangManager.GetValueByKey("Message_SuccessNum")} {successCount}/{totalCount} ");
-            } else {
+            if (toRename.Count == 0) {
                 MessageNotify.Info(LangManager.GetValueByKey("NoFileToRename"));
+                return;
             }
+
+            EnqueueRenameTasks(toRename);
 
             if (!vieModel.EditMode)
                 vieModel.SelectedVideo.Clear();
-
-            if (logs.Count > 0)
-                //onRenameFile?.Invoke(string.Join(Environment.NewLine, logs));
-                new Dialog_Logs(string.Join(Environment.NewLine, logs)).ShowDialog(App.Current.MainWindow);
         }
 
-        public int RenameFile(List<Video> toRename, TaskLogger logger, ref Dictionary<long, List<string>> dict)
+        /// <summary>
+        /// 入队重命名任务；任务完成后刷新当前页列表的路径显示
+        /// </summary>
+        private void EnqueueRenameTasks(List<Video> toRename)
         {
-            int successCount = 0;
+            List<RenameTask> tasks = new List<RenameTask>();
+            HashSet<long> seen = new HashSet<long>();
             foreach (Video video in toRename) {
-                long dataID = video.DataID;
-                Video newVideo = videoMapper.SelectVideoByID(dataID);
-                string[] newPath = null;
-                try {
-                    newPath = newVideo.ToFileName();
-                } catch (Exception ex) {
-                    logger.Error(ex.Message);
+                if (video == null || !seen.Add(video.DataID))
                     continue;
-                }
-
-                if (newPath == null || newPath.Length == 0)
-                    continue;
-
-                if (newVideo.HasSubSection) {
-                    bool success = false;
-                    bool changed = false;
-                    string[] oldPaths = newVideo.SubSectionList.Select(arg => arg.Value).ToArray();
-
-                    // 判断是否改变了文件名
-                    for (int i = 0; i < newPath.Length; i++) {
-                        if (!newPath[i].Equals(oldPaths[i])) {
-                            changed = true;
-                            break;
-                        }
-                    }
-
-                    if (!changed) {
-                        //logger.Info(LangManager.GetValueByKey("SameFileNameToOrigin"));
-                        break;
-                    }
-
-                    for (int i = 0; i < newPath.Length; i++) {
-                        if (File.Exists(newPath[i])) {
-                            logger.Error($"{LangManager.GetValueByKey("SameFileNameExists")} => {newPath[i]}");
-                            newPath[i] = oldPaths[i]; // 换回原来的
-                            continue;
-                        }
-
-                        try {
-                            File.Move(video.SubSectionList[i].ToString(), newPath[i]);
-                            success = true;
-                        } catch (Exception ex) {
-                            logger.Error(ex.Message);
-                            newPath[i] = oldPaths[i]; // 换回原来的
-                            continue;
-                        }
-                    }
-
-                    if (success)
-                        successCount++;
-                    if (!dict.ContainsKey(dataID))
-                        dict.Add(dataID, newPath.ToList());
-                } else {
-                    string target = newPath[0];
-                    string origin = newVideo.Path;
-                    if (origin.Equals(target)) {
-                        //logger.Info(LangManager.GetValueByKey("SameFileNameToOrigin") +
-                        //    $"{Environment.NewLine}    origin: {origin}{Environment.NewLine}    target: {target}");
-                        continue;
-                    }
-
-                    if (!File.Exists(target)) {
-                        try {
-                            File.Move(origin, target);
-                            successCount++;
-                        } catch (Exception ex) {
-                            logger.Error(ex.Message);
-                            continue;
-                        }
-
-                        // 显示
-                        if (!dict.ContainsKey(dataID))
-                            dict.Add(dataID, new List<string>() { target });
-                    } else {
-                        logger.Error($"{LangManager.GetValueByKey("SameFileNameExists")} => {target}");
-                    }
-                }
+                tasks.Add(new RenameTask(video));
             }
-            return successCount;
-        }
-
-
-        public void UpdateVideo(Dictionary<long, List<string>> dict, ref ObservableCollection<Video> videos)
-        {
-            if (videos == null || videos.Count == 0)
+            if (tasks.Count == 0) {
+                MessageNotify.Info(LangManager.GetValueByKey("NoFileToRename"));
                 return;
-            for (int i = 0; i < videos.Count; i++) {
-                Video video = videos[i];
-                long dataID = video.DataID;
-                if (dict.ContainsKey(dataID)) {
-                    if (video.HasSubSection) {
-                        List<string> list = dict[dataID];
-                        string subSection = string.Join(SuperUtils.Values.ConstValues.SeparatorString, list);
-                        videos[i].Path = list[0];
-                        videos[i].SubSection = subSection;
-                        metaDataMapper.UpdateFieldById("Path", list[0], dataID);
-                        videoMapper.UpdateFieldById("SubSection", subSection, dataID);
-                    } else {
-                        string path = dict[dataID][0];
-                        videos[i].Path = path;
-                        metaDataMapper.UpdateFieldById("Path", path, dataID);
-                    }
-                }
             }
 
-            // 文件已移动/重命名到新路径，同步更新可播放索引
-            if (dict.Count > 0)
-                DataIndexManager.MarkPathExists(dict.Keys.ToArray());
-        }
+            EventHandler done = null;
+            done = (s, ev) => {
+                if (!(s is RenameTask t))
+                    return;
+                App.Current.Dispatcher.BeginInvoke(new Action(() => {
+                    var item = vieModel.CurrentVideoList.FirstOrDefault(arg => arg.DataID == t.DataID);
+                    if (item != null && t.Success && !string.IsNullOrEmpty(t.NewPath)) {
+                        item.Path = t.NewPath;
+                        if (!string.IsNullOrEmpty(t.NewSubSection))
+                            item.SubSection = t.NewSubSection;
+                    }
+                    t.onCompleted -= done;
+                }));
+            };
 
+            foreach (RenameTask task in tasks) {
+                task.onCompleted += done;
+                App.RenameTaskManager.AddTask(task);
+            }
+            MessageNotify.Info($"{LangManager.GetValueByKey("RenameTask")}: {tasks.Count} - {LangManager.GetValueByKey("RenameQueuedTip")}");
+        }
 
         public static void UpdateImageIndex(long dataID, bool smallImageExists = false, bool bigImageExists = false)
         {
@@ -1158,7 +1068,9 @@ namespace Jvedio.Core.UserControls
                 if (menuItem != null)
                     DeleteFile(menuItem, new RoutedEventArgs());
             } else if (e.Key == Key.S) {
-                MenuItem menuItem = GetMenuItem(contextMenu, SuperControls.Style.LangManager.GetValueByKey("Menu_SyncInfo"));
+                // 菜单项 Header 是 SyncInfoGesture（同步信息 (S)）；此前查 Menu_SyncInfo（值「立即同步(S)」）
+                // 按 Header 文本匹配不到，快捷键 S 一直无反应（2026-10-01 修复）
+                MenuItem menuItem = GetMenuItem(contextMenu, SuperControls.Style.LangManager.GetValueByKey("SyncInfoGesture"));
                 if (menuItem != null)
                     DownLoadSelectMovie(menuItem, new RoutedEventArgs());
             } else if (e.Key == Key.E) {
@@ -1166,7 +1078,8 @@ namespace Jvedio.Core.UserControls
                 if (menuItem != null)
                     EditInfo(menuItem, new RoutedEventArgs());
             } else if (e.Key == Key.W) {
-                MenuItem menuItem = GetMenuItem(contextMenu, SuperControls.Style.LangManager.GetValueByKey("Menu_OpenWebSite"));
+                // 同病：菜单 Header 是 ViewWebsite（访问所在网址），此前查 Menu_OpenWebSite（「打开网址(W)」）
+                MenuItem menuItem = GetMenuItem(contextMenu, SuperControls.Style.LangManager.GetValueByKey("ViewWebsite"));
                 if (menuItem != null)
                     OpenWeb(menuItem, new RoutedEventArgs());
             } else if (e.Key == Key.C) {
@@ -1519,7 +1432,7 @@ namespace Jvedio.Core.UserControls
                         menuItem.Items.Add(menu);
                     });
                 } else if ("OnlineJumpMenuItems".Equals(item.Name) && item is MenuItem jumpMenu) {
-                    // 在线观看：按番号生成各站跳转链接
+                    // 在线观看：按番号生成各站跳转链接（停用的站点不出现）
                     jumpMenu.Items.Clear();
                     string code = video.VID;
                     if (string.IsNullOrEmpty(code)) {
@@ -1527,6 +1440,8 @@ namespace Jvedio.Core.UserControls
                     } else {
                         jumpMenu.IsEnabled = true;
                         foreach (Jvedio.Core.Crawler.OnlineSite site in Jvedio.Core.Crawler.OnlineSites.Sites) {
+                            if (!site.Enabled)
+                                continue;
                             MenuItem menu = new MenuItem() {
                                 Header = site.Name,
                             };
@@ -1534,6 +1449,8 @@ namespace Jvedio.Core.UserControls
                             menu.Click += (s, ev) => FileHelper.TryOpenUrl(url);
                             jumpMenu.Items.Add(menu);
                         }
+                        if (jumpMenu.Items.Count == 0)
+                            jumpMenu.IsEnabled = false;
                     }
                 }
             }
@@ -1812,6 +1729,23 @@ namespace Jvedio.Core.UserControls
 
         }
 
+        /// <summary>
+        /// 批量编辑选中影片（勾选字段 + 统一赋值 / 追加标记），完成后刷新列表
+        /// </summary>
+        private void BatchEdit(object sender, RoutedEventArgs e)
+        {
+            HandleMenuSelected(sender, 1);
+            List<Video> videos = vieModel?.SelectedVideo?.ToList();
+            if (videos == null || videos.Count == 0) {
+                MessageNotify.Info(LangManager.GetValueByKey("BatchEditNoSelection"));
+                return;
+            }
+            Jvedio.Windows.Window_BatchEdit window = new Jvedio.Windows.Window_BatchEdit(videos) { Owner = Window.GetWindow(this) };
+            window.ShowDialog();
+            if (window.DialogResult == true)
+                vieModel.Refresh();
+        }
+
         private void TranslateMovie(object sender, RoutedEventArgs e)
         {
             // 无防重入标志：翻译任务管理器按 DataID 去重入队，
@@ -1836,6 +1770,27 @@ namespace Jvedio.Core.UserControls
             if (videos == null)
                 return;
             TranslateVideos(videos);
+        }
+
+        /// <summary>
+        /// 批量重试未翻译：只翻译选中影片中「有原文标题但没有中文标题」的——
+        /// 既覆盖此前批量翻译失败的，也覆盖从未翻译过的（3.65 的字段保护思想同源：已有翻译不重跑）
+        /// </summary>
+        private void TranslateRetryUntranslated(object sender, RoutedEventArgs e)
+        {
+            HandleMenuSelected(sender, 1);
+            List<Video> retry = new List<Video>();
+            foreach (Video video in vieModel.SelectedVideo?.ToList() ?? new List<Video>()) {
+                if (video == null)
+                    continue;
+                if (!string.IsNullOrEmpty(video.Title) && string.IsNullOrEmpty(video.TitleCN))
+                    retry.Add(video);
+            }
+            if (retry.Count == 0) {
+                MessageNotify.Info(LangManager.GetValueByKey("TranslateNoneRetry"));
+                return;
+            }
+            TranslateVideos(retry);
         }
 
         private void TranslateVideos(List<Video> snapshot)
@@ -2302,7 +2257,8 @@ namespace Jvedio.Core.UserControls
         }
 
         /// <summary>
-        /// 全库重命名文件（空白处右键-全部资源-扩展功能）
+        /// 全库重命名文件（空白处右键-全部资源-扩展功能）：
+        /// 对当前结果集逐部入队重命名任务（进度/取消/失败重启在任务页查看）
         /// </summary>
         public void RenameAllFile(object sender, RoutedEventArgs e)
         {
@@ -2313,26 +2269,7 @@ namespace Jvedio.Core.UserControls
             List<Video> videos = GetCurrentVideosConfirm(LangManager.GetValueByKey("Menu_RenameFile"));
             if (videos == null)
                 return;
-
-            List<string> logs = new List<string>();
-            TaskLogger logger = new TaskLogger(logs);
-            int totalCount = videos.Count;
-
-            Dictionary<long, List<string>> dict = new Dictionary<long, List<string>>();
-
-            // 核心 RenameFile 内部按 DataID 重取全量数据，Path 以核心取到的为准
-            int successCount = RenameFile(videos, logger, ref dict);
-
-            if (dict.Count > 0) {
-                ObservableCollection<Video> currentVideos = vieModel.CurrentVideoList;
-                UpdateVideo(dict, ref currentVideos);
-                MessageNotify.Success($"{SuperControls.Style.LangManager.GetValueByKey("Message_SuccessNum")} {successCount}/{totalCount} ");
-            } else {
-                MessageNotify.Info(LangManager.GetValueByKey("NoFileToRename"));
-            }
-
-            if (logs.Count > 0)
-                new Dialog_Logs(string.Join(Environment.NewLine, logs)).ShowDialog(App.Current.MainWindow);
+            EnqueueRenameTasks(videos);
         }
 
         /// <summary>

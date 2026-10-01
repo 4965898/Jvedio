@@ -319,7 +319,8 @@ private int _SyncConcurrency = (int)ConfigManager.Settings.SyncConcurrency;
         public int SyncConcurrency {
             get { return _SyncConcurrency; }
             set {
-                _SyncConcurrency = value;
+                // 范围校验：0 会导致刮削任务永不执行，过大火并发易被目标站封 IP（维护日志 六）
+                _SyncConcurrency = Math.Min(10, Math.Max(1, value));
                 RaisePropertyChanged();
             }
         }
@@ -328,7 +329,7 @@ private int _SyncConcurrency = (int)ConfigManager.Settings.SyncConcurrency;
         public int AutoRebuildImageIndexCount {
             get { return _AutoRebuildImageIndexCount; }
             set {
-                _AutoRebuildImageIndexCount = value;
+                _AutoRebuildImageIndexCount = Math.Max(0, value);
                 RaisePropertyChanged();
             }
         }
@@ -490,6 +491,16 @@ private int _SyncConcurrency = (int)ConfigManager.Settings.SyncConcurrency;
 
             set {
                 _ImageExistsIndexAfterScan = value;
+                RaisePropertyChanged();
+            }
+        }
+        private bool _ScrapeAfterScan = ConfigManager.ScanConfig.ScrapeAfterScan;
+
+        public bool ScrapeAfterScan {
+            get { return _ScrapeAfterScan; }
+
+            set {
+                _ScrapeAfterScan = value;
                 RaisePropertyChanged();
             }
         }

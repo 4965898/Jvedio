@@ -243,7 +243,7 @@
                                 <TextBlock
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
-                                    FontSize="8"
+                                    FontSize="{DynamicResource GlobalFontSize8}"
                                     Foreground="{DynamicResource Window.Foreground}"
                                     Style="{StaticResource BaseTextBlock}"
                                     Text="{Binding PreviewImageCount, Mode=OneWay}" />
@@ -276,7 +276,7 @@
                                 <TextBlock
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
-                                    FontSize="8"
+                                    FontSize="{DynamicResource GlobalFontSize8}"
                                     Foreground="{DynamicResource Window.Foreground}"
                                     Style="{StaticResource BaseTextBlock}"
                                     Text="{Binding ScreenShotCount, Mode=OneWay}" />
@@ -323,7 +323,7 @@
                         VerticalAlignment="Center"
                         Background="Transparent"
                         FocusVisualStyle="{x:Null}"
-                        FontSize="16"
+                        FontSize="{DynamicResource GlobalFontSize16}"
                         FontWeight="Bold"
                         Foreground="{DynamicResource Window.Sub.Foreground}"
                         Style="{StaticResource ViewTextBox}"
@@ -353,7 +353,7 @@
                         VerticalAlignment="Center"
                         Background="Transparent"
                         FocusVisualStyle="{x:Null}"
-                        FontSize="16"
+                        FontSize="{DynamicResource GlobalFontSize16}"
                         FontWeight="Bold"
                         Foreground="{DynamicResource Window.Sub.Foreground}"
                         Text="{Binding CurrentVideo.TitleCN}"
@@ -733,7 +733,7 @@
                                                     MaxWidth="270"
                                                     HorizontalAlignment="Left"
                                                     FontFamily="Times New Roman"
-                                                    FontSize="24"
+                                                    FontSize="{DynamicResource GlobalFontSize24}"
                                                     Foreground="{DynamicResource Window.Foreground}"
                                                     Style="{StaticResource BaseTextBlock}"
                                                     Text="{Binding CurrentVideo.VID, Mode=OneWay, FallbackValue=VID}"
@@ -928,7 +928,7 @@
                                                                         Background="{DynamicResource Window.Detail.Background}"
                                                                         BorderThickness="0"
                                                                         Content="{Binding Count}"
-                                                                        FontSize="18"
+                                                                        FontSize="{DynamicResource GlobalFontSize18}"
                                                                         Foreground="{DynamicResource Window.Foreground}"
                                                                         Opacity="0.7"
                                                                         ToolTip="{Binding RelativeSource={RelativeSource Mode=Self}, Path=Content}" />-->
