@@ -1295,6 +1295,8 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 
 **本机验证与部署**：5.4.1.67 Release 编译和完整 ZIP 校验通过，18 项专项回归全部通过；额外只读验证真实暂存备份的 21 条源均可解析，运行对象均忽略。三语仍为 257 key，差异检查通过。部署 `E:\Jvedio-5.3.1\Jvedio29.75.exe` 并归档 `build-output/Jvedio29.75.exe`，构建/归档/部署 SHA-256 均为 `B8ABC890FE0BDC2A5881E0F9BA4FBC6851DF7176C26501201EA0723843DD77E0`。5.4.1.66 仅为本地迭代，正式发布直接从 5.4.1.65 升到 5.4.1.67；暂存合并由用户下次启动 5.4.1.67 完成。
 
+**正式发布结果**：源码与三语 README 已推送至 `origin/master`，发布源码提交及标签 `5.4.1.67` 均指向 `96c02bc8c6a8af063739bbbc02b98f89e980a62e`。[GitHub Actions 37506248534](https://github.com/4965898/Jvedio/actions/runs/37506248534) 全部成功，包含主程序/Bus/DB 构建、调度器检查、ZIP 校验、ZIP/EXE 上传与原升级窗口 feed 发布。[自改5.4.1.67](https://github.com/4965898/Jvedio/releases/tag/5.4.1.67) 于 2026-10-07 01:49:43（香港时间）正式公开且为 Latest；ZIP 为 11,398,469 字节，EXE 为 2,417,152 字节，均已实际下载验证。ZIP 中 EXE 与单独 EXE 的 SHA-256 均为 `EE9A899793A39A6AFD848E064B917806644F543C724F183764A9280DA462FF5B`；公开 ZIP SHA-256 为 `AA667BE76A3B7C59AE2397236A35993CB4825AC0F3C316A095E2A7970C7633CF`。`update-feed` 已更新至 `01389a1d64cf41309bf8de849adef97e6b37e34c`，`latest.json` 为 5.4.1.67，`list.json` 共 73 个文件，其中 Jvedio.exe 的 MD5 与公开 EXE 一致。该结果补记作为文档提交推送，并跳过重复发布 CI；工作流的本地三语检查改动仍保留，未丢弃。
+
 ---
 
 ## 四、踩坑经验（重点）
