@@ -1,5 +1,7 @@
 # Release process
 
+Label and statistics checks: run test-startup-regressions.ps1 -Library. LibraryRegression.cs creates isolated libraries, validates counts and library-scoped label operations, checks paging and unsaved changes through the WPF UI, and renders previews under build-output/library-previews/. Use -PreviewDirectory to choose another output folder. The default invocation still runs the startup and menu regression checks.
+
 Change `AssemblyVersion` in `Jvedio-WPF/Jvedio/Properties/AssemblyInfo.cs` to a new four-part version and push the commit to `master`. GitHub Actions restores dependencies, rebuilds the application and maintained crawlers, runs the dispatcher stress check, assembles and verifies a complete `Jvedio-<version>.zip` and matching `Jvedio-<version>.exe`, then creates the matching tag and publishes both files. The EXE needs an existing complete installation. Build artifacts are retained for each run.
 
 The workflow refuses to republish a version already tagged at a different commit. It skips an old run if `master` has advanced before publication. A manually pushed version tag also runs the same build and release path.

@@ -297,7 +297,8 @@ namespace Jvedio
             Border border = sender as Border;
             TextBlock textBlock = border.Child as TextBlock;
             string text = textBlock.Text;
-            string value = text.Substring(0, text.IndexOf("("));
+            int countSuffix = text.LastIndexOf("(");
+            string value = countSuffix > 0 && text.EndsWith(")") ? text.Substring(0, countSuffix) : text;
             ObservableString observableString = new ObservableString(value);
             if (vieModel.CurrentVideo.LabelList.Contains(observableString)) {
                 searchLabelPopup.IsOpen = false;

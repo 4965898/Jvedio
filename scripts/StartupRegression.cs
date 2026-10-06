@@ -299,6 +299,9 @@ internal static class StartupRegression
     [STAThread]
     public static int Main(string[] args)
     {
+        // Some Windows native launchers include argv[0] in the managed argument array.
+        if (args.Length > 0 && args[0].EndsWith("StartupRegression.exe", StringComparison.OrdinalIgnoreCase))
+            args = args.Skip(1).ToArray();
         try {
             return Run(args);
         } catch (Exception ex) {
@@ -331,6 +334,7 @@ internal static class StartupRegression
             SetPaths(Path.GetFullPath(args[1]));
             if (args[0] == "prepare") Prepare(args[2]);
             else if (args[0] == "startup") RunStartup(app, int.Parse(args[2]), args.Length > 3 && args[3] == "expect-fast");
+            else if (args[0] == "library") return LibraryRegression.Run(args[2]);
             else RunChecks();
             return failures == 0 ? 0 : 1;
         } catch (Exception ex) {

@@ -159,6 +159,14 @@ CREATE INDEX metadata_to_label_idx_DataID ON metadata_to_label (DataID);
 CREATE INDEX metadata_to_label_idx_LabelName ON metadata_to_label (LabelName);
 COMMIT;
 
+-- 未关联作品的自定义标签也可独立保存，标签名按影片库隔离。
+create table if not exists metadata_label_catalog (
+    DBId INTEGER NOT NULL,
+    LabelName VARCHAR(200) NOT NULL,
+    CreateDate VARCHAR(30) DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%S', 'NOW', 'localtime')),
+    PRIMARY KEY(DBId,LabelName)
+);
+
 -- 演员出演的作品和演员对应关系（多对多）
 -- 作品可以是：影视、写真、游戏等
 BEGIN;

@@ -307,7 +307,7 @@ namespace Jvedio.Core.UserControls
                                             "join metadata on metadata_to_label.DataID=metadata.DataID " +
                                              $"WHERE metadata.DBId={dbid} and metadata.DataType={0} ";
 
-                    long allLabelCount = metaDataMapper.SelectCount(label_count_sql);
+                    long allLabelCount = Jvedio.Core.Library.LibraryLabelService.List(dbid).Count;
                     DateTime date1 = DateTime.Now.AddDays(-1 * Jvedio.ViewModel.VieModel_Main.RECENT_DAY);
                     DateTime date2 = DateTime.Now;
                     long recentWatchCount = metaDataMapper.SelectCount(new SelectWrapper<MetaData>().Eq("DBId", dbid).Eq("DataType", 0).Between("ViewDate", DateHelper.ToLocalDate(date1), DateHelper.ToLocalDate(date2)));

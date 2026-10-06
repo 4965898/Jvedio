@@ -1,300 +1,208 @@
-using Jvedio.Core.Config;
-using LangManager = SuperControls.Style.LangManager;
-using SuperUtils.WPF.VisualTools;
+using Jvedio.Core.Library;
+using Jvedio.Core.UserControls;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
-using static Jvedio.MapperManager;
+using LangManager = SuperControls.Style.LangManager;
 
 namespace Jvedio.Windows
 {
-    /// <summary>
-    /// 统计仪表盘：库内影片/演员/容量总览 + 年份/类别/评分/片商/系列/演员分布条形图。
-    /// 纯 WPF 原生控件绘制，不引入图表库（符合项目零第三方依赖风格）。
-    /// </summary>
     public sealed class Window_Statistics : Window
     {
-        /// <summary>
-        /// 一条分布数据。注意必须用「属性」而非字段：WPF Binding 不支持公有字段，
-        /// 上一版用字段导致图表全部渲染为空（用户实测"统计界面没有显示任何图表"）
-        /// </summary>
-        private sealed class BarItem
+        private sealed class LibraryChoice
         {
-            public string Label { get; set; }
-            public long Count { get; set; }
-            public double Ratio { get; set; }
+            public long? DbId { get; set; }
+            public string Name { get; set; }
         }
-
-        private static readonly Color BAR_COLOR = (Color)ColorConverter.ConvertFromString("#409EFF");
-
-        private readonly long _DbId;
-        private readonly StackPanel _Panel = new StackPanel { Margin = new Thickness(15) };
-        private readonly TextBlock _Status = new TextBlock { Margin = new Thickness(0, 8, 0, 0), Opacity = 0.8 };
+        private readonly ComboBox _Library = new ComboBox { MinWidth = 220, DisplayMemberPath = "Name" };
+        private readonly Button _Refresh = new Button();
+        private readonly Button _Export = new Button();
+        private readonly TextBlock _Status = new TextBlock { Margin = new Thickness(12, 6, 0, 6), TextWrapping = TextWrapping.Wrap };
+        private readonly TabControl _Tabs = new TabControl { Margin = new Thickness(0, 8, 0, 0) };
+        private readonly List<UniformGrid> _Grids = new List<UniformGrid>();
+        private LibraryStatistics _Snapshot;
+        private string _SnapshotScope;
+        private int _Version;
 
         public Window_Statistics(long dbId)
         {
-            _DbId = dbId;
-            Title = LangManager.GetValueByKey("Statistics");
-            Width = 860;
-            Height = 640;
-            MinWidth = 640;
-            MinHeight = 420;
+            Title = L("Statistics");
+            Width = 1130; Height = 790; MinWidth = 700; MinHeight = 460;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             SetResourceReference(BackgroundProperty, "Window.Background");
             SetResourceReference(ForegroundProperty, "Window.Foreground");
-
-            ScrollViewer viewer = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = _Panel };
-            Content = viewer;
+            SetResourceReference(FontSizeProperty, "GlobalFontSize");
+            _Tabs.SetResourceReference(BackgroundProperty, "Window.Background");
+            _Tabs.SetResourceReference(ForegroundProperty, "Window.Foreground");
+            var root = new DockPanel { Margin = new Thickness(16) };
+            var header = new StackPanel();
+            DockPanel.SetDock(header, Dock.Top);
+            var tools = new StackPanel { Orientation = Orientation.Horizontal };
+            tools.Children.Add(new TextBlock { Text = L("StatLibraryScope"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
+            tools.Children.Add(_Library);
+            _Refresh.Content = L("Refresh"); _Export.Content = L("StatExport");
+            foreach (Button button in new[] { _Refresh, _Export }) {
+                button.Margin = new Thickness(10, 0, 0, 0); button.Padding = new Thickness(12, 6, 12, 6);
+                tools.Children.Add(button);
+            }
+            header.Children.Add(tools);
+            header.Children.Add(_Status);
+            header.Children.Add(new TextBlock { Text = L("StatDataHint"), TextWrapping = TextWrapping.Wrap, Opacity = .8 });
+            root.Children.Add(header); root.Children.Add(_Tabs); Content = root;
+            var choices = new List<LibraryChoice> { new LibraryChoice { Name = L("StatAllLibraries"), DbId = null } };
+            foreach (var database in MapperManager.appDatabaseMapper.SelectList() ?? new List<Jvedio.Entity.AppDatabase>())
+                if ((int)database.DataType == 0) choices.Add(new LibraryChoice { DbId = database.DBId, Name = database.Name });
+            _Library.ItemsSource = choices;
+            _Library.SelectedItem = choices.FirstOrDefault(choice => choice.DbId == dbId) ?? choices[0];
+            _Library.SelectionChanged += async (s, e) => { if (IsLoaded) await LoadAsync(); };
+            _Refresh.Click += async (s, e) => await LoadAsync();
+            _Export.Click += (s, e) => Export();
+            SizeChanged += (s, e) => { foreach (UniformGrid grid in _Grids) grid.Columns = ActualWidth >= 980 ? 2 : 1; };
             Loaded += async (s, e) => await LoadAsync();
+            Closed += (s, e) => _Version++;
         }
-
-        private async Task LoadAsync()
+        private static string L(string key) => LangManager.GetValueByKey(key);
+        private static ControlTemplate TabHeaderTemplate()
         {
-            _Status.Text = LangManager.GetValueByKey("HealthWorking");
-            try {
-                Dictionary<string, object> summary = await Task.Run(() => CollectSummary());
-                Dictionary<string, List<BarItem>> charts = await Task.Run(() => CollectCharts());
-                _Panel.Children.Clear();
-                BuildSummary(summary);
-                BuildChart(LangManager.GetValueByKey("StatByYear"), GetChart(charts, "Year"));
-                BuildChart(LangManager.GetValueByKey("StatByRating"), GetChart(charts, "Rating"));
-                BuildChart(LangManager.GetValueByKey("StatByGenre"), GetChart(charts, "Genre"));
-                BuildChart(LangManager.GetValueByKey("StatByStudio"), GetChart(charts, "Studio"));
-                BuildChart(LangManager.GetValueByKey("StatBySeries"), GetChart(charts, "Series"));
-                BuildChart(LangManager.GetValueByKey("StatByActor"), GetChart(charts, "Actor"));
-                _Status.Text = LangManager.GetValueByKey("Message_Success");
-            } catch (Exception ex) {
-                App.Logger.Error(ex);
-                _Status.Text = string.Format(LangManager.GetValueByKey("HealthFailed"), ex.Message);
-            }
-        }
-
-        private static List<BarItem> GetChart(Dictionary<string, List<BarItem>> charts, string key)
-        {
-            return charts.TryGetValue(key, out List<BarItem> bars) ? bars : null;
-        }
-
-        private string BaseWhere()
-        {
-            return $"metadata.DBId={_DbId} and metadata.DataType=0";
-        }
-
-        private Dictionary<string, object> CollectSummary()
-        {
-            var result = new Dictionary<string, object>();
-            string sql = "select " +
-                "(select count(*) from metadata where " + BaseWhere() + ") as VideoCount, " +
-                "(select count(*) from metadata where " + BaseWhere() + " and metadata.Grade>0) as FavoriteCount, " +
-                "(select ifnull(sum(metadata.Size),0) from metadata where " + BaseWhere() + ") as TotalSize, " +
-                "(select count(*) from metadata_to_actor mta join metadata on metadata.DataID=mta.DataID where " + BaseWhere() + ") as ActorRef, " +
-                "(select ifnull(sum(metadata_video.Duration),0) from metadata join metadata_video on metadata_video.DataID=metadata.DataID where " + BaseWhere() + ") as TotalDuration";
-            List<Dictionary<string, object>> rows = metaDataMapper.Select(sql);
-            if (rows != null && rows.Count > 0) {
-                foreach (string key in rows[0].Keys)
-                    result[key] = rows[0][key];
-            }
-            return result;
-        }
-
-        private Dictionary<string, List<BarItem>> CollectCharts()
-        {
-            var charts = new Dictionary<string, List<BarItem>>();
-
-            // 年份分布 top 15
-            List<BarItem> years = ToBars(metaDataMapper.Select(
-                "select substr(metadata.ReleaseDate,1,4) as Label, count(*) as Cnt from metadata where " + BaseWhere() +
-                " and length(metadata.ReleaseDate)>=4 group by Label order by Cnt desc limit 15"), 15);
-            charts["Year"] = years;
-
-            // 评分分布 1~5
-            List<BarItem> ratings = new List<BarItem>();
-            List<Dictionary<string, object>> ratingRows = metaDataMapper.Select(
-                "select cast(metadata.Grade as int) as Label, count(*) as Cnt from metadata where " + BaseWhere() +
-                " and metadata.Grade>0 group by Label order by Label");
-            if (ratingRows != null) {
-                foreach (Dictionary<string, object> row in ratingRows)
-                    ratings.Add(new BarItem() { Label = row["Label"] + " ★", Count = ToLong(row["Cnt"]), Ratio = 0 });
-            }
-            Normalize(ratings);
-            charts["Rating"] = ratings;
-
-            // 类别 top 15（多值列，内存拆分统计）
-            var genreCounter = new Dictionary<string, long>();
-            List<Dictionary<string, object>> genreRows = metaDataMapper.Select(
-                "select metadata.Genre from metadata where " + BaseWhere() + " and ifnull(metadata.Genre,'')<>''");
-            if (genreRows != null) {
-                foreach (Dictionary<string, object> row in genreRows) {
-                    foreach (string g in row["Genre"].ToString().Split(SuperUtils.Values.ConstValues.Separator)) {
-                        if (string.IsNullOrWhiteSpace(g))
-                            continue;
-                        genreCounter[g] = genreCounter.TryGetValue(g, out long c) ? c + 1 : 1;
-                    }
-                }
-            }
-            charts["Genre"] = ToBars(genreCounter, 15);
-
-            // 片商 / 系列 top 10（单值列）
-            charts["Studio"] = ToBars(metaDataMapper.Select(
-                "select metadata_video.Studio as Label, count(*) as Cnt from metadata join metadata_video on metadata_video.DataID=metadata.DataID where " + BaseWhere() +
-                " and ifnull(metadata_video.Studio,'')<>'' group by Label order by Cnt desc limit 10"), 10);
-            charts["Series"] = ToBars(metaDataMapper.Select(
-                "select metadata_video.Series as Label, count(*) as Cnt from metadata join metadata_video on metadata_video.DataID=metadata.DataID where " + BaseWhere() +
-                " and ifnull(metadata_video.Series,'')<>'' group by Label order by Cnt desc limit 10"), 10);
-
-            // 演员 top 10
-            charts["Actor"] = ToBars(metaDataMapper.Select(
-                "select ifnull(actor_info.ActorName, 'Actor ' || mta.ActorID) as Label, count(*) as Cnt from metadata_to_actor mta " +
-                "join metadata on metadata.DataID=mta.DataID left join actor_info on actor_info.ActorID=mta.ActorID " +
-                "where " + BaseWhere() + " group by mta.ActorID order by Cnt desc limit 10"), 10);
-
-            return charts;
-        }
-
-        private static long ToLong(object value)
-        {
-            return value == null ? 0 : (long)Convert.ChangeType(value, typeof(long));
-        }
-
-        private List<BarItem> ToBars(List<Dictionary<string, object>> rows, int limit)
-        {
-            var bars = new List<BarItem>();
-            if (rows == null)
-                return bars;
-            foreach (Dictionary<string, object> row in rows) {
-                string label = row.TryGetValue("Label", out object l) ? l?.ToString() ?? "" : "";
-                if (string.IsNullOrEmpty(label))
-                    continue;
-                bars.Add(new BarItem() { Label = label, Count = ToLong(row["Cnt"]), Ratio = 0 });
-            }
-            Normalize(bars);
-            return bars;
-        }
-
-        private List<BarItem> ToBars(Dictionary<string, long> counter, int limit)
-        {
-            List<BarItem> bars = counter.Select(kv => new BarItem() { Label = kv.Key, Count = kv.Value, Ratio = 0 })
-                .OrderByDescending(b => b.Count).Take(limit).ToList();
-            Normalize(bars);
-            return bars;
-        }
-
-        private static void Normalize(List<BarItem> bars)
-        {
-            long max = bars.Count == 0 ? 0 : bars.Max(b => b.Count);
-            if (max <= 0)
-                return;
-            foreach (BarItem bar in bars)
-                bar.Ratio = (double)bar.Count / max;
-        }
-
-        private void BuildSummary(Dictionary<string, object> summary)
-        {
-            var wrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
-            wrap.Children.Add(SummaryCard(LangManager.GetValueByKey("StatVideos"), summary.TryGetValue("VideoCount", out object v1) ? v1?.ToString() ?? "0" : "0"));
-            wrap.Children.Add(SummaryCard(LangManager.GetValueByKey("StatFavorites"), summary.TryGetValue("FavoriteCount", out object v2) ? v2?.ToString() ?? "0" : "0"));
-            double totalSize = summary.TryGetValue("TotalSize", out object v3) ? ToLong(v3) : 0;
-            wrap.Children.Add(SummaryCard(LangManager.GetValueByKey("StatTotalSize"), (totalSize / 1024d / 1024d / 1024d).ToString("F2") + " GB"));
-            long totalDuration = summary.TryGetValue("TotalDuration", out object v4) ? ToLong(v4) : 0;
-            wrap.Children.Add(SummaryCard(LangManager.GetValueByKey("StatTotalDuration"), (totalDuration / 60d).ToString("F0") + " min"));
-            _Panel.Children.Add(wrap);
-            _Panel.Children.Add(_Status);
-        }
-
-        private Border SummaryCard(string label, string value)
-        {
-            var stack = new StackPanel { Margin = new Thickness(10, 6, 10, 6) };
-            stack.Children.Add(new TextBlock { Text = value, FontSize = 22, FontWeight = FontWeights.Bold });
-            stack.Children.Add(new TextBlock { Text = label, Opacity = 0.75 });
-            return new Border {
-                Child = stack,
-                Margin = new Thickness(0, 0, 10, 6),
-                Padding = new Thickness(14, 8, 14, 8),
-                MinWidth = 150,
-                CornerRadius = new CornerRadius(4),
-                Background = new SolidColorBrush(Color.FromArgb(24, 128, 128, 128)),
-            };
-        }
-
-        private void BuildChart(string title, List<BarItem> bars)
-        {
-            if (bars == null || bars.Count == 0)
-                return;
-            var card = new Border {
-                Margin = new Thickness(0, 4, 0, 10),
-                Padding = new Thickness(12, 8, 12, 12),
-                CornerRadius = new CornerRadius(4),
-                Background = new SolidColorBrush(Color.FromArgb(14, 128, 128, 128)),
-            };
-            var stack = new StackPanel();
-            stack.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 6) });
-
-            var items = new ItemsControl { ItemsSource = bars };
-            items.ItemTemplate = BuildBarTemplate();
-            stack.Children.Add(items);
-            card.Child = stack;
-            _Panel.Children.Add(card);
-        }
-
-        /// <summary>
-        /// 一行 = [标签 140px][比例条][数量]；用水平 StackPanel 而非 Grid（代码构建更简单可靠）
-        /// </summary>
-        private DataTemplate BuildBarTemplate()
-        {
-            var template = new DataTemplate();
-
-            var rowFactory = new FrameworkElementFactory(typeof(StackPanel));
-            rowFactory.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-            rowFactory.SetValue(StackPanel.MarginProperty, new Thickness(0, 2, 0, 2));
-
-            var labelFactory = new FrameworkElementFactory(typeof(TextBlock));
-            labelFactory.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Label"));
-            labelFactory.SetValue(TextBlock.WidthProperty, 140d);
-            labelFactory.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Right);
-            labelFactory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
-            labelFactory.SetValue(TextBlock.MarginProperty, new Thickness(0, 0, 8, 0));
-            labelFactory.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
-            rowFactory.AppendChild(labelFactory);
-
-            var borderFactory = new FrameworkElementFactory(typeof(Border));
-            borderFactory.SetValue(Border.HeightProperty, 12d);
-            borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(2));
-            borderFactory.SetValue(Border.BackgroundProperty, new SolidColorBrush(BAR_COLOR));
-            borderFactory.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Center);
-            borderFactory.SetBinding(Border.WidthProperty, new System.Windows.Data.Binding("Ratio") {
-                Converter = new RatioToWidthConverter(),
-                ConverterParameter = 420d,
-            });
-            rowFactory.AppendChild(borderFactory);
-
-            var countFactory = new FrameworkElementFactory(typeof(TextBlock));
-            countFactory.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Count") {
-                StringFormat = " {0}",
-            });
-            countFactory.SetValue(TextBlock.MarginProperty, new Thickness(6, 0, 0, 0));
-            countFactory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
-            rowFactory.AppendChild(countFactory);
-
-            template.VisualTree = rowFactory;
+            var border = new FrameworkElementFactory(typeof(Border)) { Name = "TabChrome" };
+            border.SetValue(Border.PaddingProperty, new Thickness(14, 8, 14, 8));
+            border.SetValue(Border.MarginProperty, new Thickness(0, 0, 5, 0));
+            border.SetValue(Border.CornerRadiusProperty, new CornerRadius(4, 4, 0, 0));
+            border.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromArgb(35,128,128,128)));
+            var caption = new FrameworkElementFactory(typeof(ContentPresenter)) { Name = "TabCaption" };
+            caption.SetValue(ContentPresenter.ContentSourceProperty, "Header");
+            border.AppendChild(caption);
+            var template = new ControlTemplate(typeof(TabItem)) { VisualTree = border };
+            var selected = new Trigger { Property = TabItem.IsSelectedProperty, Value = true };
+            selected.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(64,158,255)), "TabChrome"));
+            selected.Setters.Add(new Setter(System.Windows.Documents.TextElement.ForegroundProperty, Brushes.White, "TabCaption"));
+            selected.Setters.Add(new Setter(System.Windows.Documents.TextElement.FontWeightProperty, FontWeights.Bold, "TabCaption"));
+            template.Triggers.Add(selected);
             return template;
         }
-
-        private class RatioToWidthConverter : System.Windows.Data.IValueConverter
+        public async Task LoadAsync()
         {
-            public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-            {
-                double ratio = value is double d ? d : 0;
-                double maxWidth = parameter is double m ? m : 420;
-                return Math.Max(2, ratio * maxWidth);
+            int version = ++_Version;
+            long? scope = (_Library.SelectedItem as LibraryChoice)?.DbId;
+            string scopeName = (_Library.SelectedItem as LibraryChoice)?.Name ?? "";
+            _Library.IsEnabled = _Refresh.IsEnabled = _Export.IsEnabled = false;
+            _Status.Text = L("HealthWorking");
+            try {
+                var snapshot = await Task.Run(() => LibraryStatisticsService.Collect(scope));
+                if (version != _Version) return;
+                _Snapshot = snapshot;
+                _SnapshotScope = scopeName;
+                Build(snapshot);
+                _Status.Text = string.Format(L("StatUpdated"), snapshot.CollectedAt.ToString("HH:mm:ss"), snapshot.Metrics["Videos"].ToString("N0"));
+            } catch (Exception ex) {
+                App.Logger.Error(ex);
+                if (version == _Version) { _Snapshot = null; _Tabs.Items.Clear(); _Status.Text = ex.Message; }
             }
-
-            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-            {
-                return null;
+            finally {
+                if (version == _Version) {
+                    _Library.IsEnabled = _Refresh.IsEnabled = true;
+                    _Export.IsEnabled = _Snapshot != null;
+                }
             }
+        }
+        private void Build(LibraryStatistics data)
+        {
+            int selected = Math.Max(0, _Tabs.SelectedIndex);
+            _Tabs.Items.Clear(); _Grids.Clear();
+            foreach (string group in new[] { "StatOverview", "StatHistory", "StatFiles", "StatPreferences" }) {
+                var panel = new StackPanel { Margin = new Thickness(8) };
+                if (group == "StatOverview") {
+                    panel.Children.Add(Summary(data));
+                    panel.Children.Add(new Expander { Header = L("StatMoreMetrics"), Content = Summary(data, true),
+                        Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 12) });
+                }
+                if (group == "StatFiles") {
+                    panel.Children.Add(new TextBlock { Text = string.Format(L("StatKnownDurationHint"),
+                        data.Metrics["DurationKnown"].ToString("N0"), data.Metrics["Videos"].ToString("N0")),
+                        Margin = new Thickness(0, 8, 0, 14), TextWrapping = TextWrapping.Wrap, Opacity = .8 });
+                }
+                var grid = new UniformGrid { Columns = ActualWidth >= 980 ? 2 : 1 };
+                _Grids.Add(grid);
+                foreach (StatisticChart chart in data.Charts.Where(chart => chart.GroupKey == group)) {
+                    var card = new StackPanel { Margin = new Thickness(14) };
+                    var title = new TextBlock { Text = L(chart.TitleKey), FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 10) };
+                    title.SetResourceReference(TextBlock.FontSizeProperty, "GlobalFontSize16");
+                    card.Children.Add(title);
+                    card.Children.Add(new StatisticsChart(chart, data.Metrics["Videos"]));
+                    grid.Children.Add(new Border { Child = card, Margin = new Thickness(0, 0, 12, 12),
+                        CornerRadius = new CornerRadius(6), Background = new SolidColorBrush(Color.FromArgb(16,128,128,128)) });
+                }
+                panel.Children.Add(grid);
+                var viewer = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+                viewer.SetResourceReference(BackgroundProperty, "Window.Background");
+                var tab = new TabItem { Header = L(group), Content = viewer };
+                tab.Template = TabHeaderTemplate();
+                tab.SetResourceReference(ForegroundProperty, "Window.Foreground");
+                tab.SetResourceReference(BackgroundProperty, "Window.Background");
+                _Tabs.Items.Add(tab);
+            }
+            _Tabs.SelectedIndex = Math.Min(selected, _Tabs.Items.Count - 1);
+        }
+        private WrapPanel Summary(LibraryStatistics data, bool additional = false)
+        {
+            var panel = new WrapPanel { Margin = new Thickness(0, 6, 0, 14) };
+            foreach (string metric in additional
+                ? new[] { "AvgGrade", "AvgSize", "AvgDuration", "Playable", "Subtitles", "Translated", "Actors", "Labels" }
+                : new[] { "Videos", "Favorites", "Watched", "Unwatched", "Size", "Duration", "PlayCount", "Imported30" }) {
+                double value = data.Metrics[metric];
+                string text = metric == "Size" || metric == "AvgSize" ? (value / 1073741824d).ToString("N2") + " GB"
+                    : metric == "Duration" ? (value / 3600d).ToString("N1") + " h"
+                    : metric == "AvgDuration" ? (value / 60d).ToString("N1") + " min"
+                    : metric == "AvgGrade" ? (data.Metrics["Favorites"] == 0 ? "—" : value.ToString("F2") + " / 5")
+                    : value.ToString("N0");
+                var stack = new StackPanel();
+                var number = new TextBlock { Text = text, FontWeight = FontWeights.Bold };
+                if (additional) number.Foreground = Brushes.White;
+                number.SetResourceReference(TextBlock.FontSizeProperty, "GlobalFontSize24");
+                stack.Children.Add(number);
+                var caption = new TextBlock { Text = L(MetricKey(metric)), Margin = new Thickness(0, 8, 0, 0), Opacity = .8, TextWrapping = TextWrapping.Wrap };
+                if (additional) caption.Foreground = Brushes.White;
+                stack.Children.Add(caption);
+                panel.Children.Add(new Border { Width = 220, MinHeight = 94, Child = stack, Padding = new Thickness(14),
+                    Margin = new Thickness(0, 0, 10, 10), CornerRadius = new CornerRadius(6),
+                    Background = new SolidColorBrush(Color.FromArgb(23,128,128,128)) });
+            }
+            return panel;
+        }
+        private static string MetricKey(string metric)
+        {
+            if (metric == "Videos") return "StatVideos";
+            if (metric == "Favorites") return "StatFavorites";
+            if (metric == "Size") return "StatTotalSize";
+            if (metric == "Duration") return "StatDurationTotal";
+            return "Stat" + metric;
+        }
+        private static string Csv(string text) => "\"" + (text ?? "").Replace("\"", "\"\"") + "\"";
+        private void Export()
+        {
+            if (_Snapshot == null) return;
+            var dialog = new SaveFileDialog { Filter = "CSV (*.csv)|*.csv", FileName = "Jvedio-statistics-" + DateTime.Now.ToString("yyyyMMdd") + ".csv" };
+            if (dialog.ShowDialog(this) != true) return;
+            var output = new StringBuilder();
+            output.AppendLine(Csv(L("StatSection")) + "," + Csv(L("StatMetric")) + "," + Csv(L("StatValue")));
+            output.AppendLine(Csv(L("StatOverview")) + "," + Csv(L("StatLibraryScope")) + "," + Csv(_SnapshotScope));
+            foreach (var metric in _Snapshot.Metrics)
+                output.AppendLine(Csv(L("StatOverview")) + "," + Csv(L(MetricKey(metric.Key))) + "," + Csv(metric.Value.ToString(CultureInfo.InvariantCulture)));
+            foreach (var chart in _Snapshot.Charts)
+                foreach (var item in chart.Items)
+                    output.AppendLine(Csv(L(chart.TitleKey)) + "," + Csv(item.Localized ? L(item.Label) : item.Label) + "," + Csv(item.Count.ToString(CultureInfo.InvariantCulture)));
+            try { File.WriteAllText(dialog.FileName, output.ToString(), new UTF8Encoding(true)); }
+            catch (Exception ex) { App.Logger.Error(ex); _Status.Text = ex.Message; }
         }
     }
 }

@@ -48,6 +48,14 @@ namespace Jvedio.ViewModels
         private TabItemManager()
         {
             BindEvent();
+            Jvedio.Core.Library.LibraryLabelService.Changed += dbId => {
+                if (vieModel == null || ConfigManager.Main.CurrentDBId != dbId || App.Current.Dispatcher.HasShutdownStarted)
+                    return;
+                App.Current.Dispatcher.BeginInvoke(new Action(() => {
+                    vieModel.Statistic();
+                    foreach (VideoList list in GetAllVideoList()) list.Refresh();
+                }));
+            };
         }
 
         public static TabItemManager CreateInstance(VieModel_Main vieModel, SimplePanel tabPanel)
@@ -265,6 +273,20 @@ namespace Jvedio.ViewModels
 
 
                     if (tabData[0] is LabelType labelType && tabData[1] is string searchText) {
+                        if (labelType == LabelType.LabelName) {
+                            var labels = new LibraryLabelView(ConfigManager.Main.CurrentDBId);
+                            labels.Uid = tabItem.UUID;
+                            labels.OnBrowse = vieModel.onLabelClick;
+                            labels.OnBrowseUnlabeled = () => {
+                                var wrapper = new SelectWrapper<Video>();
+                                wrapper.ExtraSql = " JOIN (select m.DataID from metadata m where not exists " +
+                                    "(select 1 from metadata_to_label l where l.DataID=m.DataID and trim(ifnull(l.LabelName,''))<>'')) " +
+                                    "unlabeled on unlabeled.DataID=metadata.DataID ";
+                                Add(TabType.GeoVideo, LangManager.GetValueByKey("LabelBrowseUnlabeled"), wrapper);
+                            };
+                            TabPanel.Children.Add(labels);
+                            break;
+                        }
                         LabelView labelView = new LabelView(labelType);
                         labelView.Uid = tabItem.UUID;
 
@@ -479,6 +501,11 @@ taskList.onRestart += App.DownloadManager.Restart;
         {
             if (type == TabType.GeoTask)
                 return;
+            if (type == TabType.GeoLabel) {
+                foreach (ITabItemControl labels in TabPanel.Children.OfType<ITabItemControl>().Where(control => control is LabelView || control is LibraryLabelView))
+                    labels.Refresh();
+                return;
+            }
             VideoList videoList = GetVideoListByType(type);
             if (videoList == null)
                 return;

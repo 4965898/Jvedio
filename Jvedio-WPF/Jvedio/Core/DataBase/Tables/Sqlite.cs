@@ -368,6 +368,11 @@ namespace Jvedio.Core.DataBase.Tables
                     "CREATE INDEX metadata_to_label_idx_DataID ON metadata_to_label (DataID); " +
                     "CREATE INDEX metadata_to_label_idx_LabelName ON metadata_to_label (LabelName); " +
                     "COMMIT;");
+                TABLES.Add("metadata_label_catalog",
+                    "BEGIN; " +
+                    "create table metadata_label_catalog (DBId INTEGER NOT NULL, LabelName VARCHAR(200) NOT NULL, " +
+                    "CreateDate VARCHAR(30) DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%S', 'NOW', 'localtime')), " +
+                    "PRIMARY KEY(DBId,LabelName)); COMMIT;");
                 TABLES.Add("metadata_to_actor",
                     "BEGIN;" +
                     "create table metadata_to_actor( " +

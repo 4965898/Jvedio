@@ -54,45 +54,7 @@ namespace Jvedio.Mapper
 
         public void SaveLabel(MetaData metaData)
         {
-            string selectSql = $"select LabelName from metadata_to_label where DataID={metaData.DataID}";
-            List<Dictionary<string, object>> list = Select(selectSql);
-            List<string> labels = list.Select(arg => arg["LabelName"].ToString()).ToList();
-            List<string> oldLabels = new List<string>();
-            List<string> newLabels = new List<string>();
-            if (metaData.LabelList != null)
-                newLabels = metaData.LabelList.Select(arg => arg.Value).ToList();
-            if (labels != null)
-                oldLabels = labels.ToList();
-
-            if (newLabels.SequenceEqual(oldLabels))
-                return;
-
-            // 删除，新增
-            oldLabels = oldLabels.OrderBy(arg => arg).ToList();
-            newLabels = newLabels.OrderBy(arg => arg).ToList();
-            List<string> to_delete = oldLabels.Except(newLabels).ToList();
-            List<string> to_create = newLabels.Except(oldLabels).ToList();
-
-            // 删除
-            if (to_delete.Count > 0) {
-                // ('1','2','3')
-                string sql = $"delete from metadata_to_label " +
-                    $"where DataID={metaData.DataID} " +
-                    $"and LabelName in ('{string.Join("','", to_delete)}')";
-                ExecuteNonQuery(sql);
-            }
-
-            // 新增
-            if (to_create.Count > 0) {
-                List<string> create = new List<string>();
-                to_create.ForEach(arg => {
-                    create.Add($"({metaData.DataID},'{arg}')");
-                });
-
-                string sql = $"insert or ignore into metadata_to_label(DataID,LabelName) " +
-                    $"values {string.Join(",", create)}";
-                ExecuteNonQuery(sql);
-            }
+            Jvedio.Core.Library.LibraryLabelService.SetLabels(metaData.DataID, metaData.LabelList?.Select(item => item.Value));
         }
     }
 }

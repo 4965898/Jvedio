@@ -434,6 +434,12 @@
     <Compile Include="Core\Tasks\ImageIndexManager.cs" />
     <Compile Include="Core\Tasks\DataIndexManager.cs" />
     <Compile Include="Core\Services\BackupService.cs" />
+    <Compile Include="Core\Services\LibraryDatabase.cs" />
+    <Compile Include="Core\Services\LibraryLabelService.cs" />
+    <Compile Include="Core\Services\LibraryStatisticsService.cs" />
+    <Compile Include="Core\UserControls\LibraryLabelView.cs" />
+    <Compile Include="Core\UserControls\StatisticsChart.cs" />
+    <Compile Include="Windows\Window_LabelVideos.cs" />
     <Compile Include="Core\Services\RemoteBackupStore.cs" />
     <Compile Include="Core\Services\ScrapeFieldPolicy.cs" />
     <Compile Include="Windows\Window_LibraryHealth.cs" />

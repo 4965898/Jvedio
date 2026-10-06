@@ -346,41 +346,20 @@ namespace Jvedio.ViewModel
 
         public async void GetLabels()
         {
-            if (LoadingLabel) {
-                Logger.Warn("label is loading");
-                return;
-            }
-
+            if (LoadingLabel) return;
             LoadingLabel = true;
-            string like_sql = string.Empty;
-
-            string search = LabelText.ToProperSql().Trim();
-            if (!string.IsNullOrEmpty(search))
-                like_sql = $" and LabelName like '%{search}%' ";
-
-            List<string> labels = new List<string>();
-            string sql = "SELECT LabelName,Count(LabelName) as Count  from metadata_to_label " +
-                "JOIN metadata on metadata.DataID=metadata_to_label.DataID " +
-                $"where metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType={0}" + like_sql +
-                $" GROUP BY LabelName ORDER BY Count DESC";
-            List<Dictionary<string, object>> list = metaDataMapper.Select(sql);
-            if (list != null) {
-                foreach (Dictionary<string, object> item in list) {
-                    if (!item.ContainsKey("LabelName") || !item.ContainsKey("Count") ||
-                        item["LabelName"] == null || item["Count"] == null)
-                        continue;
-                    string labelName = item["LabelName"].ToString();
-                    long.TryParse(item["Count"].ToString(), out long count);
-                    labels.Add($"{labelName}({count})");
-                }
+            string search = LabelText?.Trim() ?? string.Empty;
+            long dbId = CurrentVideo?.DBId ?? ConfigManager.Main.CurrentDBId;
+            try {
+                List<string> labels = await Task.Run(() => Jvedio.Core.Library.LibraryLabelService.Suggestions(dbId, search));
+                if ((LabelText?.Trim() ?? string.Empty) == search)
+                    CurrentLabelList = new ObservableCollection<string>(labels);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            } finally {
+                LoadingLabel = false;
+                if ((LabelText?.Trim() ?? string.Empty) != search) GetLabels();
             }
-
-            CurrentLabelList = new ObservableCollection<string>();
-            for (int i = 0; i < labels.Count; i++) {
-                await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new LoadLabelDelegate(LoadLabel), labels[i]);
-            }
-
-            LoadingLabel = false;
         }
 
     }
