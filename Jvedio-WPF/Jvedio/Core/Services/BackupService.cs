@@ -9,6 +9,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Jvedio.Core.Backup
@@ -21,6 +22,28 @@ namespace Jvedio.Core.Backup
         private const string StageName = ".restore-stage";
         private static readonly string[] DatabaseNames = { "app_configs.sqlite", "app_datas.sqlite" };
         private static readonly string[] DatabaseSidecars = { "-wal", "-shm", "-journal" };
+        private static readonly SemaphoreSlim BackupGate = new SemaphoreSlim(1, 1);
+
+        /// <summary>只读取快照名称，兼容 ZIP 和旧文件夹，不在周期检查时解压或校验整库。</summary>
+        public static DateTime GetLatestLocalBackupTime()
+        {
+            string root = LocalRoot;
+            if (!Directory.Exists(root)) return DateTime.MinValue;
+            DateTime latest = DateTime.MinValue;
+            foreach (string entry in Directory.EnumerateFileSystemEntries(root)) {
+                bool folder = Directory.Exists(entry);
+                if ((File.GetAttributes(entry) & FileAttributes.ReparsePoint) != 0) continue;
+                if (!folder && !string.Equals(Path.GetExtension(entry), ".zip", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string name = folder ? Path.GetFileName(entry) : Path.GetFileNameWithoutExtension(entry);
+                if (DateTime.TryParseExact(name,
+                    new[] { "yyyy-MM-dd_HHmmss_fff", "yyyy-MM-dd_HHmmss", "yyyy-MM-dd" },
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out DateTime created) && created > latest)
+                    latest = created;
+            }
+            return latest;
+        }
 
         private sealed class Manifest
         {
@@ -61,6 +84,17 @@ namespace Jvedio.Core.Backup
         }
 
         public static async Task<BackupResult> CreateAsync()
+        {
+            // 自动备份已移到后台，用户可同时点手动备份；串行化以免保留份数清理删除正在生成的快照。
+            await BackupGate.WaitAsync();
+            try {
+                return await CreateCoreAsync();
+            } finally {
+                BackupGate.Release();
+            }
+        }
+
+        private static async Task<BackupResult> CreateCoreAsync()
         {
             string mode = ConfigManager.Settings.BackupMode;
             if (mode != "LocalOnly" && mode != "RemoteOnly" && mode != "Both")

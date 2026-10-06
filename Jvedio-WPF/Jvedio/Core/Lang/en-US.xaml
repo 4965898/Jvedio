@@ -130,7 +130,8 @@
     <sys:String x:Key="RemoteRetentionTip">How many historical backup ZIPs to keep online (1-30): after each successful upload, oldest remote backups beyond this are deleted</sys:String>
     <sys:String x:Key="UiFontScaleInputTip">UI scale factor (0.8-1.5), applies on focus loss</sys:String>
     <sys:String x:Key="ScrollSpeedInputTip">Scroll speed factor (0.1-3.0), applies on focus loss</sys:String>
-    <sys:String x:Key="SyncInfoGesture">Sync Info (S)</sys:String>
+    <sys:String x:Key="SyncInfoGesture">Sync Info（S）</sys:String>
+    <sys:String x:Key="AddTagStampGesture">Add Tag（A）</sys:String>
     <sys:String x:Key="ActorOnlineSearch">Search Online</sys:String>
     <sys:String x:Key="OnlineJumpTip">Customize the site root URL (domain) for online watch/search jump buttons (leave empty for built-in defaults). The movie detail page and actor detail page share this root URL: the movie page jumps to the video page (using the code), the actor page jumps to the search page (using the actor name); paths are built-in. Example: default is https://javbus.com, for a mirror site enter https://mirror-domain. Click "Use Default" to fill the built-in root URL for editing.</sys:String>
     <sys:String x:Key="FillDefault">Use Default</sys:String>

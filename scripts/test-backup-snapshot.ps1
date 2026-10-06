@@ -129,17 +129,24 @@ if ($localModeResult.Mode -ne 'LocalOnly' -or -not (Test-Path -LiteralPath $loca
     throw 'Local-only backup mode produced the wrong result'
 }
 $backupRoot = Join-Path $scratch 'local-backups'
+$retentionSeed = Join-Path $scratch 'retention-seed'
+if ([IO.Path]::GetExtension($localModeResult.LocalFolder) -ne '.zip') {
+    throw 'Local-only backup did not produce a ZIP'
+}
+New-Item -ItemType Directory -Path $retentionSeed | Out-Null
+$type.GetMethod('ExtractArchive', $flags).Invoke($null, [object[]]@([string]$localModeResult.LocalFolder, [string]$retentionSeed))
+$type.GetMethod('ValidateFolder').Invoke($null, [object[]]@([string]$retentionSeed))
 $unmanaged = Join-Path $backupRoot '2000-01-01'
 New-Item -ItemType Directory -Path $unmanaged | Out-Null
-Copy-Item -LiteralPath (Join-Path $localModeResult.LocalFolder 'app_configs.sqlite') -Destination $unmanaged
-Copy-Item -LiteralPath (Join-Path $localModeResult.LocalFolder 'app_datas.sqlite') -Destination $unmanaged
+Copy-Item -LiteralPath (Join-Path $retentionSeed 'app_configs.sqlite') -Destination $unmanaged
+Copy-Item -LiteralPath (Join-Path $retentionSeed 'app_datas.sqlite') -Destination $unmanaged
 [System.IO.File]::WriteAllText((Join-Path $unmanaged 'notes.txt'), 'preserve this folder')
 $settingsType.GetProperty('MaxLocalBackups').SetValue($settings, 2)
 Start-Sleep -Milliseconds 5
 $retained1 = $type.GetMethod('CreateAsync').Invoke($null, @()).GetAwaiter().GetResult()
 Start-Sleep -Milliseconds 5
 $retained2 = $type.GetMethod('CreateAsync').Invoke($null, @()).GetAwaiter().GetResult()
-$managed = @(Get-ChildItem -LiteralPath $backupRoot -Directory | Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}_\d{6}_\d{3}$' })
+$managed = @(Get-ChildItem -LiteralPath $backupRoot | Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}_\d{6}_\d{3}(\.zip)?$' })
 if ($managed.Count -ne 2 -or -not (Test-Path -LiteralPath $retained2.LocalFolder) -or
     -not (Test-Path -LiteralPath (Join-Path $unmanaged 'notes.txt')) -or $retained2.RetentionError) {
     throw "Local retention failed: managed=$($managed.Count), latest=$($retained2.LocalFolder), error=$($retained2.RetentionError), unmanaged=$(Test-Path -LiteralPath (Join-Path $unmanaged 'notes.txt'))"

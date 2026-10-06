@@ -12,4 +12,6 @@ To pack locally after building the application, BusCrawler, and DBCrawler in Rel
 
 The ZIP and EXE are written to `artifacts/`, which Git ignores.
 
+Startup, crawler-source persistence, staged recovery and menu keyboard regressions can be checked with `./scripts/test-startup-regressions.ps1`. It compiles `StartupRegression.cs` against the Release build and runs in a temporary runtime and user directory. Pass `-CompilerPath` for the Visual Studio Roslyn compiler and `-ReferenceDirectory` for the .NET Framework 4.7.2 reference assemblies when the local defaults differ. `test-backup-snapshot.ps1` separately checks WAL snapshots, ZIP restore, retention and both remote transports.
+
 After the ZIP is published as the latest GitHub Release, CI runs `publish-update-feed.ps1` to update the original upgrade window's version data and file source in the `update-feed` branch. Use `-ValidateOnly` to generate and check the feed locally without pushing it.

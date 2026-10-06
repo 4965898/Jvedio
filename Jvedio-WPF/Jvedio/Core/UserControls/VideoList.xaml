@@ -96,7 +96,8 @@
                 Visibility="Collapsed" />
             <MenuItem
                 Name="TagMenuItems"
-                Header="{DynamicResource AddTagStamp}"
+                Header="{DynamicResource AddTagStampGesture}"
+                InputGestureText="A"
                 Icon="pack://application:,,,/Resources/menuitem/label.png" />
             <MenuItem
                 Name="OnlineJumpMenuItems"
@@ -570,7 +571,7 @@
                     FocusVisualStyle="{x:Null}"
                     Visibility="{Binding DataContext.ShowTable, ElementName=videoList, Converter={StaticResource BoolToOppositeVisibilityConverter}}">
                     <super:SimplePanel.ContextMenu>
-                        <ContextMenu Opened="BlankContextMenu_Opened">
+                        <ContextMenu Opened="BlankContextMenu_Opened" PreviewKeyUp="BlankContextMenu_PreviewKeyUp">
                             <!--  三态范围标注：空白处右键只对当前结果集生效（见维护日志 3.52）  -->
                             <MenuItem
                                 FontStyle="Italic"
@@ -587,7 +588,8 @@
                             <MenuItem Header="{DynamicResource AllData}">
                                 <MenuItem
                                     Name="AllTagMenuItems"
-                                    Header="{DynamicResource AddTagStamp}" />
+                                    Header="{DynamicResource AddTagStampGesture}"
+                                    InputGestureText="A" />
                                 <MenuItem Header="{DynamicResource Menu_Advance}">
                                     <MenuItem Click="TranslateAllMovie" Header="{DynamicResource TranslateTitle}" />
                                     <MenuItem Click="GenerateAllScreenShot" Header="{DynamicResource Menu_GenerateScreenShot}" />

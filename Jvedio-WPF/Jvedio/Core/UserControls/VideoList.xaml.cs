@@ -1059,6 +1059,17 @@ namespace Jvedio.Core.UserControls
         public void ContextMenu_PreviewKeyUp(object sender, KeyEventArgs e)
         {
             ContextMenu contextMenu = sender as ContextMenu;
+            if (contextMenu == null)
+                return;
+            MenuItem tags = FindMenuItemByName(contextMenu.Items, "TagMenuItems");
+            // 子菜单内的方向键/Enter/Esc 交给 WPF，否则旧逻辑会在选标记前关掉整个菜单。
+            if (tags?.IsSubmenuOpen == true)
+                return;
+            if (e.Key == Key.A) {
+                OpenTagSubmenu(contextMenu, "TagMenuItems");
+                e.Handled = true;
+                return;
+            }
             if (e.Key == Key.D) {
                 MenuItem menuItem = GetMenuItem(contextMenu, SuperControls.Style.LangManager.GetValueByKey("Menu_DeleteInfo"));
                 if (menuItem != null)
@@ -1093,6 +1104,33 @@ namespace Jvedio.Core.UserControls
             }
 
             contextMenu.IsOpen = false;
+        }
+
+        private void BlankContextMenu_PreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.A || !(sender is ContextMenu contextMenu))
+                return;
+            MenuItem tags = FindMenuItemByName(contextMenu.Items, "AllTagMenuItems");
+            if (tags?.IsSubmenuOpen == true)
+                return;
+            OpenTagSubmenu(contextMenu, "AllTagMenuItems");
+            e.Handled = true;
+        }
+
+        private static void OpenTagSubmenu(ContextMenu contextMenu, string name)
+        {
+            MenuItem tags = FindMenuItemByName(contextMenu.Items, name);
+            if (tags == null || !tags.IsEnabled || tags.Items.Count == 0)
+                return;
+            List<MenuItem> parents = new List<MenuItem>();
+            for (MenuItem parent = tags.Parent as MenuItem; parent != null; parent = parent.Parent as MenuItem)
+                parents.Add(parent);
+            parents.Reverse();
+            foreach (MenuItem parent in parents)
+                parent.IsSubmenuOpen = true;
+            tags.Focus();
+            tags.IsSubmenuOpen = true;
+            (tags.Items[0] as MenuItem)?.Focus();
         }
 
 

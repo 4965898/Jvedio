@@ -109,6 +109,7 @@ namespace Jvedio
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            Jvedio.Core.Lang.LangManager.NormalizeShortcutBrackets();
             // 全局字号资源按用户缩放比例初始化（窗口创建前）
             try {
                 double s = DpiConfig.UiFontScale;

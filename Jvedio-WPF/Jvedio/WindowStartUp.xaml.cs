@@ -21,6 +21,7 @@ using SuperUtils.Systems;
 using SuperUtils.Time;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -28,6 +29,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using static Jvedio.App;
 using static Jvedio.Core.Global.PathManager;
 using static Jvedio.MapperManager;
@@ -41,11 +43,6 @@ namespace Jvedio
         /// 日志保存期限
         /// </summary>
         private const int CLEAR_LOG_DAY = -10;
-
-        /// <summary>
-        /// 备份文件期限
-        /// </summary>
-        private const int CLEAR_BACKUP_DAY = -30;
 
         /// <summary>
         /// 标题栏高度
@@ -67,6 +64,8 @@ namespace Jvedio
         private bool EnteringDataBase { get; set; }
 
         private bool CancelScanTask { get; set; }
+
+        private static int MaintenanceScheduled;
 
         #endregion
 
@@ -123,6 +122,7 @@ namespace Jvedio
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            Stopwatch startupTimer = Stopwatch.StartNew();
             // ************************************
             // ************* 以下顺序不可移动 ******
             // ************************************
@@ -139,6 +139,13 @@ namespace Jvedio
             }
 
             InitMapper(); // 初始化数据库
+            try {
+                int recovered = ServerConfig.ApplyPendingRecovery();
+                if (recovered > 0)
+                    Logger.Info($"recovered {recovered} crawler sources from staged backup config");
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
             ConfigManager.Init(() => SetLang()); // 从数据库加载应用配置
 
             // 恢复上次会话未完成的刮削任务（只恢复到任务列表，不自动开始；由用户点「重启全部失败」继续）
@@ -153,18 +160,40 @@ namespace Jvedio
 
             await MoveOldFiles();
             InitAppData();
-            DeleteDirs();
-            await BackupData();
             await MovePlugins();
             await DeletePlugins();
             CrawlerManager.Init(true);
-            ConfigManager.ServerConfig.Read();
 
             InitContext();
             UtilsManager.OnUtilSettingChange(); // 初始化 SuperUtils 的配置
             InitFirstRun();
             InitMainWindow();
             InitBinding();
+            Logger.Info($"startup ready in {startupTimer.ElapsedMilliseconds} ms (maintenance deferred)");
+            ScheduleBackgroundMaintenance();
+        }
+
+        private void ScheduleBackgroundMaintenance()
+        {
+            // 返回选库界面/切换库时不重复备份；先让窗口完成绘制再启动磁盘和网络维护。
+            if (Interlocked.CompareExchange(ref MaintenanceScheduled, 1, 0) != 0)
+                return;
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => {
+                if (Dispatcher.HasShutdownStarted)
+                    return;
+                _ = Task.Run(async () => {
+                    Stopwatch timer = Stopwatch.StartNew();
+                    try {
+                        DeleteDirs();
+                        Logger.Info($"startup cleanup completed in {timer.ElapsedMilliseconds} ms");
+                        timer.Restart();
+                        bool success = await BackupData();
+                        Logger.Info($"startup background backup completed in {timer.ElapsedMilliseconds} ms, success: {success}");
+                    } catch (Exception ex) {
+                        Logger.Error(ex);
+                    }
+                });
+            }));
         }
 
         private void InitMainWindow()
@@ -237,6 +266,8 @@ namespace Jvedio
         {
             await Task.Delay(1);
             string path = Path.Combine(PathManager.BasePluginsPath, "temp");
+            if (!Directory.Exists(path))
+                return true;
             bool success = DirHelper.TryCopy(path, PathManager.BasePluginsPath);
             if (success)
                 DirHelper.TryDelete(path);
@@ -279,21 +310,15 @@ namespace Jvedio
                 DateTime latest = ConfigManager.Settings.LastSuccessfulBackupUtc == DateTime.MinValue
                     ? DateTime.MinValue : ConfigManager.Settings.LastSuccessfulBackupUtc.ToLocalTime();
                 if (ConfigManager.Settings.BackupMode != "RemoteOnly") {
-                    string root = BackupService.LocalRoot;
-                    DateTime latestLocal = Directory.Exists(root)
-                        ? Directory.EnumerateDirectories(root).Select(Path.GetFileName)
-                            .Select(name => DateTime.TryParseExact(name,
-                                new[] { "yyyy-MM-dd_HHmmss_fff", "yyyy-MM-dd_HHmmss", "yyyy-MM-dd" },
-                                System.Globalization.CultureInfo.InvariantCulture,
-                                System.Globalization.DateTimeStyles.None, out DateTime value) ? value : DateTime.MinValue)
-                            .DefaultIfEmpty(DateTime.MinValue).Max()
-                        : DateTime.MinValue;
+                    DateTime latestLocal = BackupService.GetLatestLocalBackupTime();
                     if (latestLocal > latest) latest = latestLocal;
                 }
                 if ((DateTime.Now - latest).TotalDays >= period) {
                     var result = await BackupService.CreateAsync();
                     if (!string.IsNullOrEmpty(result.RetentionError))
                         Logger.Error("旧本地备份清理失败：" + result.RetentionError);
+                    if (!string.IsNullOrEmpty(result.RemoteRetentionError))
+                        Logger.Error("旧在线备份清理失败：" + result.RemoteRetentionError);
                     if (!string.IsNullOrEmpty(result.RemoteError)) {
                         Logger.Error("自动在线备份失败：" + result.RemoteError);
                         if (!string.IsNullOrEmpty(result.CleanupError))
@@ -387,8 +412,7 @@ namespace Jvedio
             try {
                 // 清除日志
                 ClearLogBefore(CLEAR_LOG_DAY, PathManager.LogPath);
-                // 清除备份文件
-                DeleteDirBefore(CLEAR_BACKUP_DAY, PathManager.BackupPath);
+                // 备份由 BackupService 按有效快照及保留份数清理，避免旧日期解析误删新快照。
 
                 if (!ConfigManager.Settings.Debug) {
                     FileHelper.TryDeleteFile("upgrade.bat");
@@ -422,23 +446,6 @@ namespace Jvedio
             }
         }
 
-        public void DeleteDirBefore(int day, string dir)
-        {
-            DateTime dateTime = DateTime.Now.AddDays(day);
-            if (!Directory.Exists(dir))
-                return;
-            try {
-                string[] dirs = Directory.GetDirectories(dir);
-                foreach (var dirName in dirs) {
-                    DateTime.TryParse(dirName.Split('\\').Last(), out DateTime date);
-                    if (date < dateTime)
-                        DirHelper.TryDelete(dirName);
-                }
-            } catch (Exception e) {
-                Logger.Error(e);
-            }
-        }
-
         public void EnsureDirExists()
         {
             foreach (var item in InitDirs) {
@@ -461,9 +468,7 @@ namespace Jvedio
         }
 
         /// <summary>
-        /// 启动未就绪保护：vieModel 在 Window_Loaded 末尾的 InitContext() 才创建，
-        /// 其前的后台步骤（旧文件迁移/备份/插件迁移/CrawlerManager.Init）耗时期间，
-        /// 用户点击界面会踩 NRE（2026-10-01 ChangeDataType 实测）。
+        /// 旧数据迁移和插件初始化完成前，保护提前触发的界面事件。
         /// </summary>
         private bool StartUpNotReady()
         {
@@ -622,7 +627,7 @@ namespace Jvedio
                 // 默认打开上一次的库
                 id = ConfigManager.Settings.DefaultDBID;
 
-                if (appDatabases != null || appDatabases.Count > 0)
+                if (appDatabases != null && appDatabases.Count > 0)
                     database = appDatabases.Where(arg => arg.DBId == id).FirstOrDefault();
             }
 

@@ -945,6 +945,10 @@ private int _SyncConcurrency = (int)ConfigManager.Settings.SyncConcurrency;
                 }
             }
 
+            // 设置页只展示已加载插件，保留其他插件的源，避免一次加载失败抹掉用户网址。
+            if (ConfigManager.ServerConfig.CrawlerServers != null)
+                list.AddRange(ConfigManager.ServerConfig.CrawlerServers
+                    .Where(server => !CrawlerServers.ContainsKey(server.PluginID)));
             ConfigManager.ServerConfig.CrawlerServers = list;
             ConfigManager.ServerConfig.Save();
             return true;

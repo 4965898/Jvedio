@@ -129,7 +129,8 @@
     <sys:String x:Key="RemoteRetentionTip">オンラインに保持するバックアップ ZIP の数（1-30）：アップロード成功後、古いものから削除します</sys:String>
     <sys:String x:Key="UiFontScaleInputTip">UI 拡大率（0.8-1.5）、フォーカスが外れると適用</sys:String>
     <sys:String x:Key="ScrollSpeedInputTip">スクロール速度（0.1-3.0）、フォーカスが外れると適用</sys:String>
-    <sys:String x:Key="SyncInfoGesture">同期メッセージ (S)</sys:String>
+    <sys:String x:Key="SyncInfoGesture">同期メッセージ（S）</sys:String>
+    <sys:String x:Key="AddTagStampGesture">タグを追加（A）</sys:String>
     <sys:String x:Key="ActorOnlineSearch">オンライン検索</sys:String>
     <sys:String x:Key="OnlineJumpTip">オンライン視聴/検索ジャンプサイトのルートURL（ドメイン）をカスタマイズできます（空欄はデフォルトURLを使用）。動画詳細ページと女優詳細ページでこのルートURLを共有します：動画ページは動画ページURL（番号使用）、女優ページは検索ページURL（女優名使用）へジャンプし、パスは組み込みです。例：デフォルトは https://javbus.com、ミラーサイト利用時は https://ミラードメイン を入力。「デフォルトを入力」で組み込みルートURLを入力欄に表示して編集できます。</sys:String>
     <sys:String x:Key="FillDefault">デフォルトを入力</sys:String>
