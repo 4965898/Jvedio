@@ -40,6 +40,7 @@ namespace Jvedio
         public static Jvedio.Core.Config.Data.FilterConfig FilterConfig { get; set; }
         public static Jvedio.Core.Config.OnlineConfig OnlineConfig { get; set; }
         public static Jvedio.Core.Config.TranslationConfig TranslationConfig { get; set; }
+        public static Jvedio.Core.Config.BrowserClipperConfig BrowserClipperConfig { get; set; }
 
         private static void CreateInstance()
         {
@@ -66,6 +67,7 @@ namespace Jvedio
             FilterConfig = Jvedio.Core.Config.Data.FilterConfig.CreateInstance();
             OnlineConfig = Jvedio.Core.Config.OnlineConfig.CreateInstance();
             TranslationConfig = Jvedio.Core.Config.TranslationConfig.CreateInstance();
+            BrowserClipperConfig = Jvedio.Core.Config.BrowserClipperConfig.CreateInstance();
         }
 
         public static void SaveAll()
@@ -92,6 +94,7 @@ namespace Jvedio
             FilterConfig.Save();
             OnlineConfig.Save();
             TranslationConfig.Save();
+            BrowserClipperConfig.Save();
         }
 
         public static void Restore()

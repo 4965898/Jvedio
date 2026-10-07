@@ -507,7 +507,9 @@ namespace Jvedio.Entity
             string result = string.Empty;
             PathType pathType = (PathType)ConfigManager.Settings.PicPathMode;
             string basePicPath = ConfigManager.Settings.PicPaths[pathType.ToString()].ToString();
-            if (pathType != PathType.RelativeToData) {
+            bool virtualVideo = pathType == PathType.RelativeToData && (string.IsNullOrEmpty(Path) || !File.Exists(Path));
+            if (virtualVideo) basePicPath = System.IO.Path.Combine(PathManager.CurrentUserFolder, ConfigManager.Settings.PicPaths[PathType.RelativeToApp.ToString()].ToString());
+            if (pathType != PathType.RelativeToData || virtualVideo) {
                 if (pathType == PathType.RelativeToApp)
                     basePicPath = System.IO.Path.Combine(PathManager.CurrentUserFolder, basePicPath);
                 string saveDir = string.Empty;

@@ -12,6 +12,7 @@ using SuperUtils.NetWork;
 using SuperUtils.NetWork.Entity;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -226,6 +227,44 @@ namespace Jvedio.Core.Net
             }
 
             return null;
+        }
+
+        public async Task<bool> DownloadPreviewVideo(string url, string target, RequestHeader header, Action<string> onError)
+        {
+            if (File.Exists(target)) return true;
+            string partial = target + "." + Guid.NewGuid().ToString("N") + ".part";
+            try {
+                var handler = new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate };
+                if (header?.WebProxy != null) { handler.Proxy = header.WebProxy; handler.UseProxy = true; }
+                using (var client = new System.Net.Http.HttpClient(handler))
+                using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)) {
+                    deadline.CancelAfter(TimeSpan.FromMinutes(2));
+                    client.Timeout = TimeSpan.FromMinutes(2);
+                    if (header?.Headers != null) foreach (var pair in header.Headers) client.DefaultRequestHeaders.TryAddWithoutValidation(pair.Key, pair.Value);
+                    client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/5.0");
+                    using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, deadline.Token)) {
+                        response.EnsureSuccessStatusCode();
+                        string mime = response.Content.Headers.ContentType?.MediaType ?? "";
+                        if (!mime.StartsWith("video/", StringComparison.OrdinalIgnoreCase) && mime != "application/octet-stream")
+                            throw new IOException(LangManager.GetValueByKey("ClipperInvalidVideo"));
+                        const long limit = 250L * 1024 * 1024;
+                        if (response.Content.Headers.ContentLength > limit) throw new IOException(LangManager.GetValueByKey("ClipperVideoTooLarge"));
+                        using (var input = await response.Content.ReadAsStreamAsync())
+                        using (var output = new FileStream(partial, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, true)) {
+                            byte[] buffer = new byte[65536]; long total = 0; int count;
+                            while ((count = await input.ReadAsync(buffer, 0, buffer.Length, deadline.Token)) > 0) {
+                                total += count;
+                                if (total > limit) throw new IOException(LangManager.GetValueByKey("ClipperVideoTooLarge"));
+                                await output.WriteAsync(buffer, 0, count, deadline.Token);
+                            }
+                            if (total == 0) throw new IOException(LangManager.GetValueByKey("ClipperInvalidVideo"));
+                        }
+                    }
+                }
+                if (!File.Exists(target)) File.Move(partial, target);
+                return true;
+            } catch (Exception ex) { onError?.Invoke(ex.Message); return false; }
+            finally { if (File.Exists(partial)) File.Delete(partial); }
         }
 
         public void Stop()

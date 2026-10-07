@@ -161,6 +161,7 @@
                 Header="{DynamicResource Settings}"
                 Icon="/Resources/Picture/setting.png" />
             <MenuItem Click="ShowPluginWindow" Header="{DynamicResource Plugin}" />
+            <MenuItem Click="ShowBrowserClipper" Header="{DynamicResource BrowserClipper}" />
             <MenuItem Header="{DynamicResource Scan}">
                 <MenuItem
                     Command="{Binding AddNewMovie}"

@@ -1553,3 +1553,46 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 | 任务持久化 | [DownloadManager.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Tasks/DownloadManager.cs)（SaveTasksToFile/RestoreTasksFromFile）、[DownLoadTask.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Net/DownLoadTask.cs)（DoWork null 防护）、[WindowStartUp.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/WindowStartUp.xaml.cs)（启动恢复） |
 | 国际化 | [zh-CN.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Lang/zh-CN.xaml)、[en-US.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Lang/en-US.xaml) |
 | 构建 | [Jvedio.csproj](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Jvedio.csproj) |
+
+---
+
+## 2026-10-07：Jvedio Connector 浏览器剪藏开发测试版（0.1.0）
+
+- 新增独立的 Chrome Manifest V3 插件，适配 JavBus、JavDB、JAVLibrary 及相同页面结构的镜像站。点击后读取当前已加载的页面，列表支持勾选、搜索、全选/全不选、去重、复制、TXT/JSON 导出和目标影片库选择。
+- 详情页优先识别主影片，忽略推荐影片；提取标题、中文标题、日期、时长、导演、片商、发行商、系列、类别、演员及明确别名、评分、简介、封面与预览图链接。选择过影片库后，详情页可一次点击自动保存到上次使用的库，也可以关闭自动保存或切换目标库。
+- 软件接收设置放在“选项 → 扫描与导入 → 浏览器剪藏”，主菜单入口定位到该设置页。保存开启状态和端口，密钥在桌面端用 DPAPI 加密；开启后随下次启动恢复，仅监听 127.0.0.1，不需要管理员 HTTP URL 预留。
+- 新增受密钥保护的本机接收端和事务入库。列表重复番号跳过；详情只补全已有影片空白字段，保留已有资料与演员关联。来源快照保存到 browser_clip_sources，删除影片时自动清理。演员只根据明确别名复用；评分按 5 分制保存，JAVLibrary 的 10 分评分除以 2。JavDB/JAVLibrary 的远程页面 ID 写入已有网址映射表，便于后续同步。
+- 封面使用既有图片下载任务，预览图遵循软件图片下载设置；文本入库不等待网络图片下载。保存后刷新主界面，接收端退出时关闭。
+- 样本验证：三个列表分别为 30/40/20 个番号；三个 GVG-107 详情均提取为 2015-02-19、160 分钟及导演“ひょん”。保留各站演员名称差异：JavDB“仲里紗羽”，JavBus/JAVLibrary“本田莉子”，JAVLibrary 明确提供别名关系。修正 JavBus 演员名称混入类别的问题。
+- 验证：Release 构建成功；22 项插件 DOM/弹窗/后台与六份完整 HTML 回归通过；29 项隔离数据库、资料补全、删除清理、批次回滚、HTTP 鉴权、库范围、密钥持久化和设置入口检查通过；真实 Chrome 测试配置加载插件并连接隔离 WPF 接收端，3 项列表选择、详情自动保存和切换影片库链路通过；18 项原有启动/来源持久化/备份/菜单回归通过；三语 386 个 key 一致；git diff --check 通过。Chrome 测试模拟工具栏的当前标签页选择，脚本注入、存储、扩展消息及 HTTP 使用真实扩展 API。
+- 交付：browser-extension/README.md 安装与当前范围说明；scripts/pack-browser-clipper.ps1 生成插件 ZIP 和配套桌面预览 EXE。不发布正式版本、不修改版本号、不替换用户正在使用的 EXE 或影片库，不将原始网站 HTML 或会话信息打包。
+- 当前范围与待观察项：仅支持本机 SQLite 影片库，一次最多 500 个已加载番号；尚未上架 Chrome 网上应用店。网站在线登录状态、后续 DOM 改版和图床/代理的下载可用性需要实际使用观察，当前链路以用户提供的离线页面样本验收。
+
+### 2026-10-07：Connector 0.1.1 试用反馈修正
+
+- “选项 → 扫描与导入 → 浏览器剪藏”标题、说明、状态、按钮和输入框统一白字；输入框深色背景。用常显 StackPanel 替换 Expander，移除折叠按钮。修正 UI 预览工具曾依赖父容器白色字体而掩盖实际继承颜色的问题，现直接检查控件自身样式。
+- 新增“保存图片”总开关，封面图、预览图、预览视频独立选项。默认保存封面，预览图和预览视频默认关闭；不依赖常规刮削图片设置。媒体选项随任务持久化，关闭某类资源后不发起该类下载。已完成/失败任务允许重新按新选项入队；正在运行的任务在弹窗中明确提示。
+- 预览视频：提取页面可用的直链及 JavDB 的延迟预览接口；仅在启用预览视频保存时，由浏览器在原页面会话内取得链接，Cookie 不发送到桌面端。Jvedio 以流式下载写入影片预览目录，支持 MP4/WebM 等可取得的直链，限制单文件 250 MB，带取消和超时、来源 Referer 及失败提示；更新过期预览视频链接不覆盖已有文字资料。受限接口失败仍保存文字资料，HLS/DRM 不下载。
+- 详情页适配：JavBus 识别字段容忍空格、复制按钮及部分翻译后的标签，并交叉使用主标题、影片地址（含 www.javbus.com/GVG-107）回退识别；JAVLibrary 标题读取不再依赖单一书签链接，补充 h3、主标题节点和 document.title。三站 GVG-107 原始源码验证通过，在线 JavBus 页面未能通过本次网络读取工具访问，兼容性改动仍需用户实际重试。
+- 图标直接复用 Resources/Jvedio.ico 原图，保持比例导出透明的 16/32/48/128 PNG；工具栏、扩展管理页和弹窗统一 Jvedio 图标。
+- 验证：26 项插件回归（含标题缺少链接、JavBus 标签变化、视频接口失败时仍保存资料）通过；36 项隔离桌面检查（含媒体组合和任务选项持久化）通过；4 项真实 Chrome 扩展至 WPF 接收端链路通过，覆盖浏览器 Cookie 会话内解析、桌面仅携带 Referer 而不携带 Cookie、图片关闭时视频仍保存到文件；18 项既有启动/来源/备份/菜单回归通过；三语 394 个 key 一致；Release 构建与 diff --check 通过。
+- 交付更新为 Jvedio-Connector-0.1.1.zip 和配套 Jvedio-Connector-preview.exe。旧版插件目录需要覆盖后在 Chrome 扩展管理页重新加载；配套桌面 EXE 也需更新。本次未替换用户正式安装目录中的程序、未发布正式版本。
+
+### 2026-10-07：Connector 0.1.2 排版、图片与名称修正
+
+- 扫描与导入统一两列布局：浏览器剪藏复用 SettingTitleStyle，与扫描、导入、NFO 共用标题列宽；内容区使用同样的 5 像素边距、BaseTextBlock、SearchBox 与复选框样式。移除独立加粗标题、大外边距，说明和状态左对齐，保留白字与始终展开。已渲染完整设置页检查实际对齐，预览密钥已掩码。
+- 插件名改为 Jvedio Connector，去掉“· 番号剪藏”；版本更新为 0.1.2，保留软件原图标。
+- 修复结果页没有提取图片链接的问题：三站列表现在读取页面已有封面/缩略图、日期和评分；不访问影片详情页补全资料。用户明确选择暂缓“批量获取完整资料”，也不根据结果页标题推断演员及其头像。
+- 修复剪藏任务跳过演员图的问题：图片改由 Chrome 使用浏览器会话获取，临时来源请求规则仅作用于本扩展的具体图片 URL；向软件只发送图片字节，不发送网站 Cookie。新增独立保存演员图开关、已确认演员关联与历史明确别名映射、同站演员页明确头像区域读取、头像缺失提示。仅限三站与已知图床权限，没有所有网站权限。
+- 新增受密钥保护的 /v1/images 接收端：检查目标库、影片与演员关联、图片开关、图片编码和大小，保存 JPEG 到海报、缩略图、预览或演员目录，更新缓存与图片索引，触发界面刷新。已有有效文件保留，失效/空图片不会假报新下载。无本地影片文件且使用相对影片图片模式时，改为回退软件数据目录。
+- 图片保存结果显示完成、失败和缺少演员头像来源数量；网站未提供头像、请求被验证拦截或关联身份无法确认时明确报告。预览视频继续使用已有下载任务。
+- 验证：Release 构建成功；26 项插件回归（六份完整页面样本均包含可用列表图片链接）通过；39 项隔离桌面回归（新增库范围、图片总开关、虚拟影片路径）通过；6 项实际 Chrome 扩展至 WPF 链路通过，验证带 Cookie 和 Referer 的图片获取、封面/缩略图/演员图文件实际写入，以及两个结果页选中影片的封面批量保存；18 项原有启动/来源/备份/菜单回归通过；三语 395 个 key 一致；diff --check 通过。
+- 测试缓存导致 C 盘空间不足。按前缀及单个旧测试目录的清理均被自动审批以“策略阻止”拒绝，未改用其他删除方式；保留旧目录并改在 A:\Temp\Jvedio-Connector-TestCache 完成验证。仅停止本次创建的隔离测试接收端，不修改用户正式程序、配置或影片库。
+- 交付为 Jvedio-Connector-0.1.2.zip 与最新 Jvedio-Connector-preview.exe；更新插件需要覆盖原目录并重新加载，图片获取需要接受 Chrome 对相关站点/图床的权限提示。在线网站后续布局、验证与无公开头像的情况仍有明确限制，完整资料批量补齐保持暂缓。
+
+## 2026-10-07：5.4.1.70 / Jvedio29.78 正式发布准备
+
+- 桌面程序集与文件版本统一升至 5.4.1.70，浏览器插件版本为 0.1.2。README 新增本版完整版本说明，并将剪藏特性和安装方法改为正式发布文档；docs/releases/5.4.1.70.md 包含三个下载文件、安装步骤、图片权限和仍暂缓的批量完整资料范围。
+- 发布打包脚本新增 ConnectorOnly 模式，GitHub Release 需要同时具备 Jvedio-5.4.1.70.zip、Jvedio-5.4.1.70.exe、Jvedio-Connector-0.1.2.zip。测试依赖通过 package-lock.json 锁定，正式插件不包含 npm 包、测试样本、会话信息或临时连接密钥。
+- 本地重新编译桌面端、BusCrawler、DBCrawler 和 DispatcherStress，210 个调度任务各启动一次；完整桌面 ZIP 已核对运行时、双架构 SQLite、维护爬虫及资源文件，独立 EXE 与 ZIP 内 EXE 一致。26 项插件回归、39 项隔离桌面回归、6 项 Chrome 图片/视频入库链路与三语 395 个 key 检查通过。推送后由既有 GitHub Actions 再构建、发布桌面版并更新升级源，再补传已验证的插件 ZIP。
+- 初次推送因现有 GitHub 凭据缺少 workflow 权限而被远端拒绝。保留既有发布工作流，不改变该权限范围；本次通过发布后补传 Connector ZIP 完成三个资产交付，已制作的工作流修改保存在本地忽略目录，未上传。

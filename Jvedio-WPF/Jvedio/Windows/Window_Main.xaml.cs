@@ -149,6 +149,8 @@ namespace Jvedio
 
         public void Dispose()
         {
+            Core.Clipper.BrowserClipperService.Instance.Dispose();
+            Core.Clipper.BrowserClipperService.Instance.Saved -= OnBrowserClipSaved;
             SaveConfigValue();
             // 退出前保存未完成任务快照，下次启动自动恢复继续刮削
             DownloadManager.Exiting = true;
@@ -170,6 +172,18 @@ namespace Jvedio
             CheckServerStatus();
             InitAvalonEdit();
             InitSideMenu();
+            Core.Clipper.BrowserClipperService.Instance.Saved -= OnBrowserClipSaved;
+            Core.Clipper.BrowserClipperService.Instance.Saved += OnBrowserClipSaved;
+            if (ConfigManager.BrowserClipperConfig.Enabled) {
+                try {
+                    long port = ConfigManager.BrowserClipperConfig.Port;
+                    if (port < 1024 || port > 65535) throw new ArgumentException(LangManager.GetValueByKey("ClipperInvalidPort"));
+                    Core.Clipper.BrowserClipperService.Instance.Start((int)port);
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                    MessageCard.Info(LangManager.GetValueByKey("ClipperStartFailed") + " " + ex.Message);
+                }
+            }
 
             // 启动即后台静默重建一次资源存在性（可播放）索引：
             // 覆盖上次会话期间外部新增/删除的本地文件（无需用户手动点「建立资源存在索引」）
@@ -762,6 +776,19 @@ namespace Jvedio
         private void ShowStatistics(object sender, MouseButtonEventArgs e)
         {
             new Windows.Window_Statistics(ConfigManager.Main.CurrentDBId) { Owner = this }.Show();
+        }
+
+        private void ShowBrowserClipper(object sender, RoutedEventArgs e)
+        {
+            var settings = new Window_Settings();
+            settings.TabControl.SelectedItem = settings.ScanImportTab;
+            settings.Show();
+            notiIconPopup.IsOpen = false;
+        }
+
+        private void OnBrowserClipSaved(long dbId, int added, int updated, int skipped)
+        {
+            if (added > 0 || updated > 0) Dispatcher.BeginInvoke(new Action(() => LoadAll()));
         }
 
         public void OpenCommandPalette()

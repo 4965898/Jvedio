@@ -195,6 +195,7 @@ namespace Jvedio
 
         protected override void OnExit(ExitEventArgs e)
         {
+            Jvedio.Core.Clipper.BrowserClipperService.Instance.Dispose();
             ConfigManager.SaveAll();
 
             // 兜底：退出时保存未完成的刮削任务（正常退出路径 Window_Main.Dispose 已保存）
