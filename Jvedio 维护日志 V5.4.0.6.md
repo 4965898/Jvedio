@@ -1339,9 +1339,17 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 
 **本地交付**：生成 `artifacts/Jvedio-5.4.1.71.zip` 与同版 EXE；归档 `build-output/Jvedio29.79.exe` 并部署 `E:\Jvedio-5.3.1\Jvedio29.79.exe`，三份 EXE 的 SHA-256 均为 `2A9FF37B80FF679DC99A6C7D8971200FD304884CE827A633DCCEEFA0D15C0BD4`。Library DLL 版本 1.4.1.0，SHA-256 为 `9D9666D62C7DA97B67ABF048C3173AA5788C382CCE0555B065923E406DE71C0D`。用户现有进程 `Jvedio-Connector-preview.exe` 继续运行，修复 DLL、manifest 与 readme 暂存到 `E:\Jvedio-5.3.1\plugins\crawlers\library\temp`，下次启动由现有插件更新流程应用；未覆盖正在使用的 DLL。旧插件三项文件备份在 `build-output/library-before-1.4.1`，未改用户 config.json、网址、Cookie 或影片库。
 
-**待验收**：用户关闭当前 Jvedio 后运行 Jvedio29.79.exe，再用 library 刮削 OREC-473；本轮验证的是完整软件链路与本地 HTTP 夹具，实际镜像收录、网络及反爬响应尚未实测。本轮未提交、推送或公开发布。
+**首次本地交付时待验收**：用户关闭当前 Jvedio 后运行 Jvedio29.79.exe，再用 library 刮削 OREC-473；当时验证的是完整软件链路与本地 HTTP 夹具，实际镜像收录、网络及反爬响应尚未实测。首次本地交付未提交、推送或公开发布，后续实测与正式发布见下文。
 
 **用户实测与发布准备（2026-10-08）**：用户确认已可发起刮削，但 library 仍基本获取不到影片信息，要求暂不继续处理该问题，并授权更新文档、推送及发布。此版只修复本地类型过滤；不能将隔离 HTML 夹具通过解释为真实站点资料获取已修复。三语 README 与插件说明均明确记录现存限制，bus/db 可继续使用。发布准备沿用 5.4.1.71，保留既有工作流，Library 构建与回归经主项目和打包脚本进入 CI；远端构建、公开资产及升级源结果在成功后补记。
+
+**正式发布结果（2026-10-08）**：源码与文档提交 `e9335395a6fc73ed54b4161437b0d7485fd7b09d` 已推送至 `origin/master`，标签 `5.4.1.71` 指向同一提交。[GitHub Actions 37666713217](https://github.com/4965898/Jvedio/actions/runs/37666713217) 全流程成功：主项目依赖自动重建 Library，Bus/DB 构建、210 任务调度检查、打包前 26 项 Library 专项、完整 ZIP 校验、Release 及升级源发布均通过。三语 README 后续补充了插件升级方法；发布结果以 `[skip ci]` 文档提交同步，避免同一版本重复发版。
+
+[自改5.4.1.71](https://github.com/4965898/Jvedio/releases/tag/5.4.1.71) 于 2026-10-08 02:28:22（香港时间）公开并设为 Latest。四项公开资产均为 uploaded：`Jvedio-5.4.1.71.zip`（11,458,475 字节）、`Jvedio-5.4.1.71.exe`（2,606,080 字节）、`LibraryCrawler-1.4.1.zip`（8,038 字节）、`Jvedio-Connector-0.1.2.zip`（44,264 字节）。独立 Library 包直接从公开 CI 完整包提取 DLL、manifest 与说明，与完整包内插件完全一致；Connector 沿用 0.1.2。
+
+**公开下载核验**：ZIP 和单独 EXE 已实际下载，程序集版本为 5.4.1.71，ZIP 内 EXE 与单独 EXE 的 SHA-256 均为 `5abbc054f1934efe8651a06eabcb9956353fa44f0b5d6a65c3eb09c6707d305c`；完整 ZIP SHA-256 为 `c71807bc67558a78e22b89ae11ec8a04f9e983b582a6fcdb82b534a7deb278ea`。公开 Library DLL 版本 1.4.1.0，SHA-256 为 `45accb195ed8f55b344fd648a6d690d10f94a1c5013dd2b027ba6d681d49404e`（CI 与本机构建哈希不同，分别记录）。独立 Library 包 SHA-256 为 `e6b3800796475adc7f5b0d9eedb4e8b12baf1f4810b76bae625e224bc39362ba`，Connector 包 SHA-256 为 `d33a9a1dbf208a31eeb1809b99ba0c73c5cf5f725f3ca7b45909fb7eddedaa67`。升级源 `update-feed` 提交 `fbe2e4b81934a8651d2fc1d7a589ba4d36fffa7d` 的 LatestVersion 为 5.4.1.71，73 个文件逐项 MD5 均与公开 ZIP 一致，包括主程序与 Library DLL。
+
+**升级说明与现存限制**：修复位于 Library 插件 DLL，单独替换主程序 EXE 不会更新该插件。请使用完整 ZIP，或关闭 Jvedio 后将独立 Library 包内容复制到 `plugins/crawlers/library/`；独立包不含 config.json，保留用户启用状态、网址及 Cookie。三语 README 和公开 Release 正文均明确记录：实际 library 资料获取率问题未解决，用户要求暂缓后续处理。本轮发布未修改用户影片库或再次覆盖正在使用的程序。
 
 ## 四、踩坑经验（重点）
 
