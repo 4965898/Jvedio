@@ -1,7 +1,7 @@
 # Jvedio 维护日志 V5.4.0.6
 
 > 本文档沉淀自 2025-12 起对 Jvedio（WPF 本地视频管理软件）的接手维护与二次开发实践，供后续开发参考。
-> 最后更新：2026-10-07
+> 最后更新：2026-10-08
 
 ---
 
@@ -1327,6 +1327,22 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 
 **正式发布结果**：源码、测试、维护日志与三语 README 已推送至 origin/master；发布提交和 5.4.1.69 标签均为 641b47b6da68275e73efe8736c7faf0c6db6086a。[GitHub Actions 37521975215](https://github.com/4965898/Jvedio/actions/runs/37521975215) 全流程成功。[自改5.4.1.69](https://github.com/4965898/Jvedio/releases/tag/5.4.1.69) 于 2026-10-07 03:53:15（香港时间）公开并设为 Latest，包含累计统计/标签升级与更多指标白字修复。公开 ZIP 11,434,197 字节，EXE 2,541,056 字节，均已实际下载；ZIP 内 EXE 与单独 EXE 完全一致，版本均为 5.4.1.69。公开 EXE SHA-256 为 E5E8BBC5DF563ED52530F0918A15F3D92E9D2182C530AC5B3A745AF74F360372，ZIP SHA-256 为 AF48B1BC7BEAD743098690718D06768BF0CC418A39470067F90226B6EF29AF02。update-feed 已更新至 4f80c270579ca49b93443f0f03ef1eb86eb1620c，latest.json 为 5.4.1.69，73 文件清单中的 EXE 哈希与公开 EXE 一致。发布结果以文档补记提交同步，跳过重复发布 CI；现有工作流的本地修改仍保留。
 
+### 3.81 Library 仅有番号时误判不支持（2026-10-08，5.4.1.71 / Jvedio29.79）
+
+**现象与根因**：OREC-473 仅录入番号时，library 立即返回「该刮削器仅可刮削修正影片」及「无对应刮削器刮削」，bus/db 正常。`Video.VideoType` 默认为 `Normal=0`（普通/未知），主程序原样传给 `IsPluginAvailable`；原 LibraryCrawler 1.4.0 强制要求 `Censored=2`，因此在发起搜索前就被过滤。正式安装目录旧 DLL 的 SHA-256 与仓库原插件一致；隔离调用旧 DLL 已复现相同拒绝文案。
+
+**修复**：将原 DLL 还原为 `Core/Crawler/Library2/LibraryCrawler` 的可维护源码，保留原搜索、远端 DataCode 与详情字段解析。1.4.1 接受 `Normal`、缺失/空/null 类型和已知 `Censored`，允许仅用番号搜索；明确 `UnCensored`、`Europe` 和 FC2 仍拒绝，无效类型和空番号仍拒绝。不会为通过校验而修改本地影片类型。Release 主程序版本升至 5.4.1.71，三语 README 同步记录。
+
+**构建与打包**：主项目通过 `ReferenceOutputAssembly=false` 的 ProjectReference 构建 Library，打包脚本在产出发布资产前运行专项测试；沿用现有 Release 工作流，避免凭据缺少 workflow 权限阻挡推送。完整包脚本必须包含本次源码编译的 Library DLL，删除发布输入目录中的旧 DLL，避免继续随包分发 1.4.0。插件 manifest/readme 升至 1.4.1；FC2 仍使用既有二进制。独立插件包 `artifacts/LibraryCrawler-1.4.1.zip` 只含 DLL、manifest 和说明，不覆盖插件启用状态或服务器配置。
+
+**验证**：主程序与 Bus/DB/Library Release 构建成功；新增 `scripts/test-library-crawler.ps1` / `LibraryCrawlerRegression.cs`，26 项检查通过，覆盖启动应用暂存插件、主程序发现及选择 DLL、普通/未知和仅 VID 输入、302 跳转、搜索多结果精确番号、详情标题/日期/时长/演员、插件日志与请求头、下载任务资料校验、影片类型不被改写、远端 ID 缓存、未收录番号和明确不支持类型。HTTP 与数据库全部使用隔离夹具，未读取或写入真实影片库。原启动/网址恢复/菜单专项 18 项通过，调度器 210 个任务均仅启动一次，刮削字段保护检查通过，三语 395 key 一致。Windows PowerShell 运行现有字段保护脚本；PowerShell 7 直接加载 Framework EXE 不兼容。完整 ZIP 校验通过，包内 Library DLL 哈希与本次构建完全一致。
+
+**本地交付**：生成 `artifacts/Jvedio-5.4.1.71.zip` 与同版 EXE；归档 `build-output/Jvedio29.79.exe` 并部署 `E:\Jvedio-5.3.1\Jvedio29.79.exe`，三份 EXE 的 SHA-256 均为 `2A9FF37B80FF679DC99A6C7D8971200FD304884CE827A633DCCEEFA0D15C0BD4`。Library DLL 版本 1.4.1.0，SHA-256 为 `9D9666D62C7DA97B67ABF048C3173AA5788C382CCE0555B065923E406DE71C0D`。用户现有进程 `Jvedio-Connector-preview.exe` 继续运行，修复 DLL、manifest 与 readme 暂存到 `E:\Jvedio-5.3.1\plugins\crawlers\library\temp`，下次启动由现有插件更新流程应用；未覆盖正在使用的 DLL。旧插件三项文件备份在 `build-output/library-before-1.4.1`，未改用户 config.json、网址、Cookie 或影片库。
+
+**待验收**：用户关闭当前 Jvedio 后运行 Jvedio29.79.exe，再用 library 刮削 OREC-473；本轮验证的是完整软件链路与本地 HTTP 夹具，实际镜像收录、网络及反爬响应尚未实测。本轮未提交、推送或公开发布。
+
+**用户实测与发布准备（2026-10-08）**：用户确认已可发起刮削，但 library 仍基本获取不到影片信息，要求暂不继续处理该问题，并授权更新文档、推送及发布。此版只修复本地类型过滤；不能将隔离 HTML 夹具通过解释为真实站点资料获取已修复。三语 README 与插件说明均明确记录现存限制，bus/db 可继续使用。发布准备沿用 5.4.1.71，保留既有工作流，Library 构建与回归经主项目和打包脚本进入 CI；远端构建、公开资产及升级源结果在成功后补记。
+
 ## 四、踩坑经验（重点）
 
 ### 4.1 唯一约束把状态列纳入唯一键
@@ -1410,7 +1426,7 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 ### 5.1 构建
 - 解决方案：`Jvedio-WPF/Jvedio.sln`
 - 主项目：`Jvedio-WPF/Jvedio/Jvedio.csproj`
-- 爬虫插件单独编译：`Core/Crawler/Bus2/BusCrawler/BusCrawler.csproj` → `BusCrawler.dll`；`Core/Crawler/Db2/DbCrawler/DbCrawler.csproj` → `DBCrawler.dll`
+- 爬虫插件单独编译：`Core/Crawler/Bus2/BusCrawler/BusCrawler.csproj` → `BusCrawler.dll`；`Core/Crawler/Db2/DbCrawler/DbCrawler.csproj` → `DBCrawler.dll`；`Core/Crawler/Library2/LibraryCrawler/LibraryCrawler.csproj` → `LibraryCrawler.dll`（5.4.1.71 起）
 - 本机 Visual Studio MSBuild：`D:\Visual Studio IDE\MSBuild\Current\Bin\MSBuild.exe`；本机版本归档放在 `build-output/`，不提交源码仓库
 - **无 .NET Framework 4.7.2 targeting pack 的机器**（只有 VS BuildTools 时最常见）：从 nuget.org 下载 `Microsoft.NETFramework.ReferenceAssemblies.net472` 包解压（`https://www.nuget.org/api/v2/package/Microsoft.NETFramework.ReferenceAssemblies.net472/1.0.3`），MSBuild 加参数 `/p:TargetFrameworkRootPath=<解压目录>\build` 即可编译，**无需安装 SDK/开发者工具包**（2026-08-10 实测：BuildTools-only 环境用此法编译 sln 通过）。
 
@@ -1423,7 +1439,7 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 **打包流程**（脚本自动完成）：
 1. 从 `Jvedio-WPF/Jvedio/bin/Release/` 复制全量运行文件，并校验 EXE 内部版本与目标版本一致。
 2. 在独立临时目录移除 ClickOnce 清单、调试符号、用户数据和旧编号 EXE。
-3. 将源码重建的 Bus/DB DLL 与 `release-assets/plugins/crawlers/` 中的四套插件配置合并；FC2/Library DLL 暂由已发布完整包保留。
+3. 将源码重建的 Bus/DB/Library DLL 与 `release-assets/plugins/crawlers/` 中的四套插件配置合并；FC2 DLL 由已发布完整包保留。
 4. 生成 `artifacts/Jvedio-{版本}.zip`，逐项校验 EXE、配置、SQLite 原生库、高亮规则及四个爬虫入口均存在且非空。
 
 **打包内容清单**（用户解压即得）：
@@ -1479,7 +1495,7 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 ### 5.4 版本迭代与自动发布流程（5.4.1.50 起）
 
 1. 修改代码，将 `AssemblyInfo.cs` 中的 `AssemblyVersion` 与 `AssemblyFileVersion` 同步升为新的四段版本号；更新 README 三语和本文档。
-2. 本机用 Visual Studio MSBuild 编译 Release 主程序及维护中的 Bus/DB 爬虫，运行 `DispatcherStress.exe`，再运行 `scripts/pack-release.ps1 -Version <版本号>` 检查完整 ZIP。
+2. 本机用 Visual Studio MSBuild 编译 Release 主程序及维护中的 Bus/DB/Library 爬虫，运行 `DispatcherStress.exe` 和 `scripts/test-library-crawler.ps1`，再运行 `scripts/pack-release.ps1 -Version <版本号>` 检查完整 ZIP。
 3. 只提交源码、文档、工作流、脚本与发布输入；不要把本机旧版 EXE、`build-output/`、测试样本或 `nuget.exe` 混入提交。推送至 `origin/master`。
 4. GitHub Actions 在 Windows 环境重建并测试。若版本号尚无标签且提交仍是 `master` 最新提交，自动创建同版本标签、上传已校验 ZIP 和同版 EXE 到草稿 Release，再发布为 Latest；随后从同一 ZIP 更新原升级窗口使用的 `update-feed` 分支。已有同版本标签但指向其他提交时停止，须再次升版本号。
 5. 核对 Actions 结果、Release 的 ZIP 与 EXE 资产、`update-feed/jvedioupdate/latest.json` 和下载可用性。源码推送成功不等于 Release 已发布，CI 失败时先修复失败原因。

@@ -10,9 +10,9 @@
     ],
     "ReleaseNotes": {
       "Files": ["./LibraryCrawler.dll"],
-      "Version": "1.4.0",
-      "Date": "2023-09-29",
-      "Desc": "图书馆 信息同步",
+      "Version": "1.4.1",
+      "Date": "2026-10-08",
+      "Desc": "图书馆 信息同步：支持仅有番号、影片类型未知的影片",
       "KeyWords": [
         {
           "Key": "类别",
