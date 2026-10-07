@@ -1596,3 +1596,10 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 - 发布打包脚本新增 ConnectorOnly 模式，GitHub Release 需要同时具备 Jvedio-5.4.1.70.zip、Jvedio-5.4.1.70.exe、Jvedio-Connector-0.1.2.zip。测试依赖通过 package-lock.json 锁定，正式插件不包含 npm 包、测试样本、会话信息或临时连接密钥。
 - 本地重新编译桌面端、BusCrawler、DBCrawler 和 DispatcherStress，210 个调度任务各启动一次；完整桌面 ZIP 已核对运行时、双架构 SQLite、维护爬虫及资源文件，独立 EXE 与 ZIP 内 EXE 一致。26 项插件回归、39 项隔离桌面回归、6 项 Chrome 图片/视频入库链路与三语 395 个 key 检查通过。推送后由既有 GitHub Actions 再构建、发布桌面版并更新升级源，再补传已验证的插件 ZIP。
 - 初次推送因现有 GitHub 凭据缺少 workflow 权限而被远端拒绝。保留既有发布工作流，不改变该权限范围；本次通过发布后补传 Connector ZIP 完成三个资产交付，已制作的工作流修改保存在本地忽略目录，未上传。
+
+### 5.4.1.70 发布核验完成
+
+- 功能源码提交 a7bb365174fcc8e97157c42646170a03fd68c188 已推送至 origin/master；对应标签 5.4.1.70 的 GitHub Actions 运行 37640365472 构建、调度并发检查、完整包验证、发布与升级源更新全部成功。
+- 发布页：https://github.com/4965898/Jvedio/releases/tag/5.4.1.70 。最新版本确认为 5.4.1.70，公开资产为 Jvedio-5.4.1.70.zip、Jvedio-5.4.1.70.exe、Jvedio-Connector-0.1.2.zip，三项状态均为 uploaded。
+- 已下载 GitHub CI 生成的 ZIP 与 EXE，确认程序集版本为 5.4.1.70，ZIP 内 Jvedio.exe 与独立 EXE 的 SHA256 相同。桌面 EXE SHA256：e1d2cfda616f2217c45b97c752356a48cc1de88b5688912f335edfca4bf40f9c；完整 ZIP SHA256：edad9ecc6662f80839f5e35abcf201b225daa80dc100112091e1eb0fc7537e84；插件 ZIP SHA256：8022b96cc41429ae418c4756d1e430687483939775384cb113dc507d85a20cfc，与本地已验证插件包一致。
+- update-feed 分支 jvedioupdate/latest.json 的 LatestVersion 已核验为 5.4.1.70。插件补传和详细发布说明更新成功；正式安装目录与用户影片库未修改。
