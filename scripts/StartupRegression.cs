@@ -335,6 +335,7 @@ internal static class StartupRegression
             if (args[0] == "prepare") Prepare(args[2]);
             else if (args[0] == "startup") RunStartup(app, int.Parse(args[2]), args.Length > 3 && args[3] == "expect-fast");
             else if (args[0] == "library") return LibraryRegression.Run(args[2]);
+            else if (args[0] == "video-info") return VideoInfoRegression.Run(args[2], args.Length > 3 ? args[3] : null);
             else RunChecks();
             return failures == 0 ? 0 : 1;
         } catch (Exception ex) {

@@ -103,7 +103,7 @@ namespace Jvedio.ViewModel
 
             set {
                 _InfoSelectedIndex = value;
-                if (value == 1 && VideoInfo == null)
+                if (value == 1)
                     LoadVideoInfo();
                 RaisePropertyChanged();
             }
@@ -121,13 +121,24 @@ namespace Jvedio.ViewModel
         }
 
         private Video _CurrentVideo;
+        private int _VideoInfoVersion;
+        private Task _VideoInfoTask;
+        private string _VideoInfoPath;
 
         public Video CurrentVideo {
             get { return _CurrentVideo; }
 
             set {
+                // 旧影片的空结果也必须失效；在读媒体期间翻页时，旧任务不能覆盖新影片。
+                _VideoInfoVersion++;
                 _CurrentVideo = value;
+                _VideoInfoTask = null;
+                _VideoInfoPath = null;
+                VideoInfo = null;
+                LoadingVideoInfo = false;
                 RaisePropertyChanged();
+                if (InfoSelectedIndex == 1)
+                    LoadVideoInfo();
             }
         }
 
@@ -204,18 +215,52 @@ namespace Jvedio.ViewModel
 
         public async void LoadVideoInfo()
         {
-            // 异步加载
-            if (LoadingVideoInfo)
-                return;
+            await LoadVideoInfoAsync();
+        }
 
-            await Task.Run(() => {
-                LoadingVideoInfo = true;
-                VideoInfo = Video.GetMediaInfo(CurrentVideo.Path);
-                // 惰性维护视频真实时长索引（FileDuration，秒）——排序「视频时长」依赖此列
-                Video.UpdateFileDurationIndex(CurrentVideo);
-                return true;
-            });
-            LoadingVideoInfo = false;
+        private Task LoadVideoInfoAsync()
+        {
+            Video video = CurrentVideo;
+            if (video == null)
+                return Task.CompletedTask;
+
+            string path = video.Path;
+            if (LoadingVideoInfo && _VideoInfoPath == path && _VideoInfoTask != null)
+                return _VideoInfoTask;
+
+            // 读取任务只使用请求发起时的快照，不在后台访问会变化的 CurrentVideo。
+            var snapshot = new Video { DataID = video.DataID, Path = path, SubSection = video.SubSection };
+            int version = ++_VideoInfoVersion;
+            _VideoInfoPath = path;
+            LoadingVideoInfo = true;
+            _VideoInfoTask = ReadVideoInfoAsync(snapshot, video, version);
+            return _VideoInfoTask;
+        }
+
+        private async Task ReadVideoInfoAsync(Video snapshot, Video video, int version)
+        {
+            try {
+                VideoInfo info = await Task.Run(() => {
+                    if (!File.Exists(snapshot.Path) && snapshot.SubSectionList != null)
+                        snapshot.Path = snapshot.SubSectionList.Select(section => section?.Value).FirstOrDefault(File.Exists) ?? snapshot.Path;
+                    return Video.GetMediaInfo(snapshot.Path);
+                });
+                await App.Current.Dispatcher.InvokeAsync(() => {
+                    if (version == _VideoInfoVersion && ReferenceEquals(CurrentVideo, video)) {
+                        VideoInfo = info;
+                        LoadingVideoInfo = false;
+                    }
+                });
+                // 索引维护不阻挡已读取的信息显示，也不把旧任务的时长写到新影片。
+                await Task.Run(() => Video.UpdateFileDurationIndex(snapshot));
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            } finally {
+                await App.Current.Dispatcher.InvokeAsync(() => {
+                    if (version == _VideoInfoVersion)
+                        LoadingVideoInfo = false;
+                });
+            }
         }
 
         public void SaveLove()
@@ -281,8 +326,6 @@ namespace Jvedio.ViewModel
                 }
             }
 
-            if (InfoSelectedIndex == 1)
-                LoadVideoInfo();
             QueryCompleted?.Invoke(this, new EventArgs());
             Logger.Info($"load complete");
         }

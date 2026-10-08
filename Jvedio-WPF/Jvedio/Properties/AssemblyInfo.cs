@@ -48,5 +48,5 @@ using System.Windows;
 // ����ָ��������Щֵ��Ҳ����ʹ�á����ɺš��͡��޶��š���Ĭ��ֵ
 // ͨ��ʹ�� "*"��������ʾ:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("5.4.1.69")]
-[assembly: AssemblyFileVersion("5.4.1.69")]
+[assembly: AssemblyVersion("5.4.1.72")]
+[assembly: AssemblyFileVersion("5.4.1.72")]

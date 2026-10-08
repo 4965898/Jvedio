@@ -2,6 +2,8 @@
 
 Label and statistics checks: run test-startup-regressions.ps1 -Library. LibraryRegression.cs creates isolated libraries, validates counts and library-scoped label operations, checks paging and unsaved changes through the WPF UI, and renders previews under build-output/library-previews/. Use -PreviewDirectory to choose another output folder. The default invocation still runs the startup and menu regression checks.
 
+Video information checks: run `test-startup-regressions.ps1 -VideoInfo -PreviewDirectory build-output/video-info-previews`. This requires FFmpeg on PATH (or `-FFmpegPath`) and generates small videos in a temporary directory. It runs an x86 harness to match the bundled native MediaInfo library, checks empty-result invalidation, tab retries, movie navigation, UI-thread notifications, segmented paths and the actual detail controls. `-SampleVideoPath` additionally reads a supplied local video; all database writes stay in the isolated fixture. Preview images are copied to the selected output folder.
+
 Change `AssemblyVersion` in `Jvedio-WPF/Jvedio/Properties/AssemblyInfo.cs` to a new four-part version and push the commit to `master`. GitHub Actions restores dependencies, rebuilds the application and maintained crawlers, runs the dispatcher stress check, assembles and verifies a complete `Jvedio-<version>.zip` and matching `Jvedio-<version>.exe`, then creates the matching tag and publishes both files. The EXE needs an existing complete installation. Build artifacts are retained for each run.
 
 The workflow refuses to republish a version already tagged at a different commit. It skips an old run if `master` has advanced before publication. A manually pushed version tag also runs the same build and release path.
