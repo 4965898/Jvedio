@@ -1,7 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')]
-    [string]$Version
+    [string]$Version,
+    [string]$CompilerPath,
+    [string]$ReferenceDirectory
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,6 +14,7 @@ $compressionDll = Join-Path $repoRoot 'Jvedio-WPF\packages\System.IO.Compression
 $pluginAssets = Join-Path $repoRoot 'release-assets\plugins\crawlers'
 $busDll = Join-Path $repoRoot 'Jvedio-WPF\Jvedio\Core\Crawler\Bus2\BusCrawler\bin\Release\BusCrawler.dll'
 $dbDll = Join-Path $repoRoot 'Jvedio-WPF\Jvedio\Core\Crawler\Db2\DbCrawler\bin\Release\DBCrawler.dll'
+$libraryDll = Join-Path $repoRoot 'Jvedio-WPF\Jvedio\Core\Crawler\Library2\LibraryCrawler\bin\Release\LibraryCrawler.dll'
 $stage = Join-Path $artifacts ('.stage-' + [guid]::NewGuid().ToString('N'))
 $package = Join-Path $stage ('Jvedio-' + $Version)
 $zip = Join-Path $artifacts ('Jvedio-' + $Version + '.zip')
@@ -25,7 +28,7 @@ function Assert-StagePath([string]$Path) {
     }
 }
 
-foreach ($path in @($source, $compressionDll, $pluginAssets, $busDll, $dbDll)) {
+foreach ($path in @($source, $compressionDll, $pluginAssets, $busDll, $dbDll, $libraryDll)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Required release input is missing: $path"
     }
@@ -35,6 +38,21 @@ $assemblyVersion = [Reflection.AssemblyName]::GetAssemblyName((Join-Path $source
 if ($assemblyVersion -ne $Version) {
     throw "Assembly version $assemblyVersion does not match package version $Version"
 }
+
+# The main project's dependency builds LibraryCrawler even with the existing CI workflow.
+# Keep the packaged plugin's regression checks in the publication path as well.
+if (-not $CompilerPath) {
+    $taskMSBuildDirectory = Split-Path (Get-Command msbuild -ErrorAction Stop).Source
+    $CompilerPath = Join-Path $taskMSBuildDirectory 'Roslyn\csc.exe'
+}
+if (-not $ReferenceDirectory) {
+    $taskCiRefs = Join-Path $repoRoot '.ci\ref\Microsoft.NETFramework.ReferenceAssemblies.net472\build\.NETFramework\v4.7.2'
+    $ReferenceDirectory = if (Test-Path -LiteralPath $taskCiRefs) { $taskCiRefs } else {
+        Join-Path $repoRoot 'build-output\refasm-net472\build\.NETFramework\v4.7.2'
+    }
+}
+& (Join-Path $PSScriptRoot 'test-library-crawler.ps1') -BuildDirectory $source -PluginPath $libraryDll `
+    -CompilerPath $CompilerPath -ReferenceDirectory $ReferenceDirectory
 
 New-Item -ItemType Directory -Path $package -Force | Out-Null
 try {
@@ -69,6 +87,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $references 'HtmlAgilityPack.dll') -Destination $crawlerDest -Force
     Copy-Item -LiteralPath $busDll -Destination (Join-Path $crawlerDest 'bus\BusCrawler.dll') -Force
     Copy-Item -LiteralPath $dbDll -Destination (Join-Path $crawlerDest 'db\DBCrawler.dll') -Force
+    Copy-Item -LiteralPath $libraryDll -Destination (Join-Path $crawlerDest 'library\LibraryCrawler.dll') -Force
 
     $required = @(
         'Jvedio.exe', 'Jvedio.exe.config', 'SuperUpdate.exe', 'SuperUtils.dll',

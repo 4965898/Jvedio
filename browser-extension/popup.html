@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Jvedio Connector</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header><img class="brand" src="icons/48.png" alt="Jvedio"><div><h1>剪藏到 Jvedio</h1><p id="source">正在读取当前页面…</p></div><button id="rescan" title="重新读取当前页面">刷新</button></header>
+  <main>
+    <div class="tools"><input id="search" type="search" placeholder="搜索番号或标题" aria-label="搜索番号或标题"><button id="all">全选</button><button id="none">全不选</button></div>
+    <p id="count" class="muted">正在识别…</p>
+    <div id="items" role="group" aria-label="可剪藏的影片"></div>
+    <div id="metadata" hidden></div>
+    <p id="empty" hidden>没有识别到影片。请打开 JavBus、JavDB 或 JAVLibrary 的影片列表或详情页，再点击刷新。</p>
+    <div class="destination"><label for="library">保存到</label><select id="library" aria-label="目标影片库"><option value="">请先连接 Jvedio</option></select><button id="connect">连接</button></div>
+    <button id="save" class="primary" disabled>保存所选番号</button>
+    <div class="exports"><button id="copy" disabled>复制番号</button><button id="txt" disabled>导出 TXT</button><button id="json" disabled>导出 JSON</button></div>
+    <p id="status" role="status" aria-live="polite"></p>
+    <details id="settings"><summary>连接设置</summary><p>在 Jvedio「选项 → 扫描与导入 → 浏览器剪藏」开启接收，复制连接密钥并填入下方。</p><label>本机端口<input id="port" type="number" min="1024" max="65535" value="18888"></label><label>连接密钥<input id="token" type="password" autocomplete="off" placeholder="粘贴 Jvedio 提供的密钥"></label><label><input id="autoDetail" type="checkbox" checked> 点击插件时，自动将详情页保存到上次使用的影片库</label><button id="apply">保存设置并连接</button></details>
+    <footer>读取当前已加载的影片；翻页或加载更多后点击刷新。<br>仅在点击插件时读取页面，数据发送到本机 Jvedio。</footer>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

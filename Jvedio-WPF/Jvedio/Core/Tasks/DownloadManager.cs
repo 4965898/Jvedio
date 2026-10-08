@@ -28,6 +28,7 @@ namespace Jvedio.Core.Tasks
 
         public bool OverrideInfo { get; set; }
         public bool PreviewInfo { get; set; }
+        public Jvedio.Core.Net.CapturedMediaOptions CapturedMedia { get; set; }
 
         public int Status { get; set; }
 
@@ -304,6 +305,7 @@ namespace Jvedio.Core.Tasks
                 DownloadPreview = task.DownloadPreview,
                 OverrideInfo = task.OverrideInfo,
                 PreviewInfo = task.PreviewInfo,
+                CapturedMedia = task.CapturedMedia,
                 Status = (int)task.Status,
                 CreateTime = task.CreateTime,
             };
@@ -369,6 +371,7 @@ namespace Jvedio.Core.Tasks
                         DownloadPreview = record.DownloadPreview,
                         OverrideInfo = record.OverrideInfo,
                         PreviewInfo = record.PreviewInfo,
+                        CapturedMedia = record.CapturedMedia,
                         CreateTime = record.CreateTime,
                     };
                     task.onCompleted += OnTaskPersistCompleted;

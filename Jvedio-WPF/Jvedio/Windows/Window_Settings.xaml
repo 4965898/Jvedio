@@ -6,6 +6,7 @@
     xmlns:cfg="clr-namespace:Jvedio.Core.Config;assembly=Jvedio"
     xmlns:crawler="clr-namespace:Jvedio.Core.Crawler;assembly=Jvedio"
     xmlns:translation="clr-namespace:Jvedio.Core.Translation;assembly=Jvedio"
+    xmlns:clipper="clr-namespace:Jvedio.Windows"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:fa="http://schemas.fontawesome.io/icons/"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -597,12 +598,20 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
-            <TabItem Background="Transparent" Header="{DynamicResource ScanAndImport}">
+            <TabItem x:Name="ScanImportTab" Background="Transparent" Header="{DynamicResource ScanAndImport}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
+                    <StackPanel Grid.IsSharedSizeScope="True">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="auto" />
+                                <ColumnDefinition Width="auto" SharedSizeGroup="ScanImportTitles" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource SettingTitleStyle}" Text="{DynamicResource BrowserClipper}" Foreground="White" />
+                            <clipper:BrowserClipperSettings Grid.Column="1" />
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="auto" SharedSizeGroup="ScanImportTitles" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
@@ -638,7 +647,7 @@
                         </Grid>
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="auto" />
+                                <ColumnDefinition Width="auto" SharedSizeGroup="ScanImportTitles" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
@@ -711,7 +720,7 @@
 
                         <Grid Visibility="{Binding ScanNfo, Converter={StaticResource BoolToVisibilityConverter}, Mode=TwoWay, Source={x:Static config:ConfigManager.ScanConfig}}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="auto" />
+                                <ColumnDefinition Width="auto" SharedSizeGroup="ScanImportTitles" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 

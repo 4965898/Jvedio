@@ -1,0 +1,7 @@
+{
+  "name": "jvedio-connector",
+  "version": "0.1.2",
+  "private": true,
+  "scripts": { "test": "node tests/run.cjs" },
+  "devDependencies": { "jsdom": "26.1.0" }
+}

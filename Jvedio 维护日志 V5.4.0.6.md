@@ -100,7 +100,7 @@
 | 5.4.1.63（Jvedio29.71，并入 5.4.1.65 发布） | 2026-10-01 | 统计图表修复（绑定用字段导致全空）；设置页站内搜索框调高；字号/滚动速度数值改为可输入；在线备份保留份数（远端历史 ZIP 剪枝）；本地备份统一为压缩包（见 3.74）。尚未公开发布 |
 | 5.4.1.64（Jvedio29.72，并入 5.4.1.65 发布） | 2026-10-01 | 修复快捷键 S/W 无反应（菜单 Header 文本与查找 key 不一致）+ 同步信息菜单显示手势 S；站内搜索框显式固定高度与拉伸（见 3.75）。尚未公开发布 |
 | 5.4.1.65（Jvedio29.73，发布版） | 2026-10-01 | 同步信息菜单的快捷键提示改内嵌文案「同步信息 (S)」（SuperControls 菜单模板不渲染 InputGestureText，见 3.76）。尚未公开发布 |
-| 5.4.1.72（Jvedio29.80，本地修复） | 2026-10-08 | 修复详情页视频信息整组空白、空结果缓存与过期异步请求；12 项媒体专项和 18 项原回归通过，已部署，见 3.82 |
+| 5.4.1.72（Jvedio29.80，发布版） | 2026-10-08 | 修复详情页视频信息整组空白、空结果缓存与过期异步请求；12 项媒体专项和 18 项原回归通过，已部署，见 3.82 |
 
 > 这些发布说明与本地 diff 吻合，可互相印证。5.4.0.5 的 Release Body 已于 2026-08-09 更新为「下载指引 + 相对原版 5.4 的改进总结 + 原记录」三段式，源码也已同步 commit（见 1.2、第五章）。
 
@@ -1328,7 +1328,31 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 
 **正式发布结果**：源码、测试、维护日志与三语 README 已推送至 origin/master；发布提交和 5.4.1.69 标签均为 641b47b6da68275e73efe8736c7faf0c6db6086a。[GitHub Actions 37521975215](https://github.com/4965898/Jvedio/actions/runs/37521975215) 全流程成功。[自改5.4.1.69](https://github.com/4965898/Jvedio/releases/tag/5.4.1.69) 于 2026-10-07 03:53:15（香港时间）公开并设为 Latest，包含累计统计/标签升级与更多指标白字修复。公开 ZIP 11,434,197 字节，EXE 2,541,056 字节，均已实际下载；ZIP 内 EXE 与单独 EXE 完全一致，版本均为 5.4.1.69。公开 EXE SHA-256 为 E5E8BBC5DF563ED52530F0918A15F3D92E9D2182C530AC5B3A745AF74F360372，ZIP SHA-256 为 AF48B1BC7BEAD743098690718D06768BF0CC418A39470067F90226B6EF29AF02。update-feed 已更新至 4f80c270579ca49b93443f0f03ef1eb86eb1620c，latest.json 为 5.4.1.69，73 文件清单中的 EXE 哈希与公开 EXE 一致。发布结果以文档补记提交同步，跳过重复发布 CI；现有工作流的本地修改仍保留。
 
-### 3.82 详情页视频信息空白回归修复（2026-10-08，5.4.1.72 / Jvedio29.80，本地交付）
+### 3.81 Library 仅有番号时误判不支持（2026-10-08，5.4.1.71 / Jvedio29.79）
+
+**现象与根因**：OREC-473 仅录入番号时，library 立即返回「该刮削器仅可刮削修正影片」及「无对应刮削器刮削」，bus/db 正常。`Video.VideoType` 默认为 `Normal=0`（普通/未知），主程序原样传给 `IsPluginAvailable`；原 LibraryCrawler 1.4.0 强制要求 `Censored=2`，因此在发起搜索前就被过滤。正式安装目录旧 DLL 的 SHA-256 与仓库原插件一致；隔离调用旧 DLL 已复现相同拒绝文案。
+
+**修复**：将原 DLL 还原为 `Core/Crawler/Library2/LibraryCrawler` 的可维护源码，保留原搜索、远端 DataCode 与详情字段解析。1.4.1 接受 `Normal`、缺失/空/null 类型和已知 `Censored`，允许仅用番号搜索；明确 `UnCensored`、`Europe` 和 FC2 仍拒绝，无效类型和空番号仍拒绝。不会为通过校验而修改本地影片类型。Release 主程序版本升至 5.4.1.71，三语 README 同步记录。
+
+**构建与打包**：主项目通过 `ReferenceOutputAssembly=false` 的 ProjectReference 构建 Library，打包脚本在产出发布资产前运行专项测试；沿用现有 Release 工作流，避免凭据缺少 workflow 权限阻挡推送。完整包脚本必须包含本次源码编译的 Library DLL，删除发布输入目录中的旧 DLL，避免继续随包分发 1.4.0。插件 manifest/readme 升至 1.4.1；FC2 仍使用既有二进制。独立插件包 `artifacts/LibraryCrawler-1.4.1.zip` 只含 DLL、manifest 和说明，不覆盖插件启用状态或服务器配置。
+
+**验证**：主程序与 Bus/DB/Library Release 构建成功；新增 `scripts/test-library-crawler.ps1` / `LibraryCrawlerRegression.cs`，26 项检查通过，覆盖启动应用暂存插件、主程序发现及选择 DLL、普通/未知和仅 VID 输入、302 跳转、搜索多结果精确番号、详情标题/日期/时长/演员、插件日志与请求头、下载任务资料校验、影片类型不被改写、远端 ID 缓存、未收录番号和明确不支持类型。HTTP 与数据库全部使用隔离夹具，未读取或写入真实影片库。原启动/网址恢复/菜单专项 18 项通过，调度器 210 个任务均仅启动一次，刮削字段保护检查通过，三语 395 key 一致。Windows PowerShell 运行现有字段保护脚本；PowerShell 7 直接加载 Framework EXE 不兼容。完整 ZIP 校验通过，包内 Library DLL 哈希与本次构建完全一致。
+
+**本地交付**：生成 `artifacts/Jvedio-5.4.1.71.zip` 与同版 EXE；归档 `build-output/Jvedio29.79.exe` 并部署 `E:\Jvedio-5.3.1\Jvedio29.79.exe`，三份 EXE 的 SHA-256 均为 `2A9FF37B80FF679DC99A6C7D8971200FD304884CE827A633DCCEEFA0D15C0BD4`。Library DLL 版本 1.4.1.0，SHA-256 为 `9D9666D62C7DA97B67ABF048C3173AA5788C382CCE0555B065923E406DE71C0D`。用户现有进程 `Jvedio-Connector-preview.exe` 继续运行，修复 DLL、manifest 与 readme 暂存到 `E:\Jvedio-5.3.1\plugins\crawlers\library\temp`，下次启动由现有插件更新流程应用；未覆盖正在使用的 DLL。旧插件三项文件备份在 `build-output/library-before-1.4.1`，未改用户 config.json、网址、Cookie 或影片库。
+
+**首次本地交付时待验收**：用户关闭当前 Jvedio 后运行 Jvedio29.79.exe，再用 library 刮削 OREC-473；当时验证的是完整软件链路与本地 HTTP 夹具，实际镜像收录、网络及反爬响应尚未实测。首次本地交付未提交、推送或公开发布，后续实测与正式发布见下文。
+
+**用户实测与发布准备（2026-10-08）**：用户确认已可发起刮削，但 library 仍基本获取不到影片信息，要求暂不继续处理该问题，并授权更新文档、推送及发布。此版只修复本地类型过滤；不能将隔离 HTML 夹具通过解释为真实站点资料获取已修复。三语 README 与插件说明均明确记录现存限制，bus/db 可继续使用。发布准备沿用 5.4.1.71，保留既有工作流，Library 构建与回归经主项目和打包脚本进入 CI；远端构建、公开资产及升级源结果在成功后补记。
+
+**正式发布结果（2026-10-08）**：源码与文档提交 `e9335395a6fc73ed54b4161437b0d7485fd7b09d` 已推送至 `origin/master`，标签 `5.4.1.71` 指向同一提交。[GitHub Actions 37666713217](https://github.com/4965898/Jvedio/actions/runs/37666713217) 全流程成功：主项目依赖自动重建 Library，Bus/DB 构建、210 任务调度检查、打包前 26 项 Library 专项、完整 ZIP 校验、Release 及升级源发布均通过。三语 README 后续补充了插件升级方法；发布结果以 `[skip ci]` 文档提交同步，避免同一版本重复发版。
+
+[自改5.4.1.71](https://github.com/4965898/Jvedio/releases/tag/5.4.1.71) 于 2026-10-08 02:28:22（香港时间）公开并设为 Latest。四项公开资产均为 uploaded：`Jvedio-5.4.1.71.zip`（11,458,475 字节）、`Jvedio-5.4.1.71.exe`（2,606,080 字节）、`LibraryCrawler-1.4.1.zip`（8,038 字节）、`Jvedio-Connector-0.1.2.zip`（44,264 字节）。独立 Library 包直接从公开 CI 完整包提取 DLL、manifest 与说明，与完整包内插件完全一致；Connector 沿用 0.1.2。
+
+**公开下载核验**：ZIP 和单独 EXE 已实际下载，程序集版本为 5.4.1.71，ZIP 内 EXE 与单独 EXE 的 SHA-256 均为 `5abbc054f1934efe8651a06eabcb9956353fa44f0b5d6a65c3eb09c6707d305c`；完整 ZIP SHA-256 为 `c71807bc67558a78e22b89ae11ec8a04f9e983b582a6fcdb82b534a7deb278ea`。公开 Library DLL 版本 1.4.1.0，SHA-256 为 `45accb195ed8f55b344fd648a6d690d10f94a1c5013dd2b027ba6d681d49404e`（CI 与本机构建哈希不同，分别记录）。独立 Library 包 SHA-256 为 `e6b3800796475adc7f5b0d9eedb4e8b12baf1f4810b76bae625e224bc39362ba`，Connector 包 SHA-256 为 `d33a9a1dbf208a31eeb1809b99ba0c73c5cf5f725f3ca7b45909fb7eddedaa67`。升级源 `update-feed` 提交 `fbe2e4b81934a8651d2fc1d7a589ba4d36fffa7d` 的 LatestVersion 为 5.4.1.71，73 个文件逐项 MD5 均与公开 ZIP 一致，包括主程序与 Library DLL。
+
+**升级说明与现存限制**：修复位于 Library 插件 DLL，单独替换主程序 EXE 不会更新该插件。请使用完整 ZIP，或关闭 Jvedio 后将独立 Library 包内容复制到 `plugins/crawlers/library/`；独立包不含 config.json，保留用户启用状态、网址及 Cookie。三语 README 和公开 Release 正文均明确记录：实际 library 资料获取率问题未解决，用户要求暂缓后续处理。本轮发布未修改用户影片库或再次覆盖正在使用的程序。
+
+### 3.82 详情页视频信息空白回归修复（2026-10-08，5.4.1.72 / Jvedio29.80，发布准备）
 
 **用户现象与核验**：用户明确使用 `Jvedio29.77.exe`，截图中的本地影片连文件后缀在内的视频信息全部为空。阅读维护日志及部署目录运行日志后，只读核对数据库路径；截图对应的 MP4 文件仍存在，原 MediaInfo 库可读取 MPEG-4、720x1280、14.981 fps、8 分 5.789 秒及 AAC 音频。无需修改或重新扫描原视频。
 
@@ -1339,6 +1363,10 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 **验证**：新增 `scripts/VideoInfoRegression.cs`，通过 `test-startup-regressions.ps1 -VideoInfo` 运行；原生 MediaInfo 为 x86，媒体专项夹具按 x86 编译，用 FFmpeg 在临时目录生成视频。覆盖媒体/音频字段、字幕路径、空结果失效、页签重试、快速切换、界面线程通知、分段回退、实际详情页翻页、保持视频页签和重新打开详情页。使用截图对应原视频作为只读样本，通过真实控件校验全部核心字段；测试对影片、关联和时长的所有数据库写入均在隔离库。29.77 对照检查复现缓存与通知问题；修复版全部 12 项通过，使用原部署目录的 SuperUtils/SuperControls 依赖复验亦全部通过。修复后的原视频信息截图为 `build-output/video-info/fixed-previews/local-video-info-fields.png`。Release 构建、原启动/恢复/菜单 18 项回归、三语 373 key 一致性、差异检查和完整 ZIP 校验通过。
 
 **交付**：本机已存在内部版本 5.4.1.71 / Jvedio29.79，因此本轮使用 5.4.1.72 / `E:\Jvedio-5.3.1\Jvedio29.80.exe`，保留旧 EXE。构建、归档 `build-output/Jvedio29.80.exe`、部署及完整包的单独 EXE 的 SHA-256 均为 `194D8CF4F95D532FC0833160D4FAAD1B792447131B8768B07346AA257B303E81`。本地完整包为 `artifacts/Jvedio-5.4.1.72.zip`（11,434,844 字节）。维护日志、三语 README 和回归使用说明已更新。初次交付仅在本地验证和部署；用户随后授权更新日志与 README、推送及发布最新版。正式发布合入远端 5.4.1.70/71 的功能及插件更新，保留已有工作流修改，发布结果验证后补记。用户下次启动 29.80 使用原数据，仍需在日常使用中验收实际翻页流程。
+
+---
+
+**合并及发布验证**：远端 master 已先行发布 5.4.1.70/71；本轮合入至 `e6ff029`，保留浏览器采集、LibraryCrawler 1.4.1 与资料获取率未解决的说明，冲突仅涉及版本号和文档，媒体修复代码保留。合并后的 Release 构建、12 项媒体专项（含原视频只读校验）、18 项启动/恢复/菜单回归、210 任务调度压力检查、打包前 26 项 Library 回归及完整 ZIP 校验全部通过；三语资源为 395 key。已有未提交的三语检查工作流改动保留在本机，使用远端原发布流程。只推送源码、回归、文档和既有发布输入，用户样本、数据、构建目录和旧 EXE 不提交。正式公开资产与升级源待 CI 完成后核验并补记。
 
 ---
 
@@ -1425,7 +1453,7 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 ### 5.1 构建
 - 解决方案：`Jvedio-WPF/Jvedio.sln`
 - 主项目：`Jvedio-WPF/Jvedio/Jvedio.csproj`
-- 爬虫插件单独编译：`Core/Crawler/Bus2/BusCrawler/BusCrawler.csproj` → `BusCrawler.dll`；`Core/Crawler/Db2/DbCrawler/DbCrawler.csproj` → `DBCrawler.dll`
+- 爬虫插件单独编译：`Core/Crawler/Bus2/BusCrawler/BusCrawler.csproj` → `BusCrawler.dll`；`Core/Crawler/Db2/DbCrawler/DbCrawler.csproj` → `DBCrawler.dll`；`Core/Crawler/Library2/LibraryCrawler/LibraryCrawler.csproj` → `LibraryCrawler.dll`（5.4.1.71 起）
 - 本机 Visual Studio MSBuild：`D:\Visual Studio IDE\MSBuild\Current\Bin\MSBuild.exe`；本机版本归档放在 `build-output/`，不提交源码仓库
 - **无 .NET Framework 4.7.2 targeting pack 的机器**（只有 VS BuildTools 时最常见）：从 nuget.org 下载 `Microsoft.NETFramework.ReferenceAssemblies.net472` 包解压（`https://www.nuget.org/api/v2/package/Microsoft.NETFramework.ReferenceAssemblies.net472/1.0.3`），MSBuild 加参数 `/p:TargetFrameworkRootPath=<解压目录>\build` 即可编译，**无需安装 SDK/开发者工具包**（2026-08-10 实测：BuildTools-only 环境用此法编译 sln 通过）。
 
@@ -1438,7 +1466,7 @@ CAST 统一整数比较；CASE 键不带方向（`ORDER BY a, b DESC` 方向只�
 **打包流程**（脚本自动完成）：
 1. 从 `Jvedio-WPF/Jvedio/bin/Release/` 复制全量运行文件，并校验 EXE 内部版本与目标版本一致。
 2. 在独立临时目录移除 ClickOnce 清单、调试符号、用户数据和旧编号 EXE。
-3. 将源码重建的 Bus/DB DLL 与 `release-assets/plugins/crawlers/` 中的四套插件配置合并；FC2/Library DLL 暂由已发布完整包保留。
+3. 将源码重建的 Bus/DB/Library DLL 与 `release-assets/plugins/crawlers/` 中的四套插件配置合并；FC2 DLL 由已发布完整包保留。
 4. 生成 `artifacts/Jvedio-{版本}.zip`，逐项校验 EXE、配置、SQLite 原生库、高亮规则及四个爬虫入口均存在且非空。
 
 **打包内容清单**（用户解压即得）：
@@ -1494,7 +1522,7 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 ### 5.4 版本迭代与自动发布流程（5.4.1.50 起）
 
 1. 修改代码，将 `AssemblyInfo.cs` 中的 `AssemblyVersion` 与 `AssemblyFileVersion` 同步升为新的四段版本号；更新 README 三语和本文档。
-2. 本机用 Visual Studio MSBuild 编译 Release 主程序及维护中的 Bus/DB 爬虫，运行 `DispatcherStress.exe`，再运行 `scripts/pack-release.ps1 -Version <版本号>` 检查完整 ZIP。
+2. 本机用 Visual Studio MSBuild 编译 Release 主程序及维护中的 Bus/DB/Library 爬虫，运行 `DispatcherStress.exe` 和 `scripts/test-library-crawler.ps1`，再运行 `scripts/pack-release.ps1 -Version <版本号>` 检查完整 ZIP。
 3. 只提交源码、文档、工作流、脚本与发布输入；不要把本机旧版 EXE、`build-output/`、测试样本或 `nuget.exe` 混入提交。推送至 `origin/master`。
 4. GitHub Actions 在 Windows 环境重建并测试。若版本号尚无标签且提交仍是 `master` 最新提交，自动创建同版本标签、上传已校验 ZIP 和同版 EXE 到草稿 Release，再发布为 Latest；随后从同一 ZIP 更新原升级窗口使用的 `update-feed` 分支。已有同版本标签但指向其他提交时停止，须再次升版本号。
 5. 核对 Actions 结果、Release 的 ZIP 与 EXE 资产、`update-feed/jvedioupdate/latest.json` 和下载可用性。源码推送成功不等于 Release 已发布，CI 失败时先修复失败原因。
@@ -1568,3 +1596,53 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 | 任务持久化 | [DownloadManager.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Tasks/DownloadManager.cs)（SaveTasksToFile/RestoreTasksFromFile）、[DownLoadTask.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Net/DownLoadTask.cs)（DoWork null 防护）、[WindowStartUp.xaml.cs](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/WindowStartUp.xaml.cs)（启动恢复） |
 | 国际化 | [zh-CN.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Lang/zh-CN.xaml)、[en-US.xaml](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Core/Lang/en-US.xaml) |
 | 构建 | [Jvedio.csproj](file:///a:/Trae/repository/Jvedio-1/Jvedio-WPF/Jvedio/Jvedio.csproj) |
+
+---
+
+## 2026-10-07：Jvedio Connector 浏览器剪藏开发测试版（0.1.0）
+
+- 新增独立的 Chrome Manifest V3 插件，适配 JavBus、JavDB、JAVLibrary 及相同页面结构的镜像站。点击后读取当前已加载的页面，列表支持勾选、搜索、全选/全不选、去重、复制、TXT/JSON 导出和目标影片库选择。
+- 详情页优先识别主影片，忽略推荐影片；提取标题、中文标题、日期、时长、导演、片商、发行商、系列、类别、演员及明确别名、评分、简介、封面与预览图链接。选择过影片库后，详情页可一次点击自动保存到上次使用的库，也可以关闭自动保存或切换目标库。
+- 软件接收设置放在“选项 → 扫描与导入 → 浏览器剪藏”，主菜单入口定位到该设置页。保存开启状态和端口，密钥在桌面端用 DPAPI 加密；开启后随下次启动恢复，仅监听 127.0.0.1，不需要管理员 HTTP URL 预留。
+- 新增受密钥保护的本机接收端和事务入库。列表重复番号跳过；详情只补全已有影片空白字段，保留已有资料与演员关联。来源快照保存到 browser_clip_sources，删除影片时自动清理。演员只根据明确别名复用；评分按 5 分制保存，JAVLibrary 的 10 分评分除以 2。JavDB/JAVLibrary 的远程页面 ID 写入已有网址映射表，便于后续同步。
+- 封面使用既有图片下载任务，预览图遵循软件图片下载设置；文本入库不等待网络图片下载。保存后刷新主界面，接收端退出时关闭。
+- 样本验证：三个列表分别为 30/40/20 个番号；三个 GVG-107 详情均提取为 2015-02-19、160 分钟及导演“ひょん”。保留各站演员名称差异：JavDB“仲里紗羽”，JavBus/JAVLibrary“本田莉子”，JAVLibrary 明确提供别名关系。修正 JavBus 演员名称混入类别的问题。
+- 验证：Release 构建成功；22 项插件 DOM/弹窗/后台与六份完整 HTML 回归通过；29 项隔离数据库、资料补全、删除清理、批次回滚、HTTP 鉴权、库范围、密钥持久化和设置入口检查通过；真实 Chrome 测试配置加载插件并连接隔离 WPF 接收端，3 项列表选择、详情自动保存和切换影片库链路通过；18 项原有启动/来源持久化/备份/菜单回归通过；三语 386 个 key 一致；git diff --check 通过。Chrome 测试模拟工具栏的当前标签页选择，脚本注入、存储、扩展消息及 HTTP 使用真实扩展 API。
+- 交付：browser-extension/README.md 安装与当前范围说明；scripts/pack-browser-clipper.ps1 生成插件 ZIP 和配套桌面预览 EXE。不发布正式版本、不修改版本号、不替换用户正在使用的 EXE 或影片库，不将原始网站 HTML 或会话信息打包。
+- 当前范围与待观察项：仅支持本机 SQLite 影片库，一次最多 500 个已加载番号；尚未上架 Chrome 网上应用店。网站在线登录状态、后续 DOM 改版和图床/代理的下载可用性需要实际使用观察，当前链路以用户提供的离线页面样本验收。
+
+### 2026-10-07：Connector 0.1.1 试用反馈修正
+
+- “选项 → 扫描与导入 → 浏览器剪藏”标题、说明、状态、按钮和输入框统一白字；输入框深色背景。用常显 StackPanel 替换 Expander，移除折叠按钮。修正 UI 预览工具曾依赖父容器白色字体而掩盖实际继承颜色的问题，现直接检查控件自身样式。
+- 新增“保存图片”总开关，封面图、预览图、预览视频独立选项。默认保存封面，预览图和预览视频默认关闭；不依赖常规刮削图片设置。媒体选项随任务持久化，关闭某类资源后不发起该类下载。已完成/失败任务允许重新按新选项入队；正在运行的任务在弹窗中明确提示。
+- 预览视频：提取页面可用的直链及 JavDB 的延迟预览接口；仅在启用预览视频保存时，由浏览器在原页面会话内取得链接，Cookie 不发送到桌面端。Jvedio 以流式下载写入影片预览目录，支持 MP4/WebM 等可取得的直链，限制单文件 250 MB，带取消和超时、来源 Referer 及失败提示；更新过期预览视频链接不覆盖已有文字资料。受限接口失败仍保存文字资料，HLS/DRM 不下载。
+- 详情页适配：JavBus 识别字段容忍空格、复制按钮及部分翻译后的标签，并交叉使用主标题、影片地址（含 www.javbus.com/GVG-107）回退识别；JAVLibrary 标题读取不再依赖单一书签链接，补充 h3、主标题节点和 document.title。三站 GVG-107 原始源码验证通过，在线 JavBus 页面未能通过本次网络读取工具访问，兼容性改动仍需用户实际重试。
+- 图标直接复用 Resources/Jvedio.ico 原图，保持比例导出透明的 16/32/48/128 PNG；工具栏、扩展管理页和弹窗统一 Jvedio 图标。
+- 验证：26 项插件回归（含标题缺少链接、JavBus 标签变化、视频接口失败时仍保存资料）通过；36 项隔离桌面检查（含媒体组合和任务选项持久化）通过；4 项真实 Chrome 扩展至 WPF 接收端链路通过，覆盖浏览器 Cookie 会话内解析、桌面仅携带 Referer 而不携带 Cookie、图片关闭时视频仍保存到文件；18 项既有启动/来源/备份/菜单回归通过；三语 394 个 key 一致；Release 构建与 diff --check 通过。
+- 交付更新为 Jvedio-Connector-0.1.1.zip 和配套 Jvedio-Connector-preview.exe。旧版插件目录需要覆盖后在 Chrome 扩展管理页重新加载；配套桌面 EXE 也需更新。本次未替换用户正式安装目录中的程序、未发布正式版本。
+
+### 2026-10-07：Connector 0.1.2 排版、图片与名称修正
+
+- 扫描与导入统一两列布局：浏览器剪藏复用 SettingTitleStyle，与扫描、导入、NFO 共用标题列宽；内容区使用同样的 5 像素边距、BaseTextBlock、SearchBox 与复选框样式。移除独立加粗标题、大外边距，说明和状态左对齐，保留白字与始终展开。已渲染完整设置页检查实际对齐，预览密钥已掩码。
+- 插件名改为 Jvedio Connector，去掉“· 番号剪藏”；版本更新为 0.1.2，保留软件原图标。
+- 修复结果页没有提取图片链接的问题：三站列表现在读取页面已有封面/缩略图、日期和评分；不访问影片详情页补全资料。用户明确选择暂缓“批量获取完整资料”，也不根据结果页标题推断演员及其头像。
+- 修复剪藏任务跳过演员图的问题：图片改由 Chrome 使用浏览器会话获取，临时来源请求规则仅作用于本扩展的具体图片 URL；向软件只发送图片字节，不发送网站 Cookie。新增独立保存演员图开关、已确认演员关联与历史明确别名映射、同站演员页明确头像区域读取、头像缺失提示。仅限三站与已知图床权限，没有所有网站权限。
+- 新增受密钥保护的 /v1/images 接收端：检查目标库、影片与演员关联、图片开关、图片编码和大小，保存 JPEG 到海报、缩略图、预览或演员目录，更新缓存与图片索引，触发界面刷新。已有有效文件保留，失效/空图片不会假报新下载。无本地影片文件且使用相对影片图片模式时，改为回退软件数据目录。
+- 图片保存结果显示完成、失败和缺少演员头像来源数量；网站未提供头像、请求被验证拦截或关联身份无法确认时明确报告。预览视频继续使用已有下载任务。
+- 验证：Release 构建成功；26 项插件回归（六份完整页面样本均包含可用列表图片链接）通过；39 项隔离桌面回归（新增库范围、图片总开关、虚拟影片路径）通过；6 项实际 Chrome 扩展至 WPF 链路通过，验证带 Cookie 和 Referer 的图片获取、封面/缩略图/演员图文件实际写入，以及两个结果页选中影片的封面批量保存；18 项原有启动/来源/备份/菜单回归通过；三语 395 个 key 一致；diff --check 通过。
+- 测试缓存导致 C 盘空间不足。按前缀及单个旧测试目录的清理均被自动审批以“策略阻止”拒绝，未改用其他删除方式；保留旧目录并改在 A:\Temp\Jvedio-Connector-TestCache 完成验证。仅停止本次创建的隔离测试接收端，不修改用户正式程序、配置或影片库。
+- 交付为 Jvedio-Connector-0.1.2.zip 与最新 Jvedio-Connector-preview.exe；更新插件需要覆盖原目录并重新加载，图片获取需要接受 Chrome 对相关站点/图床的权限提示。在线网站后续布局、验证与无公开头像的情况仍有明确限制，完整资料批量补齐保持暂缓。
+
+## 2026-10-07：5.4.1.70 / Jvedio29.78 正式发布准备
+
+- 桌面程序集与文件版本统一升至 5.4.1.70，浏览器插件版本为 0.1.2。README 新增本版完整版本说明，并将剪藏特性和安装方法改为正式发布文档；docs/releases/5.4.1.70.md 包含三个下载文件、安装步骤、图片权限和仍暂缓的批量完整资料范围。
+- 发布打包脚本新增 ConnectorOnly 模式，GitHub Release 需要同时具备 Jvedio-5.4.1.70.zip、Jvedio-5.4.1.70.exe、Jvedio-Connector-0.1.2.zip。测试依赖通过 package-lock.json 锁定，正式插件不包含 npm 包、测试样本、会话信息或临时连接密钥。
+- 本地重新编译桌面端、BusCrawler、DBCrawler 和 DispatcherStress，210 个调度任务各启动一次；完整桌面 ZIP 已核对运行时、双架构 SQLite、维护爬虫及资源文件，独立 EXE 与 ZIP 内 EXE 一致。26 项插件回归、39 项隔离桌面回归、6 项 Chrome 图片/视频入库链路与三语 395 个 key 检查通过。推送后由既有 GitHub Actions 再构建、发布桌面版并更新升级源，再补传已验证的插件 ZIP。
+- 初次推送因现有 GitHub 凭据缺少 workflow 权限而被远端拒绝。保留既有发布工作流，不改变该权限范围；本次通过发布后补传 Connector ZIP 完成三个资产交付，已制作的工作流修改保存在本地忽略目录，未上传。
+
+### 5.4.1.70 发布核验完成
+
+- 功能源码提交 a7bb365174fcc8e97157c42646170a03fd68c188 已推送至 origin/master；对应标签 5.4.1.70 的 GitHub Actions 运行 37640365472 构建、调度并发检查、完整包验证、发布与升级源更新全部成功。
+- 发布页：https://github.com/4965898/Jvedio/releases/tag/5.4.1.70 。最新版本确认为 5.4.1.70，公开资产为 Jvedio-5.4.1.70.zip、Jvedio-5.4.1.70.exe、Jvedio-Connector-0.1.2.zip，三项状态均为 uploaded。
+- 已下载 GitHub CI 生成的 ZIP 与 EXE，确认程序集版本为 5.4.1.70，ZIP 内 Jvedio.exe 与独立 EXE 的 SHA256 相同。桌面 EXE SHA256：e1d2cfda616f2217c45b97c752356a48cc1de88b5688912f335edfca4bf40f9c；完整 ZIP SHA256：edad9ecc6662f80839f5e35abcf201b225daa80dc100112091e1eb0fc7537e84；插件 ZIP SHA256：8022b96cc41429ae418c4756d1e430687483939775384cb113dc507d85a20cfc，与本地已验证插件包一致。
+- update-feed 分支 jvedioupdate/latest.json 的 LatestVersion 已核验为 5.4.1.70。插件补传和详细发布说明更新成功；正式安装目录与用户影片库未修改。

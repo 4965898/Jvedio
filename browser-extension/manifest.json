@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Jvedio Connector",
+  "version": "0.1.2",
+  "description": "从 JavBus、JavDB、JAVLibrary 当前页面选择番号，剪藏到本机 Jvedio。",
+  "minimum_chrome_version": "102",
+  "permissions": ["activeTab", "scripting", "storage", "clipboardWrite", "declarativeNetRequestWithHostAccess"],
+  "host_permissions": ["http://127.0.0.1/*", "https://*.javbus.com/*", "https://*.javdb.com/*", "https://*.javlibrary.com/*", "https://*.jdbstatic.com/*", "https://pics.dmm.co.jp/*", "https://*.pixhost.to/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "剪藏到 Jvedio", "default_popup": "popup.html", "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png" } },
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" }
+}

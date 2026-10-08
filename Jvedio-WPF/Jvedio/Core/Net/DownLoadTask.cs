@@ -23,6 +23,13 @@ using static Jvedio.MapperManager;
 
 namespace Jvedio.Core.Net
 {
+    public sealed class CapturedMediaOptions
+    {
+        public bool CoverImages { get; set; }
+        public bool PreviewImages { get; set; }
+        public bool PreviewVideos { get; set; }
+        public string Referer { get; set; }
+    }
     // todo 检视
     public class DownLoadTask : AbstractTask
     {
@@ -43,6 +50,7 @@ namespace Jvedio.Core.Net
 
         public bool OverrideInfo { get; set; }// 强制下载覆盖信息
         public bool PreviewInfo { get; set; }
+        public CapturedMediaOptions CapturedMedia { get; set; }
         private HashSet<string> _AllowedMetadataFields;
 
         #endregion
@@ -108,6 +116,7 @@ namespace Jvedio.Core.Net
                 FinalizeWithCancel();
                 throw new Exception(Message);
             }
+            if (CapturedMedia != null) return null;
 
             // 判断是否需要下载，自动跳过已下载的信息
             if (OverrideInfo || video.ToDownload()) {
@@ -146,7 +155,7 @@ namespace Jvedio.Core.Net
 
         public async Task<bool> DownloadPoster(Video video, Dictionary<string, object> dict, VideoDownLoader downLoader, RequestHeader header)
         {
-            if (!ConfigManager.DownloadConfig.DownloadPoster)
+            if (!(CapturedMedia?.CoverImages ?? ConfigManager.DownloadConfig.DownloadPoster))
                 return true;
             object o = GetInfoFromExist("BigImageUrl", video, dict);
             string imageUrl = o != null ? o.ToString() : string.Empty;
@@ -184,7 +193,7 @@ namespace Jvedio.Core.Net
 
         public async Task<bool> DownloadThumbnail(Video video, Dictionary<string, object> dict, VideoDownLoader downLoader, RequestHeader header)
         {
-            if (!ConfigManager.DownloadConfig.DownloadThumbNail)
+            if (!(CapturedMedia?.CoverImages ?? ConfigManager.DownloadConfig.DownloadThumbNail))
                 return true;
             object o = GetInfoFromExist("SmallImageUrl", video, dict);
             string imageUrl = o != null ? o.ToString() : string.Empty;
@@ -278,6 +287,7 @@ namespace Jvedio.Core.Net
 
         public async Task<bool> DownloadActors(Video video, Dictionary<string, object> dict, VideoDownLoader downLoader, RequestHeader header)
         {
+            if (CapturedMedia != null) return true;
             if (_AllowedMetadataFields != null && !_AllowedMetadataFields.Contains("ActorNames"))
                 return true;
             object names = GetInfoFromExist("ActorNames", video, dict);
@@ -372,10 +382,10 @@ namespace Jvedio.Core.Net
 
         public async Task<bool> DownloadPreviews(Video video, Dictionary<string, object> dict, VideoDownLoader downLoader, RequestHeader header)
         {
-            if (!ConfigManager.DownloadConfig.DownloadPreviewImage)
+            if (!(CapturedMedia?.PreviewImages ?? ConfigManager.DownloadConfig.DownloadPreviewImage))
                 return true;
             object urls = GetInfoFromExist("ExtraImageUrl", video, dict);
-            if (DownloadPreview &&
+            if ((CapturedMedia?.PreviewImages ?? DownloadPreview) &&
                 urls != null &&
                 urls is List<string> imageUrls) {
                 if (imageUrls != null && imageUrls.Count > 0) {
@@ -426,6 +436,7 @@ namespace Jvedio.Core.Net
 
         public async Task<bool> CheckDataInfo(Video video, Dictionary<string, object> dict, VideoDownLoader downLoader, RequestHeader header)
         {
+            if (CapturedMedia != null) return true;
             // 只有同步了信息才需要校验信息
             if (!(video.ToDownload() || OverrideInfo)) {
                 return true;
@@ -561,6 +572,10 @@ namespace Jvedio.Core.Net
                         header.WebProxy = ConfigManager.ProxyConfig.GetWebProxy();
                     }
                     header.TimeOut = ConfigManager.ProxyConfig.HttpTimeout * 1000;
+                    if (CapturedMedia != null && !string.IsNullOrEmpty(CapturedMedia.Referer)) {
+                        if (header.Headers == null) header.Headers = new Dictionary<string, string>();
+                        header.Headers["Referer"] = CapturedMedia.Referer;
+                    }
                     Message = "";
                     StatusText = "3. 开始同步海报图";
                     success = await DownloadPoster(video, dict, downLoader, header);
@@ -589,6 +604,20 @@ namespace Jvedio.Core.Net
 
                     StatusText = "6. 开始同步预览图";
                     success = await DownloadPreviews(video, dict, downLoader, header);
+                    if (CapturedMedia?.PreviewVideos == true) {
+                        StatusText = LangManager.GetValueByKey("ClipperDownloadingVideo");
+                        if (GetInfoFromExist("PreviewVideoUrl", video, dict) is List<string> videoUrls) {
+                            for (int i = 0; i < videoUrls.Count; i++) {
+                                string extension = Path.GetExtension(new Uri(videoUrls[i]).AbsolutePath).ToLowerInvariant();
+                                if (extension != ".webm" && extension != ".m4v") extension = ".mp4";
+                                string directory = video.GetExtraImage();
+                                Directory.CreateDirectory(directory);
+                                string target = Path.Combine(directory, "preview-video-" + (i + 1) + extension);
+                                bool downloaded = await downLoader.DownloadPreviewVideo(videoUrls[i], target, header, error => Message = error);
+                                if (!downloaded) { FinalizeWithCancel(); return; }
+                            }
+                        }
+                    }
                     Status = TaskStatus.RanToCompletion;
                 }
                 StatusText = "7. 同步所有内容完成";
