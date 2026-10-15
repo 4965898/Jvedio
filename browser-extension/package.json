@@ -1,6 +1,6 @@
 {
   "name": "jvedio-connector",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "private": true,
   "scripts": {
     "test": "node tests/run.cjs"

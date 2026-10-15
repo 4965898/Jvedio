@@ -1713,3 +1713,19 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 - 已下载公开的 CI EXE、完整 ZIP 与 Connector ZIP：桌面程序集及文件版本均为 5.4.1.73，ZIP 内 EXE 与独立 EXE SHA256 一致；核对运行依赖、双架构 SQLite、资源和四类爬虫，未含用户数据或测试文件。Connector manifest 版本 0.2.5，与本地已验证 ZIP 完全一致，包含卡片/观察脚本，不含测试依赖或连接配置。完整 ZIP 下载较慢，已等待完成并通过官方资产接口复核，没有用空文件作为验证结果。
 - 公开资产 SHA256：EXE b4773c2bb78bc436fb94c3c78697c7d89acb20c8d40bcbb92ad8e0d541efe277；完整 ZIP ed15d8d7ad62bc28112130137d591939c2af81c410b3ad1c739665220da75b89；Connector a7de2f27a395085b23298fb0992351878a440f706a192c36ea06a1aaefcacded。GitHub 资产 digest 与下载文件一致。
 - update-feed 分支提交 9f3dcc1f5f43cacba2ef43d4da0beddae1bf32e6：jvedioupdate/latest.json 的 LatestVersion=5.4.1.73，日期 2026-10-15；73 项文件清单完整，清单中 EXE 的 MD5 与公开 EXE 一致。已停止本次隔离测试接收端；未替换用户正式程序、配置或影片库。最终记录以 [skip ci] 文档提交推送，避免对同一版本重复发布。
+
+### 2026-10-15：Connector 0.2.6 本地预览，卡片可再次点击取消
+
+- 用户点击错误影片后，需要返回 Connector 窗口手动查找取消。现在卡片按钮在影片未选中时加入本页选择，已经选中时再次点击则移除；按钮显示“＋Jvedio”/“已勾选”并同步窗口勾选状态。此操作不保存影片，也不改变瀑布流追加、翻页清空和关闭窗口清空的选择范围。
+- 该切换放在后台按来源标签页串行处理，与窗口增删选择共用队列，避免快速点击覆盖；按钮标题说明再次点击可取消，更新中显示加入或取消状态。筛选、详情页、接收端和桌面协议未改。
+- 插件版本为 0.2.6；README、开发说明及现有选择回归用例同步。生成 `artifacts/Jvedio-Connector-0.2.6.zip` 供本地预览；沿用 Jvedio 5.4.1.73 桌面端。本地工作副本尚未推送或作为正式 Release 发布。
+- 验证（补跑）：插件回归 60/60 通过，含六份完整离线样本、三次并行点击同一卡片的取消用例（最终仅保留另一部），以及窗口打开时卡片勾选→再点取消→再点恢复与复选框的双向同步；全部改动脚本 `node --check` 与 `git diff --check` 通过（仅既有 LF/CRLF 警告）。0.2.6 ZIP 已核对 manifest 版本、toggle 逻辑与取消提示文案齐全，SHA256 `022E5127A9F28506855BD0B950475EB6890EC23B28D5A92169902FA2F3AEE235`。真实 Chrome 至接收端的 Playwright/WPF 链路本轮未重跑，本改动不涉及接收端协议与桌面源码。
+
+## 2026-10-15：6.0.0.0 / Jvedio30.1 与 Connector 0.2.6 正式发布准备
+
+- 用户决定：软件自接手维护以来大幅重构、功能大幅增强，从本版起版本号定为 **6.0**，后续迭代从 6.0 开始；本地部署文件名按跨大版本规则进入 `Jvedio30.1.exe`。全仓硬编码版本号仅 `AssemblyInfo.cs` 两处，已核实无其他残留。
+- `AssemblyInfo.cs` 的 AssemblyVersion / AssemblyFileVersion 升为 6.0.0.0，桌面源码逻辑零改动；升级提示按 `Version.TryParse` 数值比较，6.0.0.0 > 5.4.1.73，旧版可正常收到升级提示。
+- 本地验证：主程序、BusCrawler、DBCrawler Release 重建通过（仅历史 CS0108 警告），DispatcherStress 210 项调度检查通过；`pack-release.ps1 -Version 6.0.0.0` 通过 26 项 LibraryCrawler 检查并完整打包，生成 `Jvedio-6.0.0.0.zip`（11,239,408 字节）与同版 EXE（2,617,856 字节，程序集版本 6.0.0.0）。
+- 文档：三语 README 版本表新增 6.0.0.0 行（README_EN/JP 顺带补上此前缺失的 5.4.1.73 行）；根 README 的 0.2.6 预览段改为 6.0 正式发布公告；新增 `docs/releases/6.0.0.0.md`；插件 README 标题与安装来源改为随 6.0.0.0 正式发布；scripts/README 同步。
+- 修复 `pack-browser-clipper.ps1` 在 Windows PowerShell 5.1 下因无 BOM 的 UTF-8 manifest 被按 GBK 解析导致的 JSON 报错（`Get-Content` 显式 `-Encoding UTF8`）；据此重打包 Connector 0.2.6 ZIP（SHA256 `B58709A94768287AB67A66A57F3E8B66270A4B5E62F5E2D20E3DCD7A75002E2C`）。
+- 发布流程：功能与发布文档一次提交推送 origin/master 并打标签 6.0.0.0（不含 .github/workflows 改动，避免凭据无 workflow 权限被拒）；沿用既有 master 工作流构建、发布完整 ZIP/同版 EXE 并更新升级源；随后上传经验证的 Connector ZIP、以 docs/releases/6.0.0.0.md 更新详细说明并将标题改为「自改6.0.0.0（Jvedio30.1）」，核验三项资产与 update-feed 后以 [skip ci] 提交记录。

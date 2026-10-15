@@ -2,7 +2,7 @@ param([string]$OutputDirectory = (Join-Path $PSScriptRoot '..\artifacts'), [swit
 $ErrorActionPreference = 'Stop'
 $taskRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $taskExtension = Join-Path $taskRoot 'browser-extension'
-$taskManifest = Get-Content -LiteralPath (Join-Path $taskExtension 'manifest.json') -Raw | ConvertFrom-Json
+$taskManifest = Get-Content -LiteralPath (Join-Path $taskExtension 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $taskOutput = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Path $taskOutput -Force | Out-Null
 $taskStage = Join-Path $taskOutput ('connector-stage-' + [guid]::NewGuid().ToString('N'))

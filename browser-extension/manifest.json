@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jvedio Connector",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "从 JavBus、JavDB、JAVLibrary 当前页面选择番号，剪藏到本机 Jvedio。",
   "minimum_chrome_version": "102",
   "permissions": ["activeTab", "scripting", "storage", "clipboardWrite", "contextMenus", "declarativeNetRequestWithHostAccess"],

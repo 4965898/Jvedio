@@ -9,7 +9,7 @@
     const checked = selected.has(entry.code);
     entry.button.textContent = checked ? "已勾选" : "＋Jvedio";
     entry.button.setAttribute("aria-pressed", String(checked));
-    entry.button.title = checked ? "已加入本页选择；点击扩展图标后统一保存，可在窗口中取消勾选" : "加入本页选择；挑选完成后点击扩展图标，再保存所选影片";
+    entry.button.title = checked ? "已加入本页选择；再次点击取消勾选，挑选完成后点击扩展图标统一保存" : "加入本页选择；挑选完成后点击扩展图标，再保存所选影片";
   }
   function receive(state) {
     if (!state || state.pageUrl !== location.href || state.documentKey !== documentKey || state.revision < revision) return;
@@ -42,13 +42,13 @@
       const shadow = host.attachShadow({ mode: "open" }), style = document.createElement("style");
       style.textContent = ":host{color-scheme:light}button{font:11px/1.5 system-ui,sans-serif;white-space:nowrap;border:1px solid #df9866;border-radius:4px;background:#fff5eb;color:#88431b;padding:1px 6px;cursor:pointer}button:hover{background:#ffe5ce}button[aria-pressed=true]{background:#e9f4ed;border-color:#71a982;color:#245e35}button:disabled{opacity:.65;cursor:wait}button:focus-visible{outline:2px solid #5367da;outline-offset:2px}";
       const button = document.createElement("button"); button.type = "button";
-      button.setAttribute("aria-label", `勾选 ${card.code} 到 Jvedio`);
+      button.setAttribute("aria-label", `选择或取消 ${card.code} 到 Jvedio`);
       const entry = { host, button, code: card.code }; paint(entry);
       for (const name of ["pointerdown", "mousedown"]) button.addEventListener(name, event => event.stopPropagation());
       button.addEventListener("click", async event => {
         event.preventDefault(); event.stopImmediatePropagation();
         if (!event.isTrusted || button.disabled) return;
-        button.disabled = true; button.textContent = "勾选中…";
+        button.disabled = true; button.textContent = selected.has(card.code) ? "取消中…" : "勾选中…";
         try {
           const response = await chrome.runtime.sendMessage({ kind: "select-card", code: card.code, pageUrl: location.href, documentKey });
           if (!response?.ok) throw new Error(response?.error || "勾选失败，请重试。");

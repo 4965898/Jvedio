@@ -157,7 +157,7 @@ const server = http.createServer((request, response) => {
       const body = fs.readFileSync(path.join(samples, filename), "utf8").replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "").replaceAll(oldCode, code);
       await context.route(url + "**", route => route.fulfill({ contentType: "text/html;charset=utf-8", body }));
       const cardPage = await context.newPage(); await cardPage.goto(url);
-      const button = cardPage.getByRole("button", { name: '勾选 ' + code + ' 到 Jvedio', exact: true });
+      const button = cardPage.getByRole("button", { name: '选择或取消 ' + code + ' 到 Jvedio', exact: true });
       await button.waitFor();
       const codes = [code, code.replace("001", "002"), code.replace("001", "003")];
       await cardPage.evaluate(({ site, codes }) => {
@@ -165,9 +165,9 @@ const server = http.createServer((request, response) => {
         const card = document.querySelector(selector);
         for (const code of codes.slice(1)) card.parentElement.insertAdjacentHTML("beforeend", card.outerHTML.replaceAll(codes[0], code));
       }, { site, codes });
-      const pick = code => cardPage.getByRole("button", { name: '勾选 ' + code + ' 到 Jvedio', exact: true });
+      const pick = code => cardPage.getByRole("button", { name: '选择或取消 ' + code + ' 到 Jvedio', exact: true });
       const windowsBefore = context.pages().filter(page => page.url().startsWith('chrome-extension://' + id + '/popup.html')).length;
-      await pick(codes[0]).click(); await pick(codes[2]).click(); await pick(codes[0]).click();
+      await pick(codes[0]).click(); await pick(codes[2]).click();
       await pick(codes[2]).filter({ hasText: "已勾选" }).waitFor();
       assert.equal(cardPage.url(), url);
       assert.ok(codes.every(code => movieCount(2, code) === 0), "picking must not write any movie");
@@ -199,7 +199,7 @@ const server = http.createServer((request, response) => {
       await cardPage.close();
     }
     await popup.locator("#none").click();
-    const enhancedButton = source.getByRole("button", { name: "勾选 WATER-240 到 Jvedio", exact: true });
+    const enhancedButton = source.getByRole("button", { name: "选择或取消 WATER-240 到 Jvedio", exact: true });
     await enhancedButton.click(); await enhancedButton.filter({ hasText: "已勾选" }).waitFor();
     await popup.locator("#count").filter({ hasText: "已选 1 个" }).waitFor();
     assert.equal(source.url(), origin + "/cover");

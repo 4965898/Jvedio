@@ -44,6 +44,8 @@ function pageSelection(tabId, expected, change = {}) {
     const codes = new Set(state.codes);
     for (const code of change.remove || []) codes.delete(code);
     for (const code of change.add || []) codes.add(code);
+    // A repeated card click unchecks the same film; decided here so queued clicks cannot race.
+    for (const code of change.toggle || []) codes.has(code) ? codes.delete(code) : codes.add(code);
     state.codes = [...codes];
     await chrome.storage.session.set({ [key]: state });
     await publishSelection(tabId, state);
@@ -143,7 +145,7 @@ async function selectCard(tabId, message) {
   const snapshot = response.result;
   if (snapshot?.pageUrl !== message.pageUrl || snapshot.kind !== "list" || !snapshot.items.some(item => item.code === message.code))
     throw new Error("当前列表中未找到这个番号，请刷新页面后重试。");
-  return pageSelection(tabId, { ...message, kindHint: "list" }, { add: [message.code] });
+  return pageSelection(tabId, { ...message, kindHint: "list" }, { toggle: [message.code] });
 }
 async function captureFromToolbar(tab) {
   let snapshot;

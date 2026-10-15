@@ -329,11 +329,11 @@ test("background preview resolution respects media settings and failures still s
   const failed = quickCaptureHarness({ videos: true, previewError: true }); await failed.run();
   assert.equal(failed.posts.length, 1); assert.equal(failed.windows.length, 0); assert.match(failed.titles.at(-1), /文字资料仍已保存/);
 });
-test("card buttons accumulate different films and never write to the receiver", async () => {
+test("card buttons accumulate different films; clicking a checked card again unchecks it", async () => {
   const h = quickCaptureHarness({ html: busHtml, settings: { "markIds:2": [21001, 21002] } });
   const results = await Promise.all([h.card("ABP-001"), h.card("FC2-PPV-1234567"), h.card("ABP-001")]);
   assert.ok(results.every(result => result.ok)); assert.equal(h.windows.length, 0); assert.equal(h.posts.length, 0);
-  assert.deepEqual(Array.from(h.session["selection:7"].codes), ["ABP-001", "FC2-PPV-1234567"]);
+  assert.deepEqual(Array.from(h.session["selection:7"].codes), ["FC2-PPV-1234567"]);
 });
 
 test("absent cards and switched pages are rejected without opening a window", async () => {
@@ -366,8 +366,12 @@ test("card picks before opening and during window selection merge with checkbox 
   const h = await popupHarness(store);
   assert.equal(h.get("items").querySelectorAll("input:checked").length, 1);
   const first = h.get("items").querySelector("input"); first.checked = true; first.dispatchEvent(new h.dom.window.Event("change"));
-  await h.select("FC2-PPV-1234567"); await h.flush();
+  await h.flush();
   assert.equal(h.get("items").querySelectorAll("input:checked").length, 2); assert.equal(h.captures.length, 0);
+  await h.select("ABP-001"); await h.flush();
+  assert.equal(h.get("items").querySelectorAll("input:checked").length, 1); assert.equal(first.checked, false);
+  await h.select("ABP-001"); await h.flush();
+  assert.equal(h.get("items").querySelectorAll("input:checked").length, 2);
   h.get("none").click(); await h.flush(); assert.equal(service.session["selection:7"].codes.length, 0);
   await h.flush(); h.dom.window.close();
 });
