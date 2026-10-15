@@ -1705,3 +1705,11 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 - 本版覆盖默认不全选、可移动缩放且非全局置顶的小窗口、列表零散影片累计勾选后统一保存、同页瀑布流保留而翻页/刷新/关闭清空、筛选器标记下拉多选并按 ID 原子写入回读确认、JAVBUS封面大图隐藏首批 40 部及后续卡片适配；详情页点击直接保存、原批量/导出和图片/演员图/预览视频保留。完整包保留 Bus/DB/FC2/Library 爬虫，LibraryCrawler 版本仍为 1.4.1。
 - 发布验证：应用、BusCrawler、DBCrawler、LibraryCrawler 和 DispatcherStress Release 构建完成，210 项调度任务各启动一次；60 项插件、66 项隔离桌面、23 项真实 Chrome→WPF、18 项启动/来源/备份/菜单及 25 项影片库检查通过。完整包打包前另外通过 26 项 LibraryCrawler 检查，核对 73 项升级清单、完整 ZIP 必需资源与双架构 SQLite、ZIP 内 EXE 和独立 EXE 一致。测试使用 A 盘隔离目录，不修改用户正式安装或影片库。
 - 本地生成 Jvedio-5.4.1.73.zip、Jvedio-5.4.1.73.exe、Jvedio-Connector-0.2.5.zip。沿用已有 master 发布工作流生成并公开桌面包及升级源，上传经验证的 Connector ZIP 并更新详细发布说明；完成后另记录远端提交、运行及资产校验结果。工作流文件不变，避免扩大 GitHub 凭据权限；不将测试样本、用户脚本、测试配置、连接密钥或依赖缓存提交或打包。
+
+### 5.4.1.73 / Connector 0.2.5 发布核验完成
+
+- 功能及发布文档提交 2c266993ad783e060d818623fd8a3c87e3c01d60 已推送 origin/master；标签 5.4.1.73 指向同一提交。GitHub Actions 运行 38739295333（https://github.com/4965898/Jvedio/actions/runs/38739295333）构建、调度检查、完整包验证、发布和升级源更新全部成功。
+- 正式发布页：https://github.com/4965898/Jvedio/releases/tag/5.4.1.73 ，标题“自改5.4.1.73（Jvedio29.81）”；最新 Release 确认为 5.4.1.73，详细说明已使用 docs/releases/5.4.1.73.md 更新。Jvedio-5.4.1.73.exe、Jvedio-5.4.1.73.zip、Jvedio-Connector-0.2.5.zip 三项资产均为 uploaded。
+- 已下载公开的 CI EXE、完整 ZIP 与 Connector ZIP：桌面程序集及文件版本均为 5.4.1.73，ZIP 内 EXE 与独立 EXE SHA256 一致；核对运行依赖、双架构 SQLite、资源和四类爬虫，未含用户数据或测试文件。Connector manifest 版本 0.2.5，与本地已验证 ZIP 完全一致，包含卡片/观察脚本，不含测试依赖或连接配置。完整 ZIP 下载较慢，已等待完成并通过官方资产接口复核，没有用空文件作为验证结果。
+- 公开资产 SHA256：EXE b4773c2bb78bc436fb94c3c78697c7d89acb20c8d40bcbb92ad8e0d541efe277；完整 ZIP ed15d8d7ad62bc28112130137d591939c2af81c410b3ad1c739665220da75b89；Connector a7de2f27a395085b23298fb0992351878a440f706a192c36ea06a1aaefcacded。GitHub 资产 digest 与下载文件一致。
+- update-feed 分支提交 9f3dcc1f5f43cacba2ef43d4da0beddae1bf32e6：jvedioupdate/latest.json 的 LatestVersion=5.4.1.73，日期 2026-10-15；73 项文件清单完整，清单中 EXE 的 MD5 与公开 EXE 一致。已停止本次隔离测试接收端；未替换用户正式程序、配置或影片库。最终记录以 [skip ci] 文档提交推送，避免对同一版本重复发布。
