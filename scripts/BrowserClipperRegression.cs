@@ -152,6 +152,79 @@ internal static class BrowserClipperRegression
             Check("explicit aliases reuse an existing actor instead of adding a duplicate", Convert.ToInt64(Scalar("select count(*) from actor_info")) == 1);
             Check("a repeated detail save leaves metadata unchanged", BrowserClipperService.Import(Read(fixtures, "JavBus-detail")).Skipped == 1);
 
+            Sql("insert into metadata_label_catalog(DBId,LabelName) values(1,'收藏'),(1,'待看'),(2,'另库专用'),(2,'浏览器测试')");
+            var tagged = new BrowserClipRequest { LibraryId = 1, Site = "JavBus", Kind = "list", PageUrl = "https://www.javbus.com/",
+                Labels = new List<string> { "收藏", "待看", "收藏" }, Items = new List<BrowserClipItem> {
+                    new BrowserClipItem { Code = "TAG-001", Title = "标签测试" }, new BrowserClipItem { Code = "TAG-002" } } };
+            bool labelsNotified = false;
+            Action<long> onLabelsChanged = id => { labelsNotified = id == 1 && Convert.ToInt64(Scalar("select count(*) from metadata_to_label l join metadata_video v on v.DataID=l.DataID where v.VID='TAG-001'")) == 2; };
+            Jvedio.Core.Library.LibraryLabelService.Changed += onLabelsChanged;
+            Check("each new movie receives multiple distinct labels in the import transaction", BrowserClipperService.Import(tagged).Added == 2 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_label l join metadata_video v on v.DataID=l.DataID where v.VID in('TAG-001','TAG-002')")) == 4);
+            Jvedio.Core.Library.LibraryLabelService.Changed -= onLabelsChanged;
+            Check("label pages are notified after their associations have committed", labelsNotified);
+            var confirmedLabels = BrowserClipperService.Import(tagged);
+            Check("the receiver confirms all labels for every existing item", confirmedLabels.LabelsApplied == 2 && confirmedLabels.LabeledItems == 2);
+            Check("reimporting the same labels creates no duplicate associations", BrowserClipperService.Import(tagged).Skipped == 2 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_label l join metadata_video v on v.DataID=l.DataID where v.VID='TAG-001'")) == 2);
+            tagged.Items = new List<BrowserClipItem> { new BrowserClipItem { Code = "GVG-107" } };
+            Check("existing movies without metadata can receive labels", BrowserClipperService.Import(tagged).Updated == 1 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_label where DataID=" + detailId)) == 2);
+            tagged.Labels = new List<string> { "收藏" };
+            Check("saving a subset of labels retains all old labels", BrowserClipperService.Import(tagged).Skipped == 1 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_label where DataID=" + detailId)) == 2);
+            tagged.Items = new List<BrowserClipItem> { new BrowserClipItem { Code = "TAG-003" } };
+            tagged.Labels = new List<string> { "另库专用" }; Rejected("labels from another library reject the entire import", tagged);
+            tagged.Labels = new List<string> { "已删除" }; Rejected("deleted labels reject the entire import", tagged);
+            tagged.Labels = new List<string> { "无\n效" }; Rejected("control characters in labels reject the entire import", tagged);
+            tagged.Labels = Enumerable.Repeat("收藏", 101).ToList(); Rejected("overlarge label selections reject the entire import", tagged);
+            tagged.Items = new List<BrowserClipItem> { new BrowserClipItem { Code = "TAG-999" } }; tagged.Labels = new List<string> { "收藏" };
+            Sql("create trigger reject_clip_label before insert on metadata_to_label when exists(select 1 from metadata_video where DataID=NEW.DataID and VID='TAG-999') begin select raise(ignore); end");
+            Rejected("a silently ignored label association rolls back the movie instead of reporting success", tagged);
+            Sql("drop trigger reject_clip_label");
+
+            Sql("insert into common_tagstamp(TagID,TagName,SortOrder,Foreground,Background) values" +
+                "(21001,'AV',1,'255,255,255,255','154,88,183,255'),(21002,'套路直播',0,'255,255,255,255','0,140,90,255')," +
+                "(21003,'其他',-1,'255,255,255,255','80,90,110,255'),(21004,'AV',2,'255,255,255,255','90,120,130,255')," +
+                "(21005,'未使用标记',-1,'255,255,255,255','80,90,110,255')");
+            var marked = new BrowserClipRequest { LibraryId = 1, Site = "JavBus", Kind = "list", PageUrl = "https://www.javbus.com/",
+                MarkIds = new List<long> { 21001, 21002, 21001 }, Items = new List<BrowserClipItem> {
+                    new BrowserClipItem { Code = "MARK-001", Title = "标记测试" }, new BrowserClipItem { Code = "MARK-002" } } };
+            var markResult = BrowserClipperService.Import(marked);
+            Check("filter markers use metadata_to_tagstamp and are confirmed for each new movie", markResult.Added == 2 && markResult.MarksApplied == 2 && markResult.MarkedItems == 2 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_tagstamp t join metadata_video v on v.DataID=t.DataID where v.VID in('MARK-001','MARK-002') and t.TagID in(21001,21002)")) == 4);
+            Check("marker imports do not create text labels and retain the default new-item marker",
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_label l join metadata_video v on v.DataID=l.DataID where v.VID like 'MARK-%'")) == 0 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_tagstamp t join metadata_video v on v.DataID=t.DataID where v.VID in('MARK-001','MARK-002') and t.TagID=10000")) == 2);
+            Check("repeated marker imports neither duplicate links nor change counts", BrowserClipperService.Import(marked).Skipped == 2 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_tagstamp t join metadata_video v on v.DataID=t.DataID where v.VID in('MARK-001','MARK-002') and t.TagID in(21001,21002)")) == 4);
+            marked.Items = new List<BrowserClipItem> { new BrowserClipItem { Code = "GVG-107" } }; marked.MarkIds = new List<long> { 21003 };
+            Check("existing movies can receive filter markers while retaining old text labels", BrowserClipperService.Import(marked).Updated == 1 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_tagstamp where DataID=" + detailId + " and TagID=21003")) == 1 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_label where DataID=" + detailId)) == 2);
+            marked.LibraryId = 2; marked.Items[0].Code = "MARK-001"; marked.MarkIds = new List<long> { 21001, 21003 };
+            Check("global marker choices are usable in another library without changing the first library movie", BrowserClipperService.Import(marked).Added == 1 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_tagstamp t join metadata m on m.DataID=t.DataID join metadata_video v on v.DataID=m.DataID where m.DBId=1 and v.VID='MARK-001' and t.TagID=21003")) == 0);
+            marked.LibraryId = 1; marked.Items[0].Code = "MARK-002"; marked.MarkIds = new List<long> { 21001 };
+            Sql("update common_tagstamp set TagName='AV改名' where TagID=21001");
+            Check("renaming a marker keeps its ID association valid", BrowserClipperService.Import(marked).Skipped == 1);
+            Sql("update common_tagstamp set TagName='AV' where TagID=21001");
+            marked.Items[0].Code = "MARK-003"; marked.MarkIds = new List<long> { 21004 };
+            BrowserClipperService.Import(marked);
+            Check("identically named markers are assigned by ID rather than name", Convert.ToInt64(Scalar("select count(*) from metadata_to_tagstamp t join metadata_video v on v.DataID=t.DataID where v.VID='MARK-003' and t.TagID=21004")) == 1 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_tagstamp t join metadata_video v on v.DataID=t.DataID where v.VID='MARK-003' and t.TagID=21001")) == 0);
+            Sql("delete from metadata_to_tagstamp where TagID=21004; delete from common_tagstamp where TagID=21004");
+            marked.Items[0].Code = "MARK-999"; marked.MarkIds = new List<long> { 999999 }; Rejected("deleted markers reject the entire import", marked);
+            marked.MarkIds = new List<long> { 0 }; Rejected("invalid marker IDs reject the entire import", marked);
+            marked.MarkIds = Enumerable.Repeat(21001L, 101).ToList(); Rejected("overlarge marker selections reject the entire import", marked);
+            marked.MarkIds = new List<long> { 21001 };
+            Sql("create trigger reject_clip_mark before insert on metadata_to_tagstamp when NEW.TagID=21001 and exists(select 1 from metadata_video where DataID=NEW.DataID and VID='MARK-999') begin select raise(ignore); end");
+            Rejected("silently ignored marker inserts roll back the whole batch", marked); Sql("drop trigger reject_clip_mark");
+            Jvedio.Entity.CommonSQL.TagStamp.Init();
+            var filterMarks = Jvedio.Entity.CommonSQL.TagStamp.InitTagStamp();
+            Check("the real filter reads the imported AV marker and its library-scoped count", filterMarks.Any(mark => mark.TagID == 21001 && mark.TagName == "AV" &&
+                mark.Count == Convert.ToInt64(Scalar("select count(*) from metadata_to_tagstamp t join metadata m on m.DataID=t.DataID where m.DBId=1 and t.TagID=21001"))));
+
             var pictureVideo = MapperManager.videoMapper.SelectVideoByID(detailId);
             long oldPictureMode = ConfigManager.Settings.PicPathMode;
             ConfigManager.Settings.PicPathMode = 2;
@@ -216,9 +289,24 @@ internal static class BrowserClipperRegression
                 Check("ordinary website origins are rejected even with a correct key", Send(service, "GET", "/v1/status", token: service.Token, origin: "https://example.com").Item1 == 403);
                 var status = Send(service, "GET", "/v1/status", token: service.Token);
                 Check("authenticated status lists only video libraries", status.Item1 == 200 && status.Item2["libraries"].Count() == 2);
+                Check("status returns the filter marker catalog in filter order including unused markers", (bool)status.Item2["markImport"] && (int)status.Item2["markImportVersion"] == 1 &&
+                    status.Item2["marks"].Select(mark => (long)mark["id"]).SequenceEqual(MapperManager.tagStampMapper.GetAllTagStamp().Select(mark => mark.TagID)) &&
+                    status.Item2["marks"].Any(mark => (string)mark["name"] == "AV") && status.Item2["marks"].Any(mark => (string)mark["name"] == "套路直播") &&
+                    status.Item2["marks"].Any(mark => (long)mark["id"] == 21005));
+                Check("HTTP status includes library-scoped labels, including unused labels", (bool)status.Item2["labelImport"] && (int)status.Item2["labelImportVersion"] == 2 &&
+                    status.Item2["libraries"][0]["labels"].Values<string>().Contains("收藏") &&
+                    !status.Item2["libraries"][0]["labels"].Values<string>().Contains("另库专用") &&
+                    status.Item2["libraries"][1]["labels"].Values<string>().Contains("另库专用"));
                 var httpList = Read(fixtures, "JavBus-list", 2); httpList.BrowserImages = true;
                 var clipped = Send(service, "POST", "/v1/clips", httpList, service.Token);
                 Check("real HTTP save is idempotent and reports its result", clipped.Item1 == 200 && (int)clipped.Item2["added"] == 0 && (int)clipped.Item2["skipped"] == 30);
+                var httpTagged = Read(fixtures, "JavBus-list", 1); httpTagged.BrowserImages = true; httpTagged.Labels = new List<string> { "收藏", "待看" };
+                var taggedReply = Send(service, "POST", "/v1/clips", httpTagged, service.Token);
+                Check("HTTP save acknowledges two labels on all thirty movies", taggedReply.Item1 == 200 && (int)taggedReply.Item2["labelsApplied"] == 2 && (int)taggedReply.Item2["labeledItems"] == 30);
+                var httpMarked = new BrowserClipRequest { LibraryId = 1, Site = "JavBus", Kind = "list", BrowserImages = true, PageUrl = "https://www.javbus.com/",
+                    MarkIds = new List<long> { 21001, 21002 }, Items = new List<BrowserClipItem> { new BrowserClipItem { Code = "HTTPMARK-001" }, new BrowserClipItem { Code = "HTTPMARK-002" } } };
+                var markReply = Send(service, "POST", "/v1/clips", httpMarked, service.Token);
+                Check("HTTP imports confirm the real filter marker associations", markReply.Item1 == 200 && (int)markReply.Item2["marksApplied"] == 2 && (int)markReply.Item2["markedItems"] == 2);
                 Check("unknown HTTP endpoints are rejected", Send(service, "GET", "/unexpected", token: service.Token).Item1 == 404);
                 int activePort = service.Port; service.Dispose();
                 bool stopped = false;
@@ -259,7 +347,8 @@ internal static class BrowserClipperRegression
                     return Path.Combine(MapperManager.videoMapper.SelectVideoByID(id).GetExtraImage(), "preview-video-1.mp4");
                 }).ToList();
                 var coverImagePaths = new[] { MapperManager.videoMapper.SelectVideoByID(detailId).GetBigImage(".jpg", false), MapperManager.videoMapper.SelectVideoByID(detailId).GetSmallImage(".jpg", false) };
-                File.WriteAllText(credentialPath, JsonConvert.SerializeObject(new { port = BrowserClipperService.Instance.Port, token = BrowserClipperService.Instance.Token, previewVideoPaths, coverImagePaths }));
+                File.WriteAllText(credentialPath, JsonConvert.SerializeObject(new { port = BrowserClipperService.Instance.Port, token = BrowserClipperService.Instance.Token,
+                    databasePath = Path.GetFullPath(SqlManager.DEFAULT_SQLITE_PATH), previewVideoPaths, coverImagePaths }));
                 var mediaTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
                 mediaTimer.Tick += (s, e) => {
                     string flag = Path.Combine(fixtures, "test-enable-images.flag");

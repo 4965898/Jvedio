@@ -30,6 +30,7 @@ namespace Jvedio.Core.Library
     public static class LibraryLabelService
     {
         public static event Action<long> Changed;
+        internal static void NotifyChanged(long dbId) => Changed?.Invoke(dbId);
         public const int PageSize = 100;
 
         public static string ValidateName(string name)

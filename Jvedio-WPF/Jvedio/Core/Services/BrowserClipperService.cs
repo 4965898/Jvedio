@@ -56,6 +56,10 @@ namespace Jvedio.Core.Clipper
         public int Added { get; set; }
         public int Updated { get; set; }
         public int Skipped { get; set; }
+        public int LabelsApplied { get; set; }
+        public int LabeledItems { get; set; }
+        public int MarksApplied { get; set; }
+        public int MarkedItems { get; set; }
         public List<long> ImageDataIds { get; } = new List<long>();
         public List<object> SavedItems { get; } = new List<object>();
     }
@@ -67,6 +71,8 @@ namespace Jvedio.Core.Clipper
         public bool BrowserImages { get; set; }
         public string PageUrl { get; set; }
         public List<BrowserClipItem> Items { get; set; }
+        public List<string> Labels { get; set; }
+        public List<long> MarkIds { get; set; }
     }
 
     /// <summary>Explicitly enabled, authenticated loopback receiver; no administrator URL reservation needed.</summary>
@@ -172,9 +178,18 @@ namespace Jvedio.Core.Clipper
                         using (var connection = Open(true))
                         using (var command = MakeCommand(connection, null, "select DBId,Name from app_databases where DataType=0 order by DBId"))
                         using (var reader = command.ExecuteReader())
-                            while (reader.Read()) libraries.Add(new { id = reader.GetInt64(0), name = reader.GetString(1) });
+                            while (reader.Read()) libraries.Add(new { id = reader.GetInt64(0), name = reader.GetString(1),
+                                labels = LibraryLabelService.List(reader.GetInt64(0)).Select(label => label.Name).ToArray() });
                         var config = ConfigManager.BrowserClipperConfig;
-                        Reply(stream, 200, new { app = "Jvedio", protocol = 1, currentLibraryId = ConfigManager.Main.CurrentDBId, libraries,
+                        var marks = new List<object>();
+                        using (var connection = Open(true))
+                        using (var command = MakeCommand(connection, null,
+                            "select TagID,TagName from common_tagstamp where trim(ifnull(TagName,''))<>'' " +
+                            "order by case when ifnull(SortOrder,-1)<0 then 2147483647 else SortOrder end,TagID"))
+                        using (var reader = command.ExecuteReader())
+                            while (reader.Read()) marks.Add(new { id = reader.GetInt64(0), name = reader.GetString(1) });
+                        Reply(stream, 200, new { app = "Jvedio", protocol = 1, labelImport = true, labelImportVersion = 2,
+                            markImport = true, markImportVersion = 1, marks, currentLibraryId = ConfigManager.Main.CurrentDBId, libraries,
                             media = new { saveImages = config.SaveImages, saveCoverImages = config.SaveImages && config.SaveCoverImages,
                                 saveActorImages = config.SaveImages && config.SaveActorImages,
                                 savePreviewImages = config.SaveImages && config.SavePreviewImages, savePreviewVideos = config.SavePreviewVideos } }, origin);
@@ -225,7 +240,9 @@ namespace Jvedio.Core.Clipper
                                 }));
                             } catch (Exception ex) { App.Logger.Error(ex); }
                         }
-                        Reply(stream, 200, new { app = "Jvedio", protocol = 1, added = result.Added, updated = result.Updated, skipped = result.Skipped, imagesQueued, mediaQueued = imagesQueued, mediaAlreadyQueued, savedItems = result.SavedItems }, origin);
+                        Reply(stream, 200, new { app = "Jvedio", protocol = 1, added = result.Added, updated = result.Updated, skipped = result.Skipped,
+                            labelsApplied = result.LabelsApplied, labeledItems = result.LabeledItems,
+                            marksApplied = result.MarksApplied, markedItems = result.MarkedItems, imagesQueued, mediaQueued = imagesQueued, mediaAlreadyQueued, savedItems = result.SavedItems }, origin);
                         try { Saved?.Invoke(request.LibraryId, result.Added, result.Updated, result.Skipped); }
                         catch (Exception ex) { App.Logger.Error(ex); }
                     } else if (requestLine[0] == "POST" && requestLine[1] == "/v1/images") {
@@ -393,7 +410,7 @@ namespace Jvedio.Core.Clipper
             return changed;
         }
 
-        /// <summary>Atomic batches skip existing list entries; detail captures fill missing metadata and retain the source snapshot.</summary>
+        /// <summary>Atomic batches append chosen labels, fill missing metadata and retain the source snapshot.</summary>
         public static BrowserClipResult Import(BrowserClipRequest request)
         {
             EnsureSQLite();
@@ -402,6 +419,11 @@ namespace Jvedio.Core.Clipper
             string webType = request.Site == "JavBus" ? "bus" : request.Site == "JavDB" ? "db" : request.Site == "JAVLibrary" ? "library" : "";
             if (webType.Length == 0) throw new ArgumentException("此版支持 JavBus、JavDB、JAVLibrary。");
             string pageUrl = HttpUrl(request.PageUrl);
+            if ((request.Labels?.Count ?? 0) > 100) throw new ArgumentException("一次最多选择 100 个标签。");
+            var labels = (request.Labels ?? new List<string>()).Select(LibraryLabelService.ValidateName).Distinct(StringComparer.Ordinal).ToList();
+            if ((request.MarkIds?.Count ?? 0) > 100) throw new ArgumentException("一次最多选择 100 个标记。");
+            var markIds = (request.MarkIds ?? new List<long>()).Distinct().ToList();
+            if (markIds.Any(id => id <= 0)) throw new ArgumentException("无效的标记，请重新选择。");
             var items = request.Items.Select(item => {
                 if (item == null || (item.Title?.Length ?? 0) > 1000) throw new ArgumentException("无效的影片条目。");
                 if (item.Metadata != null) ValidateMetadata(item.Metadata);
@@ -412,18 +434,28 @@ namespace Jvedio.Core.Clipper
             using (var transaction = connection.BeginTransaction()) {
                 using (var command = MakeCommand(connection, transaction, "select count(*) from app_databases where DBId=@db and DataType=0", "@db", request.LibraryId))
                     if (Convert.ToInt64(command.ExecuteScalar()) != 1) throw new ArgumentException("目标影片库不存在，请重新连接并选择影片库。");
+                foreach (string label in labels) {
+                    using (var command = MakeCommand(connection, transaction,
+                        "select exists(select 1 from metadata_label_catalog where DBId=@db and LabelName=@name) " +
+                        "or exists(select 1 from metadata_to_label l join metadata m on m.DataID=l.DataID where m.DBId=@db and l.LabelName=@name)",
+                        "@db", request.LibraryId, "@name", label))
+                        if (Convert.ToInt64(command.ExecuteScalar()) == 0) throw new ArgumentException("所选标签已删除或不属于目标影片库，请重新连接后选择。");
+                }
                 var existing = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+                foreach (long markId in markIds) {
+                    using (var command = MakeCommand(connection, transaction, "select count(*) from common_tagstamp where TagID=@mark", "@mark", markId))
+                        if (Convert.ToInt64(command.ExecuteScalar()) != 1) throw new ArgumentException("所选标记已删除，请重新连接后选择。");
+                }
                 using (var command = MakeCommand(connection, transaction,
                     "select v.VID,m.DataID from metadata_video v join metadata m on m.DataID=v.DataID where m.DBId=@db and m.DataType=0 order by m.DataID", "@db", request.LibraryId))
                 using (var reader = command.ExecuteReader())
                     while (reader.Read()) existing[Key(Convert.ToString(reader[0]).Trim().ToUpperInvariant())] = reader.GetInt64(1);
                 Execute(connection, transaction, "create table if not exists browser_clip_sources(DataID integer not null, SourceUrl text not null, Site text not null, SnapshotJson text not null, CapturedAt text not null, primary key(DataID,SourceUrl))");
                 Execute(connection, transaction, "create trigger if not exists browser_clip_sources_cleanup after delete on metadata begin delete from browser_clip_sources where DataID=OLD.DataID; end");
-                var result = new BrowserClipResult();
+                var result = new BrowserClipResult { LabelsApplied = labels.Count, MarksApplied = markIds.Count };
                 string now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
                 foreach (var item in items) {
                     bool isExisting = existing.TryGetValue(Key(item.Code), out long id);
-                    if (isExisting && item.Metadata == null) { result.Skipped++; continue; }
                     if (!isExisting) {
                         Execute(connection, transaction,
                             "insert into metadata(DBId,DataType,Title,Path,PathExist,Size,CreateDate,UpdateDate,FirstScanDate,LastScanDate) " +
@@ -435,14 +467,42 @@ namespace Jvedio.Core.Clipper
                         Execute(connection, transaction, "insert or ignore into metadata_to_tagstamp(DataID,TagID) values(@id,10000)", "@id", id);
                         existing[Key(item.Code)] = id; result.Added++;
                     }
+                    bool updated = false;
+                    foreach (long markId in markIds)
+                        updated |= Execute(connection, transaction, "insert or ignore into metadata_to_tagstamp(DataID,TagID) values(@id,@mark)", "@id", id, "@mark", markId) > 0;
+                    if (markIds.Count > 0) {
+                        var parameters = new List<object> { "@id", id };
+                        var placeholders = markIds.Select((markId, index) => {
+                            string parameter = "@mark" + index; parameters.Add(parameter); parameters.Add(markId); return parameter;
+                        }).ToArray();
+                        using (var command = MakeCommand(connection, transaction,
+                            "select count(*) from metadata_to_tagstamp where DataID=@id and TagID in(" + string.Join(",", placeholders) + ")", parameters.ToArray()))
+                            if (Convert.ToInt32(command.ExecuteScalar()) != markIds.Count) throw new ArgumentException("标记保存未完成，本批次已取消，请检查影片库后重试。");
+                        result.MarkedItems++;
+                    }
+                    foreach (string label in labels) {
+                        Execute(connection, transaction, "insert or ignore into metadata_label_catalog(DBId,LabelName) values(@db,@name)", "@db", request.LibraryId, "@name", label);
+                        updated |= Execute(connection, transaction, "insert or ignore into metadata_to_label(DataID,LabelName) values(@id,@name)", "@id", id, "@name", label) > 0;
+                    }
+                    if (labels.Count > 0) {
+                        var parameters = new List<object> { "@id", id };
+                        var names = labels.Select((name, index) => {
+                            string parameter = "@label" + index;
+                            parameters.Add(parameter); parameters.Add(name); return parameter;
+                        }).ToArray();
+                        using (var command = MakeCommand(connection, transaction,
+                            "select count(*) from metadata_to_label where DataID=@id and LabelName in(" + string.Join(",", names) + ")", parameters.ToArray()))
+                            if (Convert.ToInt32(command.ExecuteScalar()) != labels.Count) throw new ArgumentException("标签保存未完成，本批次已取消，请检查影片库后重试。");
+                        result.LabeledItems++;
+                    }
                     if (item.Metadata != null) {
-                        bool updated = FillMetadata(connection, transaction, id, item, webType);
-                        if (isExisting) { if (updated) result.Updated++; else result.Skipped++; }
+                        updated |= FillMetadata(connection, transaction, id, item, webType);
                         var media = ConfigManager.BrowserClipperConfig;
                         if (media.SaveImages && media.SaveCoverImages && !string.IsNullOrEmpty(item.Metadata.CoverUrl) ||
                             media.SaveImages && media.SavePreviewImages && item.Metadata.PreviewUrls.Count > 0 ||
                             media.SavePreviewVideos && item.Metadata.PreviewVideoUrls.Count > 0) result.ImageDataIds.Add(id);
                     }
+                    if (isExisting) { if (updated) result.Updated++; else result.Skipped++; }
                     var savedActors = new List<object>();
                     var knownActors = new List<BrowserClipActor>();
                     using (var command = MakeCommand(connection, transaction, "select SnapshotJson from browser_clip_sources where DataID=@id", "@id", id))
@@ -469,6 +529,10 @@ namespace Jvedio.Core.Clipper
                         "@id", id, "@url", item.Url.Length > 0 ? item.Url : pageUrl, "@site", request.Site, "@json", JsonConvert.SerializeObject(item), "@now", now);
                 }
                 transaction.Commit();
+                if (labels.Count > 0 && result.Added + result.Updated > 0) {
+                    try { LibraryLabelService.NotifyChanged(request.LibraryId); }
+                    catch (Exception ex) { App.Logger.Error(ex); }
+                }
                 return result;
             }
         }

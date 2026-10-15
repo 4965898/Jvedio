@@ -8,7 +8,7 @@ New-Item -ItemType Directory -Path $taskOutput -Force | Out-Null
 $taskStage = Join-Path $taskOutput ('connector-stage-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $taskStage -Force | Out-Null
 try {
-    foreach ($taskName in @('manifest.json', 'extractor.js', 'background.js', 'popup.html', 'popup.js', 'popup.css', 'README.md', 'icons')) {
+    foreach ($taskName in @('manifest.json', 'extractor.js', 'card-buttons.js', 'watch.js', 'background.js', 'popup.html', 'popup.js', 'popup.css', 'README.md', 'icons')) {
         Copy-Item -LiteralPath (Join-Path $taskExtension $taskName) -Destination $taskStage -Recurse
     }
     Copy-Item -LiteralPath (Join-Path $taskRoot 'LICENSE') -Destination $taskStage
@@ -18,7 +18,7 @@ try {
     $taskArchive = [IO.Compression.ZipFile]::OpenRead($taskZip)
     try {
         $taskNames = @($taskArchive.Entries | ForEach-Object { $_.FullName.Replace('\','/') })
-        foreach ($taskName in @('manifest.json', 'background.js', 'extractor.js', 'popup.html', 'popup.js', 'popup.css', 'icons/128.png')) {
+        foreach ($taskName in @('manifest.json', 'background.js', 'extractor.js', 'card-buttons.js', 'watch.js', 'popup.html', 'popup.js', 'popup.css', 'icons/128.png')) {
             if ($taskName -notin $taskNames) { throw "Connector ZIP is missing $taskName" }
         }
         if ($taskNames | Where-Object { $_ -match 'node_modules|tests/|JAVBUS.txt|JAVDB.txt|GVG-107|test-connection' }) { throw 'Unexpected test or private data in connector package' }
@@ -27,6 +27,7 @@ try {
         $taskExe = Join-Path $taskRoot 'Jvedio-WPF\Jvedio\bin\Release\Jvedio.exe'
         if (-not (Test-Path -LiteralPath $taskExe)) { throw 'Build the desktop application in Release mode first' }
         Copy-Item -LiteralPath $taskExe -Destination (Join-Path $taskOutput 'Jvedio-Connector-preview.exe') -Force
+        Copy-Item -LiteralPath $taskExe -Destination (Join-Path $taskOutput "Jvedio-Connector-$($taskManifest.version)-preview.exe") -Force
     }
     Copy-Item -LiteralPath (Join-Path $taskExtension 'README.md') -Destination (Join-Path $taskOutput 'Jvedio-Connector-使用说明.md') -Force
     Write-Output "Connector package: $taskZip"

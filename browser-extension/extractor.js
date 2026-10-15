@@ -1,4 +1,4 @@
-/* Runs in Chrome's isolated world, only after the user clicks the extension. */
+/* Runs in Chrome's isolated world; extraction never sends page data by itself. */
 (() => {
   "use strict";
   const text = node => (node?.textContent || "").replace(/\s+/g, " ").trim();
@@ -123,8 +123,9 @@
     }
 
     const bus = doc.querySelectorAll("a.movie-box");
-    const db = doc.querySelectorAll(".movie-list .item a.box");
-    const library = doc.querySelectorAll(".videothumblist .video, #videos .video");
+    // JAV老司机 reparents fetched cards into #waterfall (and sometimes #waterfall_h).
+    const db = doc.querySelectorAll(".movie-list a.box, #waterfall a.box, #waterfall_h a.box");
+    const library = doc.querySelectorAll(".videothumblist .video, #videos .video, .videos .video, #waterfall .video, #waterfall_h .video");
     if (kind === "detail") {
       // Only the primary movie belongs in a single-click detail capture.
     } else if (bus.length) {
@@ -158,7 +159,55 @@
         add(text(card.querySelector(".id")), text(card.querySelector(".title")), anchor?.getAttribute("href"), listMetadata(image?.getAttribute("data-src") || image?.getAttribute("src")));
       }
     }
-    return { site, kind, pageUrl, pageTitle: doc.title, items: Array.from(items.values()).slice(0, 500) };
+    // JAVBUS larger thumbnails hides the original first page and renders all
+    // subsequent pages as a separate #grid-b list (kygo233/tkjs).
+    if (kind === "list") for (const card of doc.querySelectorAll("#grid-b .item-b .box-b")) {
+      const code = normalizeCode(text(card.querySelector("date[name='avid']")));
+      const anchor = card.querySelector("a[name='av-title'][href]") || card.querySelector(".cover-b a[href]");
+      if (!code || !anchor) continue;
+      const href = safeUrl(anchor.getAttribute("href"));
+      if (!href) continue;
+      const target = new URL(href);
+      const cardSite = /^\/v\/[a-z0-9]+\/?$/i.test(target.pathname) ? "JavDB" :
+        /^jav[a-z0-9]+$/i.test(target.searchParams.get("v") || "") || /\/jav[a-z0-9]+\.html$/i.test(target.pathname) ? "JAVLibrary" :
+        normalizeCode(target.pathname.split("/").filter(Boolean).at(-1)) === code ? "JavBus" : "";
+      if (!cardSite || (site && site !== cardSite)) continue;
+      site = cardSite;
+      const image = card.querySelector(".cover-b img");
+      const info = listMetadata(image?.getAttribute("data-src") || image?.getAttribute("src"));
+      info.releaseDate = text(card.querySelector(".info-bottom-one")).match(/\d{4}-\d{2}-\d{2}/)?.[0] || "";
+      if (site === "JavDB") {
+        const score = text(card.querySelector(".score .value, .score"));
+        info.rating = number(score); info.ratingCount = Number(score.match(/(?:由|by)\s*(\d+)/i)?.[1] || 0);
+      }
+      // Prefer the rendered card, including lazy/full-size cover data, over a
+      // duplicate in the hidden original page.
+      items.delete(code);
+      add(code, anchor.getAttribute("title") || text(anchor.querySelector("span:last-child")), href, info);
+    }
+    return { site, kind, pageUrl, pageTitle: doc.title, items: Array.from(items.values()) };
   }
-  globalThis.JvedioExtractor = Object.freeze({ extract, normalizeCode });
+  function listCards(doc = document) {
+    const cards = [];
+    for (const element of doc.querySelectorAll("a.movie-box, .movie-list a.box, #waterfall a.box, #waterfall_h a.box, .videothumblist .video, #videos .video, .videos .video, #waterfall .video, #waterfall_h .video, #grid-b .item-b .box-b")) {
+      let code, position;
+      if (element.matches(".box-b")) {
+        code = text(element.querySelector("date[name='avid']"));
+        position = element.querySelector(".info-bottom-one");
+      } else if (element.matches("a.movie-box")) {
+        code = text(element.querySelector(".photo-info date"));
+        if (!code) { try { code = new URL(element.getAttribute("href"), doc.baseURI).pathname.split("/").pop(); } catch { } }
+        position = element.querySelector(".photo-info date:last-of-type")?.parentElement || element.querySelector(".photo-info");
+      } else if (element.matches("a.box")) {
+        code = text(element.querySelector(".video-title strong"));
+        position = element.querySelector(".meta, .video-title");
+      } else {
+        code = text(element.querySelector(".id")); position = element.querySelector(".id");
+      }
+      code = normalizeCode(code);
+      if (code && position) cards.push({ element, position, code });
+    }
+    return cards;
+  }
+  globalThis.JvedioExtractor = Object.freeze({ extract, normalizeCode, listCards });
 })();

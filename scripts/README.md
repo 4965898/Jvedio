@@ -2,6 +2,10 @@
 
 Browser clipping: `browser-extension/README.md` describes installing the unpacked Chrome extension and enabling the receiver under Scan and Import. Run `npm test` in `browser-extension` with a sample directory and fixture output directory, then `test-browser-clipper.ps1` against the Release build. Pass `-ScratchRoot` to choose a drive for isolated test runtimes. `pack-browser-clipper.ps1 -ConnectorOnly` creates the connector ZIP for release; omit the switch to also copy a desktop preview EXE. The existing GitHub Actions workflow publishes the application ZIP and EXE; upload the verified connector ZIP to the same release and check all three asset names. Changing the workflow to automate that third upload requires a GitHub credential with workflow permission.
 
+Connector 0.2.3 adds card-level saves alongside the existing list and detail paths. Browser tests use genuine content scripts on intercepted HTTPS fixtures for all three sites and read the isolated receiver SQLite database through `node:sqlite` (validated with Node 24). Set `JVEDIO_COVER_SCRIPT` to a local copy of kygo233/tkjs's userscript to run its pure card renderer without executing startup, GM APIs or network actions; this covers the hidden 40-item source and 240 rendered cards. Tagged saves require `labelImportVersion: 2` and per-batch label acknowledgements; deploy the freshly built desktop preview together with the connector. Packing also emits `Jvedio-Connector-<version>-preview.exe` to distinguish it from older previews.
+
+Connector 0.2.4 corrects that selector to the filter's markers: `common_tagstamp` supplies the global, sorted catalog, and `markIds` are appended to `metadata_to_tagstamp`. The new client requires `markImportVersion: 1` and `marksApplied`/`markedItems` acknowledgements; the old text-label protocol remains backward compatible but is not used by the new selector. The browser checks now read the actual marker table, verify AV/live-stream/other choices for all save paths, and assert that new marker imports do not create text-label associations. Update both preview EXE and extension, then choose markers afresh instead of migrating label names into IDs.
+
 Label and statistics checks: run test-startup-regressions.ps1 -Library. LibraryRegression.cs creates isolated libraries, validates counts and library-scoped label operations, checks paging and unsaved changes through the WPF UI, and renders previews under build-output/library-previews/. Use -PreviewDirectory to choose another output folder. The default invocation still runs the startup and menu regression checks.
 
 Video information checks: run `test-startup-regressions.ps1 -VideoInfo -PreviewDirectory build-output/video-info-previews`. This requires FFmpeg on PATH (or `-FFmpegPath`) and generates small videos in a temporary directory. It runs an x86 harness to match the bundled native MediaInfo library, checks empty-result invalidation, tab retries, movie navigation, UI-thread notifications, segmented paths and the actual detail controls. `-SampleVideoPath` additionally reads a supplied local video; all database writes stay in the isolated fixture. Preview images are copied to the selected output folder.
@@ -13,7 +17,7 @@ The workflow refuses to republish a version already tagged at a different commit
 To pack locally after building the application, BusCrawler, DBCrawler, and LibraryCrawler in Release mode:
 
 ```powershell
-./scripts/pack-release.ps1 -Version 5.4.1.71
+./scripts/pack-release.ps1 -Version 5.4.1.73
 ```
 
 The ZIP and EXE are written to `artifacts/`, which Git ignores. Packing uses `msbuild` on PATH to locate Roslyn and the CI reference-assembly directory when available; pass `-CompilerPath` and `-ReferenceDirectory` for other local installations.
@@ -23,3 +27,7 @@ Library crawler checks: build `Jvedio-WPF/Jvedio/Core/Crawler/Library2/LibraryCr
 Startup, crawler-source persistence, staged recovery and menu keyboard regressions can be checked with `./scripts/test-startup-regressions.ps1`. It compiles `StartupRegression.cs` against the Release build and runs in a temporary runtime and user directory. Pass `-CompilerPath` for the Visual Studio Roslyn compiler and `-ReferenceDirectory` for the .NET Framework 4.7.2 reference assemblies when the local defaults differ. `test-backup-snapshot.ps1` separately checks WAL snapshots, ZIP restore, retention and both remote transports.
 
 After the ZIP is published as the latest GitHub Release, CI runs `publish-update-feed.ps1` to update the original upgrade window's version data and file source in the `update-feed` branch. Use `-ValidateOnly` to generate and check the feed locally without pushing it.
+
+Connector 0.2.5 changes card buttons to additive selection only. Background selection updates are serialized per source tab and scoped by page URL and document lifetime. The tests cover card/window merging, duplicate clicks, no database write before explicit save, waterfall growth, and clearing on manual pagination, source/window refresh and window closure. Library and marker preferences remain persistent; detail toolbar capture remains immediate. Only the extension needs updating when using the 0.2.4 preview EXE.
+
+Release 5.4.1.73 (Jvedio29.81) ships Connector 0.2.5 as the third release asset. Use the existing master workflow for the complete desktop ZIP, matching EXE and update feed, then upload the verified connector ZIP and apply `docs/releases/5.4.1.73.md` as the release notes. Verify all three public assets and the update-feed version before recording completion.

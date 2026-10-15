@@ -1,7 +1,12 @@
 {
   "name": "jvedio-connector",
-  "version": "0.1.2",
+  "version": "0.2.5",
   "private": true,
-  "scripts": { "test": "node tests/run.cjs" },
-  "devDependencies": { "jsdom": "26.1.0" }
+  "scripts": {
+    "test": "node tests/run.cjs"
+  },
+  "devDependencies": {
+    "jquery": "^3.7.1",
+    "jsdom": "26.1.0"
+  }
 }

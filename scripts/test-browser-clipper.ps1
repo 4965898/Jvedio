@@ -31,6 +31,12 @@ if ($Serve) {
     Remove-Item -LiteralPath (Join-Path $taskFixtures 'test-connection.json') -ErrorAction SilentlyContinue
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\browser-extension\icons\128.png') -Destination (Join-Path $taskFixtures 'test-image.png') -Force
     $taskServer = Start-Process -FilePath $taskExecutable -ArgumentList @(('"' + (Join-Path $taskScratch 'user') + '"'), ('"' + $taskFixtures + '"'), 'serve') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $taskFixtures 'server.log') -RedirectStandardError (Join-Path $taskFixtures 'server-error.log')
+    $taskReadyDeadline = [DateTime]::UtcNow.AddSeconds(30)
+    while (-not (Test-Path -LiteralPath (Join-Path $taskFixtures 'test-connection.json'))) {
+        if ($taskServer.HasExited) { throw 'Isolated receiver exited before becoming ready; see server.log' }
+        if ([DateTime]::UtcNow -gt $taskReadyDeadline) { Stop-Process -Id $taskServer.Id; throw 'Isolated receiver did not become ready within 30 seconds' }
+        Start-Sleep -Milliseconds 200
+    }
     Write-Output "Isolated receiver PID: $($taskServer.Id)"
     exit 0
 }
