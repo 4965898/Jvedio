@@ -170,6 +170,8 @@
 
 **2026-10-16 正式发布：Jvedio 6.0.0.1（Jvedio30.2）。** bus/db 刮削失败现在会写明「哪个源、哪一环、怎么办」：单个源失败自动尝试下一个源，全部失败时逐源列出原因；需要登录时提示在服务器 Headers 粘贴登录后的浏览器请求头，被 Cloudflare 拦截时提示更新 Cookie/UA。Headers 弹窗恢复并强化了填写指引（按 JavDB/JavBus 给针对性建议，不再依赖第三方字典）。同时修复并发批量刮削偶发的「集合已修改」异常、bus 回传 Referer 覆盖用户 Headers 的问题，异常日志现在记录完整堆栈。插件无变化（Connector 0.2.6）。下载和安装见 [6.0.0.1 发布说明](docs/releases/6.0.0.1.md)。
 
+发布核验：[GitHub Actions 构建与发布通过](https://github.com/4965898/Jvedio/actions/runs/38780691181)，[发布页](https://github.com/4965898/Jvedio/releases/tag/6.0.0.1) 的 EXE、完整 ZIP 与 Connector ZIP 均已下载校验；完整包内外 EXE 一致，软件升级源已同步至 6.0.0.1。
+
 ## 插件
 
 包含以下插件

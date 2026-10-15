@@ -1754,3 +1754,12 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 - 按用户指示将 6.0.0.1（bus/db 刮削失败提示清晰化、Headers 指引、并发竞态修复与两轮回归处置）正式发布；Connector 无变化，沿用 0.2.6。根 README 三语版本表新增 6.0.0.1 行、发布公告段，新增 docs/releases/6.0.0.1.md（其中特别提醒：**本版包含 Bus/DB 爬虫插件行为变化，勿只换 EXE，须连同 plugins 目录更新**）。
 - 本地发布验证：主程序、BusCrawler、DBCrawler Release 重建通过，DispatcherStress 210 项调度检查通过，`pack-release.ps1 -Version 6.0.0.1` 通过 26 项 LibraryCrawler 检查并完整打包。
 - 发布流程（吸取 6.0.0.0 的 refspec 教训）：**只推 master、不预推标签**，由工作流走「标签不存在→自建标签→发布→升级源」的已验证路径；随后上传 Connector 0.2.6 ZIP、以 docs/releases/6.0.0.1.md 更新标题「自改6.0.0.1（Jvedio30.2）」与正文；核验三项资产与 update-feed 后以 [skip ci] 提交收尾记录。
+- **发布准备期间的回归拦截**：`pack-release.ps1` 的 26 项 LibraryCrawler 回归首次失败——回归工具断言 `Convert.ToInt32(result["Error"])==404`（校验"番号缺失→404"），而我在「全部源失败」时用汇总字符串覆盖了插件原始 Error，破坏了既有契约。修正为：保留原始 `Error`（上层与工具依赖），多源失败时把逐源汇总另存为 `ErrorAll`，`CheckDataInfo` 优先展示 `ErrorAll`、单源失败仍走「翻译 + 源前缀」路径。修正后 26 项回归与完整打包全部通过。教训：新增返回键位时不得改变既有键的类型契约。
+
+### 6.0.0.1 / Connector 0.2.6 发布核验完成
+
+- 功能及发布文档提交 `8c2b92710676d1c0686c41d21111092bce1fe87b` 已推送 origin/master（仅推 master、未预推标签）。[GitHub Actions 38780691181](https://github.com/4965898/Jvedio/actions/runs/38780691181) 单一 run 全流程成功：构建、210 项调度检查、完整 ZIP 校验、标签 6.0.0.1 由 CI 自建于同一提交、发布与升级源更新全部完成——6.0.0.0 教训后的新发版姿势（不预推标签）一次通过。
+- 正式发布页：https://github.com/4965898/Jvedio/releases/tag/6.0.0.1 ，标题「自改6.0.0.1（Jvedio30.2）」，已核实为 Latest。三项资产均为 uploaded：`Jvedio-6.0.0.1.zip`（11,465,915 字节）、`Jvedio-6.0.0.1.exe`（2,626,048 字节）、`Jvedio-Connector-0.2.6.zip`（58,272 字节，与 6.0.0.0 所载同一验证包）。详细说明已用 docs/releases/6.0.0.1.md 更新，其中特别提醒：本版含 Bus/DB 爬虫插件变更，**勿只替换 EXE**，须连同 `plugins\crawlers\bus`、`plugins\crawlers\db` 一并更新。
+- 三项资产均已实际下载核验：独立 EXE 程序集版本 6.0.0.1，ZIP 内 EXE 与独立 EXE SHA256 完全一致（`186b8ff26342a36e4fb822a6829991562a2814952bbd11476532e86fa6582d95`）；完整 ZIP SHA256 为 `31e7eb9466ec5dda8755fe0351825b734957517c6f31ce1ec3770b3e71ad5cf8`；Connector ZIP SHA256 仍为 `b58709a94768287ab67a66a57f3e8b66270a4b5e62f5e2d20e3dcd7a75002e2c`。
+- update-feed 分支提交 `cdf954f827942cf3eb33d888ea206855560ac063`：jvedioupdate/latest.json 的 LatestVersion=6.0.0.1，日期 2026-10-16；list.json 共 73 个文件，Jvedio.exe 的 MD5（`26f6ca45…`）与公开独立 EXE 实测一致。
+- 公开 EXE 已归档另放 `E:\Jvedio-5.3.1\Jvedio-6.0.0.1.exe`（未替换运行中的实例）；用户影片库与配置未动。最终记录以 [skip ci] 文档提交推送，避免重复发版。
