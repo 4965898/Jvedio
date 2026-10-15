@@ -400,4 +400,8 @@
     <sys:String x:Key="StatSection">Section</sys:String>
     <sys:String x:Key="StatMetric">Metric (size in bytes; duration in seconds)</sys:String>
     <sys:String x:Key="StatValue">Value</sys:String>
+    <sys:String x:Key="CopyHeaderHere">Paste the browser's request headers (F12 → Network → Doc → Request Headers) on the left, one "name: value" per line (e.g. user-agent, cookie); the right side shows the parsed JSON.</sys:String>
+    <sys:String x:Key="HeaderHintDb">JavDB usually requires login: sign in with your browser, then copy the request headers as described above and paste them on the left (must include cookie). A "login required" failure means the cookie has expired; copy it again.</sys:String>
+    <sys:String x:Key="HeaderHintBus">JavBus usually needs no headers; when scraping fails with a Cloudflare challenge or 403, pasting the browser's request headers (user-agent, cookie) usually helps.</sys:String>
+    <sys:String x:Key="HeaderHintOther">This source usually needs no headers; if scraping fails, try pasting the browser's request headers (user-agent, cookie).</sys:String>
 </ResourceDictionary>

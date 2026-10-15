@@ -125,16 +125,28 @@ namespace Jvedio.Core.Crawler
             }
         }
 
+        // 返回独立拷贝：CrawlerHeader.Default 是静态共享实例，直接外发会被
+        // 并发任务/爬虫插件修改其 Headers 字典（「集合已修改」异常的根源之一）
+        private static RequestHeader CopyDefaultHeader()
+        {
+            RequestHeader copy = new RequestHeader();
+            copy.WebProxy = ConfigManager.ProxyConfig.GetWebProxy();
+            copy.TimeOut = ConfigManager.ProxyConfig.HttpTimeout * 1000; // 转为 ms
+            if (CrawlerHeader.Default?.Headers != null)
+                copy.Headers = new Dictionary<string, string>(CrawlerHeader.Default.Headers);
+            return copy;
+        }
+
         public static RequestHeader ParseHeader(CrawlerServer server)
         {
             if (server == null)
-                return CrawlerHeader.Default;
+                return CopyDefaultHeader();
             RequestHeader result = new RequestHeader();
             result.WebProxy = ConfigManager.ProxyConfig.GetWebProxy();
             result.TimeOut = ConfigManager.ProxyConfig.HttpTimeout * 1000; // 转为 ms
             string header = server.Headers;
             if (string.IsNullOrEmpty(header))
-                return CrawlerHeader.Default;
+                return CopyDefaultHeader();
 
             Logger.Info($"parse header: {header}");
 

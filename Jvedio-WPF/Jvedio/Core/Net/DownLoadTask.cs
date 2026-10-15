@@ -86,12 +86,15 @@ namespace Jvedio.Core.Net
         static Dictionary<int, string> STATUS_DICT { get; set; } = new Dictionary<int, string>()
         {
             {200,"成功获取资源" },
-            {500,"远程服务器错误" },
+            {301,"被永久重定向（301）：该网址已失效，请在「选项 → 同步信息」更换服务器网址" },
+            {302,"被重定向（302）：站点认为请求过于频繁或需要登录，请降低并发、稍后重试，或在 Headers 中填入登录 Cookie" },
+            {401,"站点要求登录（401）：请在「选项 → 同步信息」对应服务器的 Headers 中粘贴登录后的浏览器请求头（含 cookie）" },
             {403,"远程服务器拒绝了您的访问（IP 被限制或站点启用 Cloudflare 人机验证，请更新 Cookie/UA 或更换代理）" },
-            {404,"远程服务器无该资源" },
+            {404,"远程服务器无该资源：番号可能不存在或已下架，也可能是网址已更换" },
+            {500,"远程服务器错误" },
         };
 
-        public string StatusCodeToMessage(int status)
+        public static string StatusCodeToMessage(int status)
         {
             if (STATUS_DICT.ContainsKey(status)) {
                 return STATUS_DICT[status];
@@ -100,11 +103,63 @@ namespace Jvedio.Core.Net
             }
         }
 
-        public string StatusCodeToMessage(string status)
+        public static string StatusCodeToMessage(string status)
         {
             if (int.TryParse(status, out int _temp))
                 return StatusCodeToMessage(_temp);
             return "";
+        }
+
+        /// <summary>
+        /// 把爬虫返回的原始错误翻译成「哪一环出错 + 怎么办」的中文提示。
+        /// 返回空串表示该错误不构成失败（空值/默认占位）。
+        /// </summary>
+        public static string NormalizeCrawlerError(string error)
+        {
+            if (string.IsNullOrEmpty(error) || error.Equals(HttpResult.DEFAULT_ERROR_MSG))
+                return "";
+            string text = error.Trim();
+            switch (text) {
+                case "NotFound":
+                    return "站点返回 404：未找到该番号（番号可能不存在、已下架，或网址已失效）";
+                case "Forbidden":
+                    return StatusCodeToMessage(403);
+                case "Unauthorized":
+                    return StatusCodeToMessage(401);
+                case "no VID":
+                case "必须指定 VID":
+                case "传入的信息不合理":
+                    return "缺少识别码（VID）等必要信息，无法刮削";
+                case "failed":
+                    return "站点返回了空页面（可能被拦截或网址已失效）";
+                case "检索太频繁":
+                    return StatusCodeToMessage(302);
+                case "開通VIP":
+                    return "该影片需要 JavDB VIP 账户才能查看，请换用其他源或跳过";
+                case "此內容需要登入才能查看或操作":
+                    return "需要登录：先在浏览器登录 JavDB，再在「选项 → 同步信息」该服务器的 Headers 中粘贴登录后的浏览器请求头（务必包含 cookie）";
+            }
+            string lower = text.ToLowerInvariant();
+            if (lower.Contains("timeout") || lower.Contains("timed out") || text.Contains("超时"))
+                return "网络请求超时：检查网址是否有效、代理与网络是否可用，或稍后重试（" + text + "）";
+            if (lower.Contains("unable to connect") || lower.Contains("connection") || lower.Contains("name resolution")
+                || lower.Contains("no such host") || lower.Contains("socket") || lower.Contains("ssl"))
+                return "无法连接站点：检查网址是否有效、网络与代理是否可用（" + text + "）";
+            return text;
+        }
+
+        /// <summary>在错误信息前标注出错的刮削器与服务器，让用户知道是哪一个源出错。</summary>
+        public static string PrefixCrawlerSource(Dictionary<string, object> dict, string message)
+        {
+            if (dict == null || string.IsNullOrEmpty(message))
+                return message;
+            string pluginID = dict.TryGetValue("PluginID", out object p) ? p?.ToString() : "";
+            string url = dict.TryGetValue("ServerUrl", out object u) ? u?.ToString() : "";
+            if (string.IsNullOrEmpty(pluginID))
+                return message;
+            string host = url;
+            try { if (!string.IsNullOrEmpty(url)) host = new Uri(url).Host; } catch { }
+            return string.IsNullOrEmpty(host) ? $"[{pluginID}] {message}" : $"[{pluginID} · {host}] {message}";
         }
 
         public async Task<Dictionary<string, object>> GetDataInfo(Video video, VideoDownLoader downLoader, RequestHeader header, Action<RequestHeader> headerCallBack)
@@ -446,21 +501,34 @@ namespace Jvedio.Core.Net
                 string statusCode = dict.Get("StatusCode", WRONG_STATUS_CODE).ToString();
                 Logger.Info($"响应码: {statusCode} ({StatusCodeToMessage(statusCode)})");
                 string error = dict["Error"].ToString();
-                if (!string.IsNullOrEmpty(error) && !error.Equals(HttpResult.DEFAULT_ERROR_MSG)) {
-                    Message = error;
-                    Logger.Error(error);
+                string allSources = dict.TryGetValue("ErrorAll", out object allObj) ? allObj?.ToString() : "";
+                string normalized = NormalizeCrawlerError(error);
+                if (!string.IsNullOrEmpty(allSources)) {
+                    // 多个源都失败：直接展示逐源汇总
+                    Message = allSources;
+                    Logger.Error(Message);
+                } else if (!string.IsNullOrEmpty(normalized)) {
+                    Message = PrefixCrawlerSource(dict, normalized);
+                    Logger.Error(Message);
                 }
                 success = dict.ContainsKey("Title") && !string.IsNullOrEmpty(dict["Title"].ToString());
             }
             if (!success) {
                 if (string.IsNullOrEmpty(Message)) {
-                    Message = dict.Get("StatusCode", "-1").ToString();
-                    Logger.Error(Message);
+                    // 区分「拿到了页面但没解析出信息」与「按状态码失败」两种情况
+                    string statusCode = dict != null ? dict.Get("StatusCode", WRONG_STATUS_CODE).ToString() : WRONG_STATUS_CODE;
+                    if (int.TryParse(statusCode, out int status)) {
+                        Message = status == 200
+                            ? "页面响应 200 但未解析出影片信息：可能被人机验证/防爬页拦截、需要登录或站点改版，请更新 Headers（Cookie/UA）或更换网址"
+                            : StatusCodeToMessage(status);
+                    } else {
+                        Message = "未获得影片信息（" + statusCode + "）：请检查服务器网址与 Headers 配置";
+                    }
                 }
-                if (int.TryParse(Message, out int status)) {
-                    Message = StatusCodeToMessage(status);
-                    Logger.Warning(Message);
+                if (int.TryParse(Message, out int status2)) {
+                    Message = StatusCodeToMessage(status2);
                 }
+                Logger.Warning(Message);
 
                 await Task.Delay(Delay.INFO);
                 // 发生了错误，停止下载
@@ -542,7 +610,8 @@ namespace Jvedio.Core.Net
                         //dict = new Dictionary<string, object>();
                         dict = await GetDataInfo(video, downLoader, header, (h) => { header = h; });
                     } catch (Exception ex) {
-                        Logger.Error(ex.Message);
+                        // 记录完整堆栈，便于定位「集合已修改」这类并发异常的准确抛出点
+                        Logger.Error(ex.ToString());
                         FinalizeWithCancel();
                         return;
                     }

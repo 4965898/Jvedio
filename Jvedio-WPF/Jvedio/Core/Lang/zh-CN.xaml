@@ -399,4 +399,8 @@
     <sys:String x:Key="StatSection">分类</sys:String>
     <sys:String x:Key="StatMetric">指标（容量为字节，时长为秒）</sys:String>
     <sys:String x:Key="StatValue">数值</sys:String>
+    <sys:String x:Key="CopyHeaderHere">把浏览器「开发者工具（F12）→ Network → Doc → Request Headers」的全部内容粘贴到左侧，每行“名字: 值”（如 user-agent、cookie），右侧自动生成 JSON。</sys:String>
+    <sys:String x:Key="HeaderHintDb">JavDB 通常需要登录：用浏览器登录 JavDB 后，按上方方法复制请求头粘贴到左侧（务必包含 cookie）。刮削失败提示「需要登录」说明 Cookie 已失效，请重新复制。</sys:String>
+    <sys:String x:Key="HeaderHintBus">JavBus 通常无需填写 Headers；刮削失败提示被 Cloudflare 人机验证拦截或 403 时，粘贴浏览器请求头（含 user-agent、cookie）通常可以解决。</sys:String>
+    <sys:String x:Key="HeaderHintOther">该源一般无需填写；刮削失败时可尝试粘贴浏览器请求头（user-agent、cookie）。</sys:String>
 </ResourceDictionary>

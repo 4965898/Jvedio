@@ -399,4 +399,8 @@
     <sys:String x:Key="StatSection">区分</sys:String>
     <sys:String x:Key="StatMetric">指標（容量：バイト、時間：秒）</sys:String>
     <sys:String x:Key="StatValue">値</sys:String>
+    <sys:String x:Key="CopyHeaderHere">ブラウザーの Request Headers（F12 → Network → Doc → Request Headers）を左側に 1 行「名前: 値」で貼り付けてください（例: user-agent、cookie）。右側に変換結果が表示されます。</sys:String>
+    <sys:String x:Key="HeaderHintDb">JavDB は通常ログインが必要です。ブラウザーでログイン後、上記の方法でリクエストヘッダーをコピーして左に貼り付けてください（cookie を必ず含める）。「ログインが必要」の失敗表示は Cookie の期限切れを意味します。再コピーしてください。</sys:String>
+    <sys:String x:Key="HeaderHintBus">JavBus は通常 Headers 不要です。Cloudflare の認証や 403 でブロックされた場合は、ブラウザーのリクエストヘッダー（user-agent、cookie）を貼り付けると解決することが多いです。</sys:String>
+    <sys:String x:Key="HeaderHintOther">このソースは通常 Headers 不要です。取得に失敗する場合はブラウザーのリクエストヘッダー（user-agent、cookie）を試してください。</sys:String>
 </ResourceDictionary>

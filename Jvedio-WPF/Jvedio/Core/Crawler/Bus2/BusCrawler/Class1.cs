@@ -65,6 +65,7 @@ namespace BusCrawler
             if (statusCode != (int)HttpStatusCode.OK || string.IsNullOrEmpty(sourceCode))
             {
                 result["Error"] = string.IsNullOrEmpty(errorMsg) ? "failed" : errorMsg;
+                logs.Add($"请求详情页失败: status={statusCode}, error={errorMsg ?? "(空响应)"}");
                 if (logs.Count > 0) result["Logs"] = logs;
                 return result;
             }
@@ -333,6 +334,12 @@ namespace BusCrawler
                     extra.Add(href);
                 }
                 if (extra.Count > 0) result["ExtraImageUrl"] = extra;
+            }
+            if (!result.ContainsKey("Title"))
+            {
+                // 响应 200 但页面里没有 h3 标题：多为人机验证/防爬页、番号不存在或站点改版
+                result["Error"] = "页面响应 200 但未找到影片信息：可能被人机验证/防爬页拦截、番号不存在或站点改版（可更新 Headers 中的 Cookie/UA 或更换网址）";
+                logs.Add("no <h3> title node in page (challenge or layout change?)");
             }
             if (logs.Count > 0) result["Logs"] = logs;
             return result;

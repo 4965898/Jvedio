@@ -1219,9 +1219,26 @@ namespace Jvedio
             }
 
             string pluginID = GetPluginID();
+            UpdateHeaderPluginHint(pluginID);
             if (string.IsNullOrEmpty(pluginID))
                 return;
             currentCrawlerServer = vieModel.CrawlerServers[pluginID][ServersDataGrid.SelectedIndex];
+        }
+
+        /// <summary>
+        /// 按 bus/db 插件类型在 Headers 弹窗中显示针对性的填写指引（6.0.0.1）。
+        /// </summary>
+        private void UpdateHeaderPluginHint(string pluginID)
+        {
+            string key = "HeaderHintOther";
+            string id = pluginID?.ToLowerInvariant();
+            // 插件 ID 形如 "crawler/db"、"crawler/bus"
+            if (id != null && id.EndsWith("db"))
+                key = "HeaderHintDb";
+            else if (id != null && id.EndsWith("bus"))
+                key = "HeaderHintBus";
+            if (headerPluginHint != null)
+                headerPluginHint.Text = LangManager.GetValueByKey(key);
         }
 
         private void CancelHeader(object sender, RoutedEventArgs e)

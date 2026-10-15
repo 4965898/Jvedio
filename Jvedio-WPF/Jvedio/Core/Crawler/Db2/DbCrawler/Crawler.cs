@@ -54,6 +54,7 @@ namespace Jvedio.Crawler
         private async Task<string> GetDataCode()
         {
             string url = BaseUrl + "search?q=" + VID + "&f=all";
+            Logs.Add("搜索页: " + url);
             Header.AllowAutoRedirect = false;
             HttpResult result;
             try {
@@ -62,12 +63,11 @@ namespace Jvedio.Crawler
                 Exception ex = ex2;
                 result = new HttpResult();
                 result.Error = ex.Message;
+                // 网络环节失败必须带上原因，否则最后会被误报成 404
+                Info["Error"] = "搜索页网络请求失败：" + ex.Message;
             }
             if (result != null && result.StatusCode == HttpStatusCode.Found) {
-                if (!Info.ContainsKey("Error"))
-                    Info.Add("Error", "检索太频繁");
-                else
-                    Info["Error"] = "检索太频繁";
+                Info["Error"] = "检索太频繁";
             }
             if (result != null && !string.IsNullOrEmpty(result.SourceCode))
                 return await GetCodeFromSearchResult(result.SourceCode);
@@ -178,8 +178,11 @@ namespace Jvedio.Crawler
                 DataCode = await GetDataCode();
             if (!Info.ContainsKey("DataCode"))
                 Info.Add("DataCode", DataCode);
-            if (string.IsNullOrEmpty(DataCode) && !Info.ContainsKey("Error")) {
-                Info.Add("Error", HttpStatusCode.NotFound);
+            if (string.IsNullOrEmpty(DataCode)) {
+                if (!Info.ContainsKey("Error")) {
+                    Info.Add("Error", "搜索页未找到该番号：番号可能不存在或已下架，也可能是站点被拦截或改版（404）");
+                    Info.Add("StatusCode", 404);
+                }
                 return Info;
             }
             string url = BaseUrl + "v/" + DataCode;
@@ -205,6 +208,9 @@ namespace Jvedio.Crawler
                     await Parse();
                     if (!Info.ContainsKey("Magnets"))
                         Info.Add("Magnets", magnets);
+                    // 响应 200 却没解析出标题：多为防爬页/验证页或站点改版
+                    if (!Info.ContainsKey("Error") && !Info.ContainsKey("Title"))
+                        Info.Add("Error", "详情页响应 200 但未解析出影片信息：可能需要登录、被人机验证拦截或站点改版");
                 }
                 if (!Info.ContainsKey("WebUrl"))
                     Info.Add("WebUrl", url);
@@ -215,7 +221,8 @@ namespace Jvedio.Crawler
             if (!Info.ContainsKey("Error") && !string.IsNullOrEmpty(httpResult.Error))
                 Info.Add("Error", httpResult.Error);
             if (!Info.ContainsKey("Error") && httpResult.StatusCode != HttpStatusCode.OK)
-                Info.Add("Error", httpResult.StatusCode);
+                // 数值状态码让上层映射为明确文案（403/404/500 等）
+                Info.Add("Error", (int)httpResult.StatusCode);
             Info.Add("Logs", Logs);
             return Info;
         }

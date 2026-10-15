@@ -45,7 +45,15 @@ namespace Jvedio.Core.Net
         {
             CurrentVideo = video;
             cancellationToken = token;
-            Header = CrawlerHeader.Default;
+            // CrawlerHeader.Default 是静态共享实例：并发任务直接共用其 Headers 字典时，
+            // 「一个任务在遍历、另一个任务在写入」会抛出「集合已修改；可能无法执行枚举操作」。
+            // 每个任务独享一份拷贝，彻底消除跨任务竞态（6.0.0.1）。
+            Header = new RequestHeader();
+            Header.WebProxy = ConfigManager.ProxyConfig.GetWebProxy();
+            Header.TimeOut = ConfigManager.ProxyConfig.HttpTimeout * 1000;
+            Header.Headers = CrawlerHeader.Default?.Headers != null
+                ? new Dictionary<string, string>(CrawlerHeader.Default.Headers)
+                : new Dictionary<string, string>();
             TaskLogger = Logger;
         }
 
@@ -59,6 +67,44 @@ namespace Jvedio.Core.Net
         }
 
 
+        /// <summary>
+        /// 判断爬虫结果是否可用：有标题，或爬虫没有报告任何错误。
+        /// 不可用的结果不再直接返回，而是记录原因后尝试下一个源。
+        /// </summary>
+        private static bool IsUsableResult(Dictionary<string, object> d)
+        {
+            if (d == null) return false;
+            string error = d.TryGetValue("Error", out object errObj) ? errObj?.ToString() : "";
+            bool errorEmpty = string.IsNullOrEmpty(error) || error.Equals(HttpResult.DEFAULT_ERROR_MSG);
+            string title = d.TryGetValue("Title", out object titleObj) ? titleObj?.ToString() : "";
+            return !string.IsNullOrEmpty(title) || errorEmpty;
+        }
+
+        /// <summary>把单个源的失败整理成「哪个源 · 哪一环 · 怎么办」的一句话。</summary>
+        private static string DescribeFailure(Dictionary<string, object> d, CrawlerServer server)
+        {
+            string error = d != null && d.TryGetValue("Error", out object errObj) ? errObj?.ToString() : "";
+            string reason = DownLoadTask.NormalizeCrawlerError(error);
+            if (string.IsNullOrEmpty(reason)) {
+                string statusCode = d != null && d.TryGetValue("StatusCode", out object statusObj) ? statusObj?.ToString() : "";
+                reason = int.TryParse(statusCode, out int code) ? DownLoadTask.StatusCodeToMessage(code) : "未知原因";
+                if (reason == DownLoadTask.StatusCodeToMessage(200))
+                    reason = "页面响应 200 但未解析出影片信息";
+            }
+            string host = server?.Url;
+            try { if (!string.IsNullOrEmpty(host)) host = new Uri(host).Host; } catch { }
+            return string.IsNullOrEmpty(host) ? $"{server?.PluginID}：{reason}" : $"{server?.PluginID}（{host}）：{reason}";
+        }
+
+        /// <summary>
+        /// 日志只是诊断信息，绝不能因为日志集合的并发竞争
+        /// （如另一任务/UI 正在枚举同一日志列表）把整个刮削任务打断。
+        /// </summary>
+        private void LogSafely(Action logAction)
+        {
+            try { logAction(); } catch { }
+        }
+
         public async Task<Dictionary<string, object>> GetInfo(Action<RequestHeader> headerCallBack)
         {
             // 下载信息
@@ -67,39 +113,70 @@ namespace Jvedio.Core.Net
             // 获得所有可用服务器源
             Dictionary<PluginMetaData, List<CrawlerServer>> crawlers = GetCrawlerServer(dataInfo);
 
+            List<string> failures = new List<string>();
+            Dictionary<string, object> lastFailure = null;
             foreach (var key in crawlers.Keys) {
                 List<CrawlerServer> crawlerServers = crawlers[key];
                 foreach (CrawlerServer server in crawlerServers) {
                     if (server.Invoker == null) {
-                        TaskLogger.Warning($"刮削器[{server.PluginID}] invoker 为空");
+                        LogSafely(() => TaskLogger.Warning($"刮削器[{server.PluginID}] invoker 为空"));
+                        failures.Add($"{server.PluginID}：插件未正确加载");
                         continue;
                     }
                     server.AttachToDict(dataInfo);
                     // Header 传递代理配置进去
                     object o = await server.Invoker.SetMethod("GetInfo").InvokeAsync(new object[] { Header, dataInfo });
-                    if (o is Dictionary<string, object> d) {
-                        // 成功一个立即返回，否则使用下一个
-                        if (d.ContainsKey("Header") && d["Header"] is Dictionary<string, string> dict) {
-                            server.Headers = JsonUtils.TrySerializeObject(dict);
-                            Header.Headers = dict;
-                        }
-                        headerCallBack?.Invoke(Header);
-                        d.Add("PluginID", server.PluginID);
+                    if (!(o is Dictionary<string, object> d)) {
+                        LogSafely(() => TaskLogger.Warning($"刮削器[{server.PluginID}] invoker 失败"));
+                        failures.Add($"{server.PluginID}：插件调用失败");
+                        continue;
+                    }
 
-                        if (d.ContainsKey("Logs") && d["Logs"] is List<string> logs) {
+                    if (d.ContainsKey("Logs") && d["Logs"] is List<string> logs) {
+                        LogSafely(() => {
                             foreach (var item in logs) {
                                 TaskLogger.Info($"[{server.PluginID}] {item}");
                             }
-                        }
-
-
-                        return d;
-                    } else {
-                        TaskLogger.Warning($"刮削器[{server.PluginID}] invoker 失败");
+                        });
                     }
+
+                    if (!IsUsableResult(d)) {
+                        // 该源失败：写清原因，继续尝试下一个源
+                        string reason = DescribeFailure(d, server);
+                        failures.Add(reason);
+                        LogSafely(() => TaskLogger.Warning($"刮削失败（{reason}），尝试下一个源"));
+                        lastFailure = d;
+                        continue;
+                    }
+
+                    // 成功一个立即返回
+                    if (d.ContainsKey("Header") && d["Header"] is Dictionary<string, string> dict) {
+                        // 合并爬虫回传的请求头（如 JavBus 图片防盗链的 Referer），
+                        // 不再覆盖用户在服务器列表里保存的 Headers
+                        var merged = Header.Headers != null
+                            ? new Dictionary<string, string>(Header.Headers)
+                            : new Dictionary<string, string>();
+                        foreach (var kv in dict)
+                            merged[kv.Key] = kv.Value;
+                        Header.Headers = merged;
+                    }
+                    headerCallBack?.Invoke(Header);
+                    d["PluginID"] = server.PluginID;
+                    if (!string.IsNullOrEmpty(server.Url))
+                        d["ServerUrl"] = server.Url;
+                    return d;
                 }
             }
-            return null;
+
+            // 所有源都失败：保留最后一个源的原始 Error（上层与回归工具依赖它），
+            // 多源失败时把每个源的原因另存为 ErrorAll 汇总，供任务提示展示
+            if (lastFailure == null) {
+                lastFailure = new Dictionary<string, object>();
+                lastFailure["Error"] = "没有可用的刮削源，请检查「选项 → 同步信息」的服务器列表";
+            }
+            if (failures.Count > 1)
+                lastFailure["ErrorAll"] = "全部 " + failures.Count + " 个源均失败：" + string.Join("；", failures);
+            return lastFailure;
         }
 
         public Dictionary<PluginMetaData, List<CrawlerServer>> GetCrawlerServer(Dictionary<string, object> dataInfo)
@@ -148,7 +225,19 @@ namespace Jvedio.Core.Net
                         if (!string.IsNullOrEmpty(webType))
                             wrapper.Eq("WebType", webType);
                         wrapper.Eq("LocalValue", CurrentVideo.VID);
-                        UrlCode urlCode = MapperManager.urlCodeMapper.SelectOne(wrapper);
+                        UrlCode urlCode = null;
+                        for (int attempt = 0; attempt < 3 && urlCode == null; attempt++) {
+                            try {
+                                urlCode = MapperManager.urlCodeMapper.SelectOne(wrapper);
+                            } catch (InvalidOperationException) when (attempt < 2) {
+                                // SelectWrapper 的 whereConditions 是静态字典：并发首查时
+                                // 「一个线程在枚举、另一个在写入」会瞬态抛出集合异常，重试即可恢复
+                            }
+                        }
+                        if (urlCode == null) {
+                            // 三次都失败（或确实抛错）：把真实的异常留给上层堆栈日志
+                            urlCode = MapperManager.urlCodeMapper.SelectOne(wrapper);
+                        }
                         foreach (var item in crawlerServers) {
                             item.UrlCode = urlCode;
                         }
