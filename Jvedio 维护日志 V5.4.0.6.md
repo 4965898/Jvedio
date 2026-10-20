@@ -1779,3 +1779,11 @@ Invoke-RestMethod "https://api.github.com/repos/4965898/Jvedio/releases/$($rel.i
 - 按用户指示将清单标签导入（Connector 0.3.0 + 桌面 6.0.0.2）正式发布。根 README 三语版本表新增 6.0.0.2 行、发布公告段，新增 docs/releases/6.0.0.2.md（特别提醒：**本版须同时更新插件与桌面端**，旧桌面端禁用标签选择并提示更新）；插件 README 标题与安装来源改为随 6.0.0.2 正式发布，脚本说明同步。
 - 本地发布验证：主程序、BusCrawler、DBCrawler、LibraryCrawler Release 重建通过，DispatcherStress 210 项调度检查通过，`pack-release.ps1 -Version 6.0.0.2` 通过 26 项 LibraryCrawler 检查并完整打包（Jvedio-6.0.0.2.zip 11,243,825 字节 + 同版 EXE 2,626,560 字节）；插件回归 70/70、剪藏回归全部通过。
 - 发布流程（沿用 6.0.0.1 已验证姿势）：**只推 master、不预推标签**，由工作流走「标签不存在→自建标签→发布→升级源」路径；随后上传 Connector 0.3.0 ZIP、以 docs/releases/6.0.0.2.md 更新标题「自改6.0.0.2（Jvedio30.3）」与正文；核验三项资产与 update-feed 后以 [skip ci] 提交收尾记录。
+
+### 6.0.0.2 / Connector 0.3.0 发布核验完成
+
+- 功能及发布文档提交 `0f2e895023345ae687bba7d5dbb2202956062ea9` 已推送 origin/master（仅推 master、未预推标签）。[GitHub Actions 39496190312](https://github.com/4965898/Jvedio/actions/runs/39496190312) 单一 run 全流程成功：构建、210 项调度检查、完整 ZIP 校验、标签 6.0.0.2 由 CI 自建于同一提交、发布与升级源更新全部完成。
+- 正式发布页：https://github.com/4965898/Jvedio/releases/tag/6.0.0.2 ，标题「自改6.0.0.2（Jvedio30.3）」，已核实为 Latest。三项资产均为 uploaded：`Jvedio-6.0.0.2.zip`（11,466,058 字节）、`Jvedio-6.0.0.2.exe`（2,626,560 字节）、`Jvedio-Connector-0.3.0.zip`（60,041 字节）。详细说明已用 docs/releases/6.0.0.2.md 更新。
+- 三项资产均已实际下载核验（API octet-stream）：独立 EXE 程序集版本 6.0.0.2，ZIP 内 EXE 与独立 EXE SHA256 完全一致（`9d3bde58…`）；完整 ZIP SHA256 为 `6c6f4635…`；Connector ZIP SHA256 为 `0b80451f…`，与本地验证包一致，manifest 版本 0.3.0、含清单标签逻辑；核验脚本同时确认 ZIP 必需资源、双架构 SQLite、无用户数据或测试文件（`build-output/release-602-verified.json`）。
+- update-feed：jvedioupdate/latest.json 的 LatestVersion=6.0.0.2；list.json 共 73 个文件，Jvedio.exe 的 MD5 与公开独立 EXE 实测一致。
+- 用户影片库与配置未动。最终记录以 [skip ci] 文档提交推送，避免重复发版。
