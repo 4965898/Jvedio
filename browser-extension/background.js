@@ -91,7 +91,7 @@ chrome.action.onClicked.addListener(tab => {
   handleAction(tab).catch(() => {});
 });
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.removeAll(() => chrome.contextMenus.create({ id: MANUAL_MENU, title: "选择影片库、标记与连接设置…", contexts: ["action"] }));
+  chrome.contextMenus.removeAll(() => chrome.contextMenus.create({ id: MANUAL_MENU, title: "选择影片库、标记、标签与连接设置…", contexts: ["action"] }));
 });
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === MANUAL_MENU) showClipper(tab).catch(() => {});
@@ -106,7 +106,7 @@ async function reportCapture(tabId, pageUrl, message, kind, selectDetail = false
   // Closing the source tab must not turn a completed import into a reported failure.
   await Promise.allSettled([
     chrome.action.setBadgeText({ tabId, text: badge }), chrome.action.setBadgeBackgroundColor({ tabId, color }),
-    chrome.action.setTitle({ tabId, title: `${message}\n右键图标可选择影片库、标记与连接设置。` }),
+    chrome.action.setTitle({ tabId, title: `${message}\n右键图标可选择影片库、标记、标签与连接设置。` }),
     chrome.storage.session.set({ [`capture:${tabId}`]: { pageUrl, message, kind, selectDetail } })
   ]);
 }
@@ -116,6 +116,7 @@ function captureMessage(payload, result, libraryName) {
     ` 图片完成 ${pictures.succeeded} 项${pictures.failed ? `，失败 ${pictures.failed} 项（${pictures.error}）` : ""}。` +
     (pictures.unavailableActors ? ` ${pictures.unavailableActors} 位演员未找到可用头像链接。` : "") +
     (payload.markIds?.length ? ` 已为 ${result.markedItems} 部影片添加标记：${result.markNames.join("、")}。` : "") +
+    (result.labelNames?.length ? ` 已为 ${result.labeledItems} 部影片添加标签：${result.labelNames.join("、")}。` : "") +
     (result.mediaQueued ? " 视频已加入下载任务。" : "") +
     (result.mediaAlreadyQueued ? " 已有媒体任务正在进行。" : "") + (result.videoNote || "");
 }
@@ -137,7 +138,8 @@ async function clipDestination() {
   const library = connection.libraries.find(item => String(item.id) === String(settings.libraryId));
   if (!library) throw new Error("上次使用的影片库已不存在，请重新选择目标影片库。");
   const markKey = `markIds:${library.id}`, storedMarks = (await chrome.storage.local.get(markKey))[markKey];
-  return { library, connection, markIds: Array.isArray(storedMarks) ? storedMarks : [] };
+  const labelKey = `labelNames:${library.id}`, storedLabels = (await chrome.storage.local.get(labelKey))[labelKey];
+  return { library, connection, markIds: Array.isArray(storedMarks) ? storedMarks : [], labels: Array.isArray(storedLabels) ? storedLabels : [] };
 }
 async function selectCard(tabId, message) {
   await chrome.scripting.executeScript({ target: { tabId }, files: ["extractor.js"] });
@@ -156,13 +158,13 @@ async function captureFromToolbar(tab) {
     snapshot = response.result;
     if (snapshot?.kind !== "detail" || snapshot.items.length !== 1) {
       await chrome.action.setBadgeText({ tabId: tab.id, text: "" });
-      await chrome.action.setTitle({ tabId: tab.id, title: "剪藏到 Jvedio：选择影片、影片库与标记" });
+      await chrome.action.setTitle({ tabId: tab.id, title: "剪藏到 Jvedio：选择影片、影片库、标记与标签" });
       await showClipper(tab); return;
     }
     await reportCapture(tab.id, snapshot.pageUrl, `正在保存 ${snapshot.items[0].code}…`, "pending");
-    const { library, connection, markIds } = await clipDestination();
+    const { library, connection, markIds, labels } = await clipDestination();
     const payload = { libraryId: Number(library.id), site: snapshot.site, kind: snapshot.kind, pageUrl: snapshot.pageUrl,
-      markIds, items: snapshot.items };
+      markIds, labels, items: snapshot.items };
     const result = await saveClips(payload, tab.id, connection);
     await reportCapture(tab.id, snapshot.pageUrl, captureMessage(payload, result, library.name), captureKind(result));
   } catch (error) {
@@ -350,15 +352,30 @@ async function saveClips(payload, tabId, connection) {
   if (payload.markIds != null && (!Array.isArray(payload.markIds) || payload.markIds.length > 100 || payload.markIds.some(id => !Number.isSafeInteger(id) || id <= 0)))
     throw new Error("无效的标记选择，请重新选择标记。");
   payload.markIds = [...new Set(payload.markIds || [])];
-  let markNames = [];
-  if (payload.markIds.length) {
+  if (payload.labels != null && (!Array.isArray(payload.labels) || payload.labels.length > 100 ||
+    payload.labels.some(name => { const trimmed = typeof name === "string" ? name.trim() : "";
+      return !trimmed.length || trimmed.length > 200 || /[\u0000-\u001f\u007f-\u009f]/.test(trimmed); })))
+    throw new Error("无效的标签选择，请重新选择标签。");
+  payload.labels = [...new Set((payload.labels || []).map(name => name.trim()))];
+  payload.newLabels = [];
+  let markNames = [], labelNames = [...payload.labels];
+  if (payload.markIds.length || payload.labels.length) {
     connection ??= await request("status");
-    if (connection.markImport !== true || !(connection.markImportVersion >= 1)) throw new Error("当前桌面接收端不支持筛选器标记导入，请更新本次配套桌面 EXE 后重新连接；本次尚未提交影片。");
+    if (payload.markIds.length && (connection.markImport !== true || !(connection.markImportVersion >= 1))) throw new Error("当前桌面接收端不支持筛选器标记导入，请更新本次配套桌面 EXE 后重新连接；本次尚未提交影片。");
+    if (payload.labels.length && (connection.labelImport !== true || !(connection.labelImportVersion >= 3))) throw new Error("当前桌面接收端不支持清单标签导入，请更新本次配套桌面 EXE 后重新连接；本次尚未提交影片。");
     const library = connection.libraries.find(item => String(item.id) === String(payload.libraryId));
     if (!library) throw new Error("目标影片库已不存在，请重新连接并选择；本次尚未提交影片。");
-    const catalog = new Map((connection.marks || []).map(mark => [mark.id, mark.name]));
-    if (payload.markIds.some(id => !catalog.has(id))) throw new Error("所选标记已删除，请重新连接并选择标记；本次尚未提交影片。");
-    markNames = payload.markIds.map(id => catalog.get(id));
+    if (payload.markIds.length) {
+      const catalog = new Map((connection.marks || []).map(mark => [mark.id, mark.name]));
+      if (payload.markIds.some(id => !catalog.has(id))) throw new Error("所选标记已删除，请重新连接并选择标记；本次尚未提交影片。");
+      markNames = payload.markIds.map(id => catalog.get(id));
+    }
+    if (payload.labels.length) {
+      // Names already in the receiver's catalog validate as labels; the rest are declared new and created on save.
+      const available = new Set(library.labels || []);
+      payload.newLabels = payload.labels.filter(name => !available.has(name));
+      payload.labels = payload.labels.filter(name => available.has(name));
+    }
   }
   const videoNote = await resolvePreviewVideos(payload, tabId, connection?.media);
   payload.browserImages = true;
@@ -372,7 +389,7 @@ async function saveClips(payload, tabId, connection) {
     batch.push(item); bytes += size;
   }
   if (batch.length) batches.push(batch);
-  const total = { added: 0, updated: 0, skipped: 0, markedItems: 0, imagesQueued: 0, mediaQueued: 0, mediaAlreadyQueued: 0,
+  const total = { added: 0, updated: 0, skipped: 0, markedItems: 0, labeledItems: 0, imagesQueued: 0, mediaQueued: 0, mediaAlreadyQueued: 0,
     pictures: { succeeded: 0, failed: 0, unavailableActors: 0, error: "" } };
   let completed = 0;
   for (const items of batches) {
@@ -380,15 +397,17 @@ async function saveClips(payload, tabId, connection) {
       const part = { ...payload, items }, result = await request("clips", part);
       if (payload.markIds.length && (result.marksApplied !== payload.markIds.length || result.markedItems !== items.length))
         throw new Error("影片资料可能已保存，但接收端未确认标记写入，请更新配套桌面 EXE 后重新连接再重试。");
+      if (payload.labels.length + payload.newLabels.length && (result.labelsApplied !== payload.labels.length + payload.newLabels.length || result.labeledItems !== items.length))
+        throw new Error("影片资料可能已保存，但接收端未确认标签写入，请更新配套桌面 EXE 后重新连接再重试。");
       completed += items.length;
-      for (const key of ["added", "updated", "skipped", "markedItems", "imagesQueued", "mediaQueued", "mediaAlreadyQueued"]) total[key] += result[key] || 0;
+      for (const key of ["added", "updated", "skipped", "markedItems", "labeledItems", "imagesQueued", "mediaQueued", "mediaAlreadyQueued"]) total[key] += result[key] || 0;
       try { result.pictures = await saveImages(part, result); }
       catch (error) { result.pictures = { failed: 1, error: error.message }; }
       for (const key of ["succeeded", "failed", "unavailableActors"]) total.pictures[key] += result.pictures[key] || 0;
       total.pictures.error ||= result.pictures.error;
     } catch (error) { throw new Error(`${completed ? `已完成 ${completed} 个番号；后续批次失败。` : ""}${error.message}`); }
   }
-  return { ...total, videoNote, markNames };
+  return { ...total, videoNote, markNames, labelNames };
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (["select-card", "read-card-selection"].includes(message?.kind)) {

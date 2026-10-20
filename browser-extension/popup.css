@@ -19,10 +19,20 @@ main{padding:10px 12px 12px}
 #marks{max-height:170px;overflow:auto}
 #marks label{display:flex;gap:7px;align-items:flex-start;margin:4px 0;overflow-wrap:anywhere}
 #marks input{width:auto;margin-top:4px;accent-color:#5367da}
+#labels{max-height:170px;overflow:auto}
+#labels label{display:flex;gap:7px;align-items:flex-start;margin:4px 0;overflow-wrap:anywhere}
+#labels input{width:auto;margin-top:4px;accent-color:#5367da}
+.new-label-row{display:flex;gap:6px;margin-top:8px}
+.new-label-row input{flex:1;min-width:0;padding:4px 8px;font-size:12px}
+.new-label-row button{padding:3px 10px}
+.new-labels{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.label-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid #d5daea;border-radius:6px;background:#f0f2ff;padding:2px 4px 2px 8px;font-size:12px;max-width:100%;overflow-wrap:anywhere}
+.label-chip button{padding:0 4px;border:0;background:transparent;font-size:12px;line-height:1.2;cursor:pointer;color:#697287}
+.label-chip button:hover{color:#ba3448}
 details .check-option{display:flex;gap:7px;align-items:flex-start}
 details .check-option input{width:auto;margin-top:4px}
 footer{margin-top:8px}
-@media(prefers-color-scheme:dark){.mark-menu{background:#242b3b;border-color:#3a455d}.mark-menu-footer{color:#a8b3cb}}
+@media(prefers-color-scheme:dark){.mark-menu{background:#242b3b;border-color:#3a455d}.mark-menu-footer{color:#a8b3cb}.label-chip{background:#303b59;border-color:#3a455d}}
 #metadata{margin:10px 0;padding:9px 12px;border:1px solid #d5daea;border-radius:8px;max-height:160px;overflow:auto;font-size:12px}
 #metadata p{margin:3px 0;overflow-wrap:anywhere}
 @media(prefers-color-scheme:dark){#metadata{border-color:#3a455d}}

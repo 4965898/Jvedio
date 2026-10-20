@@ -183,6 +183,17 @@ internal static class BrowserClipperRegression
             Rejected("a silently ignored label association rolls back the movie instead of reporting success", tagged);
             Sql("drop trigger reject_clip_label");
 
+            var created = new BrowserClipRequest { LibraryId = 1, Site = "JavBus", Kind = "list", PageUrl = "https://www.javbus.com/",
+                NewLabels = new List<string> { "新片单", "收藏", "新片单" }, Items = new List<BrowserClipItem> { new BrowserClipItem { Code = "LIST-001", Title = "清单测试" } } };
+            Check("declared new labels are created with their associations in one import", BrowserClipperService.Import(created).LabelsApplied == 2 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_label_catalog where DBId=1 and LabelName in('新片单','收藏')")) == 2 &&
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_label where DataID=(select DataID from metadata_video where VID='LIST-001')")) == 2);
+            Check("created labels stay scoped to the target library", Convert.ToInt64(Scalar("select count(*) from metadata_label_catalog where DBId=2 and LabelName='新片单'")) == 0);
+            Check("existing labels keep their original IDs when mixed with new ones",
+                Convert.ToInt64(Scalar("select count(*) from metadata_to_label where DataID=(select DataID from metadata_video where VID='LIST-001') and LabelName='收藏'")) == 1);
+            created.NewLabels = new List<string> { "无\n效" }; Rejected("control characters reject a new label too", created);
+            created.NewLabels = Enumerable.Repeat("新片单", 101).ToList(); Rejected("overlarge new-label selections reject the entire import", created);
+
             Sql("insert into common_tagstamp(TagID,TagName,SortOrder,Foreground,Background) values" +
                 "(21001,'AV',1,'255,255,255,255','154,88,183,255'),(21002,'套路直播',0,'255,255,255,255','0,140,90,255')," +
                 "(21003,'其他',-1,'255,255,255,255','80,90,110,255'),(21004,'AV',2,'255,255,255,255','90,120,130,255')," +
@@ -293,7 +304,7 @@ internal static class BrowserClipperRegression
                     status.Item2["marks"].Select(mark => (long)mark["id"]).SequenceEqual(MapperManager.tagStampMapper.GetAllTagStamp().Select(mark => mark.TagID)) &&
                     status.Item2["marks"].Any(mark => (string)mark["name"] == "AV") && status.Item2["marks"].Any(mark => (string)mark["name"] == "套路直播") &&
                     status.Item2["marks"].Any(mark => (long)mark["id"] == 21005));
-                Check("HTTP status includes library-scoped labels, including unused labels", (bool)status.Item2["labelImport"] && (int)status.Item2["labelImportVersion"] == 2 &&
+                Check("HTTP status includes library-scoped labels, including unused labels", (bool)status.Item2["labelImport"] && (int)status.Item2["labelImportVersion"] == 3 &&
                     status.Item2["libraries"][0]["labels"].Values<string>().Contains("收藏") &&
                     !status.Item2["libraries"][0]["labels"].Values<string>().Contains("另库专用") &&
                     status.Item2["libraries"][1]["labels"].Values<string>().Contains("另库专用"));
@@ -303,6 +314,10 @@ internal static class BrowserClipperRegression
                 var httpTagged = Read(fixtures, "JavBus-list", 1); httpTagged.BrowserImages = true; httpTagged.Labels = new List<string> { "收藏", "待看" };
                 var taggedReply = Send(service, "POST", "/v1/clips", httpTagged, service.Token);
                 Check("HTTP save acknowledges two labels on all thirty movies", taggedReply.Item1 == 200 && (int)taggedReply.Item2["labelsApplied"] == 2 && (int)taggedReply.Item2["labeledItems"] == 30);
+                var httpCreated = Read(fixtures, "JavBus-list", 1); httpCreated.BrowserImages = true; httpCreated.NewLabels = new List<string> { "HTTP片单" };
+                var createdReply = Send(service, "POST", "/v1/clips", httpCreated, service.Token);
+                Check("HTTP save creates a declared new label on all thirty movies", createdReply.Item1 == 200 && (int)createdReply.Item2["labelsApplied"] == 1 && (int)createdReply.Item2["labeledItems"] == 30 &&
+                    Convert.ToInt64(Scalar("select count(*) from metadata_label_catalog where DBId=1 and LabelName='HTTP片单'")) == 1);
                 var httpMarked = new BrowserClipRequest { LibraryId = 1, Site = "JavBus", Kind = "list", BrowserImages = true, PageUrl = "https://www.javbus.com/",
                     MarkIds = new List<long> { 21001, 21002 }, Items = new List<BrowserClipItem> { new BrowserClipItem { Code = "HTTPMARK-001" }, new BrowserClipItem { Code = "HTTPMARK-002" } } };
                 var markReply = Send(service, "POST", "/v1/clips", httpMarked, service.Token);

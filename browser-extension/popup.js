@@ -6,6 +6,7 @@ let selectionWrite = Promise.resolve();
 const viewKey = crypto.randomUUID();
 let confirmedSelection = [], selectionRevision = -1, pendingChoices = [];
 let markWrite = Promise.resolve(), restoringMarks = false, markImport = false;
+let libraryLabels = [], selectedLabels = new Set(), labelImport = false, restoringLabels = false, labelWrite = Promise.resolve();
 const chosen = () => snapshot.items.filter(item => selected.has(item.code));
 const visible = () => {
   const query = $("search").value.trim().toUpperCase();
@@ -39,7 +40,7 @@ function changeSelection(add = [], remove = []) {
   return selectionWrite;
 }
 function update() {
-  const locked = busy || scanning || restoringMarks;
+  const locked = busy || scanning || restoringMarks || restoringLabels;
   $("count").textContent = `已加载 ${snapshot.items.length} 个番号 · 已选 ${chosen().length} 个 · 显示 ${visible().length} 个`;
   for (const id of ["copy", "txt", "json"]) $(id).disabled = locked || !chosen().length;
   $("save").disabled = locked || !chosen().length || !connected || !$("library").value;
@@ -47,8 +48,13 @@ function update() {
   for (const id of ["library", "rescan", "all", "none", "connect", "apply", "port", "token", "search"]) $(id).disabled = locked;
   for (const check of $("items").querySelectorAll("input")) check.disabled = locked;
   for (const check of $("marks").querySelectorAll("input")) check.disabled = locked;
+  for (const check of $("labels").querySelectorAll("input")) check.disabled = locked;
   $("markToggle").disabled = locked || !connected || !markImport;
   $("clearMarks").disabled = locked || !selectedMarks.size;
+  $("labelToggle").disabled = locked || !connected || !labelImport;
+  $("clearLabels").disabled = locked || !selectedLabels.size;
+  $("newLabel").disabled = locked; $("addLabel").disabled = locked;
+  for (const button of $("newLabels").querySelectorAll("button")) button.disabled = locked;
 }
 function renderMarks() {
   $("marks").replaceChildren();
@@ -91,6 +97,66 @@ async function restoreMarks() {
     selectedMarks = new Set((Array.isArray(stored) ? stored : []).filter(id => Number.isSafeInteger(id) && available.has(id)).slice(0, 100));
     await rememberMarks();
   } finally { restoringMarks = false; renderMarks(); }
+}
+function renderLabels() {
+  $("labels").replaceChildren();
+  for (const name of libraryLabels) {
+    const row = document.createElement("label");
+    const check = document.createElement("input"); check.type = "checkbox"; check.checked = selectedLabels.has(name);
+    check.setAttribute("aria-label", name);
+    check.addEventListener("change", () => {
+      if (check.checked && selectedLabels.size >= 100) { check.checked = false; status("一次最多选择 100 个标签。", "error"); return; }
+      check.checked ? selectedLabels.add(name) : selectedLabels.delete(name); rememberLabels(); updateLabelCount(); update();
+    });
+    const text = document.createElement("span"); text.textContent = name; row.append(check, text); $("labels").append(row);
+  }
+  const created = [...selectedLabels].filter(name => !libraryLabels.includes(name));
+  $("newLabels").hidden = !created.length; $("newLabels").replaceChildren();
+  for (const name of created) {
+    const chip = document.createElement("span"); chip.className = "label-chip";
+    const text = document.createElement("span"); text.textContent = name;
+    const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "×"; remove.setAttribute("aria-label", `移除新建标签 ${name}`);
+    remove.addEventListener("click", () => { selectedLabels.delete(name); rememberLabels(); renderLabels(); update(); });
+    chip.append(text, remove); $("newLabels").append(chip);
+  }
+  $("labelHint").textContent = !connected ? "连接后自动读取 Jvedio 的“我的标签”。" : !labelImport ? "当前桌面端不支持清单标签导入，请更新本次配套 EXE 后重新连接。" :
+    !libraryLabels.length ? "该影片库暂无标签；输入新标签名（如片单名），保存时自动创建。" : "来自主程序“我的标签”，可多选；也可输入新标签名，保存时自动创建。";
+  updateLabelCount(); update();
+}
+function updateLabelCount() {
+  const names = [...selectedLabels].join("、");
+  $("labelCount").textContent = names || "不添加标签";
+  $("labelToggle").title = names || "下拉选择已有标签，或输入新标签名（可多选）";
+}
+function closeLabels() { $("labelMenu").hidden = true; $("labelToggle").setAttribute("aria-expanded", "false"); }
+function rememberLabels() {
+  if (!labelImport || !$("library").value) return labelWrite;
+  const state = { [`labelNames:${$("library").value}`]: [...selectedLabels] };
+  labelWrite = labelWrite.catch(() => {}).then(() => chrome.storage.local.set(state));
+  return labelWrite;
+}
+async function restoreLabels() {
+  restoringLabels = true; selectedLabels.clear(); closeLabels(); renderLabels();
+  const libraryId = $("library").value;
+  try {
+    await labelWrite;
+    const library = libraries.find(item => String(item.id) === libraryId);
+    if (!labelImport || !library) return;
+    libraryLabels = library.labels || [];
+    const key = `labelNames:${libraryId}`, stored = (await chrome.storage.local.get(key))[key];
+    if ($("library").value !== libraryId) return;
+    const available = new Set(library.labels || []);
+    selectedLabels = new Set((Array.isArray(stored) ? stored : []).filter(name => typeof name === "string" && available.has(name)).slice(0, 100));
+    await rememberLabels();
+  } finally { restoringLabels = false; renderLabels(); }
+}
+function addNewLabel() {
+  const name = $("newLabel").value.trim();
+  if (!name || selectedLabels.has(name)) { $("newLabel").value = ""; return; }
+  if (name.length > 200 || /[\u0000-\u001f\u007f-\u009f]/.test(name)) { status("标签名不能为空、过长或包含无效字符。", "error"); return; }
+  if (selectedLabels.size >= 100) { status("一次最多选择 100 个标签。", "error"); return; }
+  selectedLabels.add(name); $("newLabel").value = "";
+  rememberLabels(); renderLabels(); update();
 }
 function render() {
   $("items").replaceChildren();
@@ -163,6 +229,7 @@ function applySnapshot(next) {
 }
 async function connect() {
   connected = false; markImport = false; libraries = []; marks = []; selectedMarks.clear(); closeMarks(); $("library").replaceChildren(); renderMarks();
+  labelImport = false; libraryLabels = []; selectedLabels.clear(); closeLabels(); renderLabels();
   try {
     const response = await chrome.runtime.sendMessage({ kind: "status" });
     if (!response?.ok) throw new Error(response?.error || "连接失败。");
@@ -170,6 +237,7 @@ async function connect() {
     libraries = response.result.libraries;
     markImport = response.result.markImport === true && response.result.markImportVersion >= 1;
     marks = Array.isArray(response.result.marks) ? response.result.marks : [];
+    labelImport = response.result.labelImport === true && response.result.labelImportVersion >= 3;
     for (const library of libraries) {
       const option = document.createElement("option"); option.value = library.id; option.textContent = library.name; $("library").append(option);
     }
@@ -177,12 +245,13 @@ async function connect() {
     if ([...$("library").options].some(option => option.value === String(preferred))) $("library").value = String(preferred);
     connected = true;
     await restoreMarks();
+    await restoreLabels();
     status(response.result.libraries.length ? "已连接 Jvedio，请选择要保存的影片。" : "请先在 Jvedio 中创建影片库。", "success");
   } catch (error) { status(error.message, "error"); }
   renderMarks();
 }
 function exportFile(format) {
-  const payload = { version: 1, site: snapshot.site, kind: snapshot.kind, pageUrl: snapshot.pageUrl, pageTitle: snapshot.pageTitle, capturedAt: new Date().toISOString(), markIds: [...selectedMarks], marks: marks.filter(mark => selectedMarks.has(mark.id)), items: chosen() };
+  const payload = { version: 1, site: snapshot.site, kind: snapshot.kind, pageUrl: snapshot.pageUrl, pageTitle: snapshot.pageTitle, capturedAt: new Date().toISOString(), markIds: [...selectedMarks], marks: marks.filter(mark => selectedMarks.has(mark.id)), labels: [...selectedLabels], items: chosen() };
   const blob = new Blob([format === "txt" ? chosen().map(item => item.code).join("\r\n") + "\r\n" : JSON.stringify(payload, null, 2)], { type: format === "txt" ? "text/plain;charset=utf-8" : "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob), anchor = document.createElement("a");
   anchor.href = url; anchor.download = `Jvedio-${new Date().toISOString().slice(0, 10)}.${format}`;
@@ -193,14 +262,27 @@ $("all").addEventListener("click", () => changeSelection(visible().map(item => i
 $("none").addEventListener("click", () => changeSelection([], visible().map(item => item.code)));
 $("rescan").addEventListener("click", () => scan(true));
 $("connect").addEventListener("click", connect);
-$("library").addEventListener("change", () => { chrome.storage.local.set({ libraryId: $("library").value }); restoreMarks(); });
+$("library").addEventListener("change", () => { chrome.storage.local.set({ libraryId: $("library").value }); restoreMarks(); restoreLabels(); });
 $("markToggle").addEventListener("click", () => {
+  closeLabels();
   $("markMenu").hidden = !$("markMenu").hidden;
   $("markToggle").setAttribute("aria-expanded", String(!$("markMenu").hidden));
 });
 $("marksDone").addEventListener("click", closeMarks);
 $("clearMarks").addEventListener("click", () => { selectedMarks.clear(); rememberMarks(); closeMarks(); renderMarks(); });
-document.addEventListener("click", event => { if (!$("markPicker").contains(event.target)) closeMarks(); });
+$("labelToggle").addEventListener("click", () => {
+  closeMarks();
+  $("labelMenu").hidden = !$("labelMenu").hidden;
+  $("labelToggle").setAttribute("aria-expanded", String(!$("labelMenu").hidden));
+});
+$("labelsDone").addEventListener("click", closeLabels);
+$("clearLabels").addEventListener("click", () => { selectedLabels.clear(); rememberLabels(); closeLabels(); renderLabels(); });
+$("addLabel").addEventListener("click", addNewLabel);
+$("newLabel").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); addNewLabel(); } });
+document.addEventListener("click", event => {
+  if (!$("markPicker").contains(event.target)) closeMarks();
+  if (!$("labelPicker").contains(event.target)) closeLabels();
+});
 document.addEventListener("keydown", event => { if (event.key === "Escape" && !$("markMenu").hidden) { closeMarks(); $("markToggle").focus(); } });
 $("apply").addEventListener("click", async () => {
   const port = Number($("port").value), token = $("token").value.trim();
@@ -213,18 +295,19 @@ $("copy").addEventListener("click", async () => {
 });
 for (const format of ["txt", "json"]) $(format).addEventListener("click", () => exportFile(format));
 async function save() {
-  if (busy || scanning || restoringMarks || !connected || !$("library").value || !chosen().length) return;
-  busy = true; closeMarks(); update(); status("正在保存所选影片和标记…");
+  if (busy || scanning || restoringMarks || restoringLabels || !connected || !$("library").value || !chosen().length) return;
+  busy = true; closeMarks(); closeLabels(); update(); status("正在保存所选影片、标记与标签…");
   try {
-    await selectionWrite; await rememberMarks();
-    const payload = { libraryId: Number($("library").value), site: snapshot.site, kind: snapshot.kind, pageUrl: snapshot.pageUrl, markIds: [...selectedMarks], items: chosen() };
+    await selectionWrite; await rememberMarks(); await rememberLabels();
+    const payload = { libraryId: Number($("library").value), site: snapshot.site, kind: snapshot.kind, pageUrl: snapshot.pageUrl, markIds: [...selectedMarks], labels: [...selectedLabels], items: chosen() };
     const response = await chrome.runtime.sendMessage({ kind: "save", payload, sourceTabId, libraryName: $("library").selectedOptions[0].textContent });
     if (!response?.ok) throw new Error(response?.error || "保存失败。");
     await chrome.storage.local.set({ libraryId: $("library").value });
     const pictures = response.result.pictures;
     const markNote = selectedMarks.size ? ` 已为 ${response.result.markedItems} 部影片添加标记：${response.result.markNames.join("、")}。` : "";
+    const labelNote = payload.labels.length ? ` 已为 ${response.result.labeledItems} 部影片添加标签：${payload.labels.join("、")}。` : "";
     const pictureNote = pictures ? ` 图片完成 ${pictures.succeeded} 项${pictures.failed ? `，失败 ${pictures.failed} 项（${pictures.error}）` : ""}。${pictures.unavailableActors ? ` ${pictures.unavailableActors} 位演员未找到可用头像链接。` : ""}` : "";
-    status(`已保存到「${$("library").selectedOptions[0].textContent}」：新增 ${response.result.added} 个，补全 ${response.result.updated || 0} 个，跳过已有 ${response.result.skipped} 个。${markNote}${pictureNote}${response.result.mediaQueued || response.result.imagesQueued ? " 视频已加入下载任务。" : ""}${response.result.mediaAlreadyQueued ? " 已有媒体任务正在进行，完成后再次剪藏可应用新的保存选项。" : ""}${response.result.videoNote || ""}`, pictures?.failed ? "error" : "success");
+    status(`已保存到「${$("library").selectedOptions[0].textContent}」：新增 ${response.result.added} 个，补全 ${response.result.updated || 0} 个，跳过已有 ${response.result.skipped} 个。${markNote}${labelNote}${pictureNote}${response.result.mediaQueued || response.result.imagesQueued ? " 视频已加入下载任务。" : ""}${response.result.mediaAlreadyQueued ? " 已有媒体任务正在进行，完成后再次剪藏可应用新的保存选项。" : ""}${response.result.videoNote || ""}`, pictures?.failed ? "error" : "success");
   } catch (error) { status(error.message, "error"); }
   finally { busy = false; if (pendingSnapshot) { applySnapshot(pendingSnapshot); pendingSnapshot = null; } update(); }
 }

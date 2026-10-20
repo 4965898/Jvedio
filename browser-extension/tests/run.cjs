@@ -106,9 +106,13 @@ async function popupHarness(store = {}, html = busHtml) {
     } },
     runtime: { id: "test", onMessage: { addListener: listener => { store.onSelection = listener; } }, sendMessage: async message => {
       if (["selection-read", "selection-change"].includes(message.kind)) return { ok: true, state: await store.service.selection(message, message) };
-      if (message.kind === "status") return { ok: true, result: { markImport: !store.oldReceiver, markImportVersion: store.oldReceiver ? 0 : 1, marks: store.catalog || testMarks, libraries: [{ id: 1, name: "片库一" }, { id: 2, name: "片库二" }], currentLibraryId: 2, media: store.media || {} } };
+      if (message.kind === "status") return { ok: true, result: { markImport: !store.oldReceiver, markImportVersion: store.oldReceiver ? 0 : 1,
+        labelImport: !store.oldReceiver, labelImportVersion: store.oldReceiver ? 0 : 3, marks: store.catalog || testMarks,
+        libraries: [{ id: 1, name: "片库一", labels: [] }, { id: 2, name: "片库二", labels: store.libraryLabels || [] }], currentLibraryId: 2, media: store.media || {} } };
       captures.push(message.payload); return { ok: true, result: { added: message.payload.items.length, skipped: 0, markedItems: message.payload.markIds?.length ? message.payload.items.length : 0,
-        markNames: (message.payload.markIds || []).map(id => testMarks.find(mark => mark.id === id)?.name) } };
+        markNames: (message.payload.markIds || []).map(id => testMarks.find(mark => mark.id === id)?.name),
+        labelsApplied: message.payload.labels?.length || 0, labeledItems: message.payload.labels?.length ? message.payload.items.length : 0,
+        labelNames: message.payload.labels || [] } };
     } }
   };
   dom.window.eval(popup);
@@ -237,6 +241,53 @@ test("legacy text label preferences are not guessed into mark IDs; renamed marks
   const renamed = await popupHarness({ local: { token: "a".repeat(64), "markIds:2": [21001] }, catalog: testMarks.map(mark => ({ ...mark, name: mark.id === 21001 ? "AV（改名）" : mark.name })) });
   assert.equal(renamed.get("marks").querySelectorAll("input:checked").length, 1); assert.equal(renamed.get("markCount").textContent, "AV（改名）"); renamed.dom.window.close();
 });
+test("label picker reads the library's own labels and remembers choices per library", async () => {
+  const store = { local: { token: "a".repeat(64) }, libraryLabels: ["收藏", "待看"] }, h = await popupHarness(store);
+  assert.equal(h.get("labelToggle").disabled, false);
+  h.get("labelToggle").click(); assert.equal(h.get("labelMenu").hidden, false);
+  assert.deepEqual([...h.get("labels").querySelectorAll("input")].map(input => input.getAttribute("aria-label")), ["收藏", "待看"]);
+  const first = h.get("labels").querySelector("input"); first.checked = true; first.dispatchEvent(new h.dom.window.Event("change"));
+  await h.flush(); assert.deepEqual(Array.from(store.local["labelNames:2"]), ["收藏"]);
+  h.get("library").value = "1"; h.get("library").dispatchEvent(new h.dom.window.Event("change")); await h.flush(); await h.flush();
+  assert.equal(h.get("labels").querySelectorAll("input:checked").length, 0);
+  h.get("library").value = "2"; h.get("library").dispatchEvent(new h.dom.window.Event("change")); await h.flush(); await h.flush();
+  assert.equal(h.get("labels").querySelectorAll("input:checked").length, 1);
+  h.get("clearLabels").click(); await h.flush(); assert.deepEqual(Array.from(store.local["labelNames:2"]), []); await h.flush(); h.dom.window.close();
+});
+test("typing a list name creates a removable new-label chip and sends it on save", async () => {
+  const store = { local: { token: "a".repeat(64) }, libraryLabels: ["收藏", "待看"] }, h = await popupHarness(store);
+  h.get("all").click();
+  h.get("labelToggle").click();
+  const check = h.get("labels").querySelector("input"); check.checked = true; check.dispatchEvent(new h.dom.window.Event("change"));
+  h.get("newLabel").value = "  某人的片单  "; h.get("addLabel").click();
+  assert.match(h.get("newLabels").textContent, /某人的片单/);
+  assert.match(h.get("labelCount").textContent, /收藏、某人的片单/);
+  h.get("newLabel").value = "某人的片单"; h.get("addLabel").click(); assert.equal(h.get("newLabels").querySelectorAll(".label-chip").length, 1);
+  h.get("save").click(); await h.flush();
+  assert.deepEqual(Array.from(h.captures[0].labels), ["收藏", "某人的片单"]);
+  assert.match(h.get("status").textContent, /已为 2 部影片添加标签：收藏、某人的片单/);
+  await h.flush(); h.dom.window.close();
+});
+test("new-label chips can be removed and restore keeps only existing library labels", async () => {
+  const store = { local: { token: "a".repeat(64), "labelNames:2": ["收藏", "未入库片单"] }, libraryLabels: ["收藏"] }, h = await popupHarness(store);
+  assert.equal([...h.get("labels").querySelectorAll("input:checked")].length, 1);
+  assert.equal(h.get("newLabels").querySelectorAll(".label-chip").length, 0);
+  h.get("labelToggle").click();
+  h.get("newLabel").value = "临时片单"; h.get("addLabel").click();
+  assert.equal(h.get("newLabels").querySelectorAll(".label-chip").length, 1);
+  h.get("newLabels").querySelector(".label-chip button").click();
+  assert.equal(h.get("newLabels").querySelectorAll(".label-chip").length, 0);
+  assert.deepEqual(Array.from(store.local["labelNames:2"]), ["收藏"]);
+  await h.flush(); h.dom.window.close();
+});
+test("old receivers disable label selection until the paired desktop EXE is updated", async () => {
+  const h = await popupHarness({ oldReceiver: true, local: { token: "a".repeat(64) }, libraryLabels: ["收藏"] });
+  assert.equal(h.get("labelToggle").disabled, true); assert.match(h.get("labelHint").textContent, /更新本次配套/); await h.flush(); h.dom.window.close();
+});
+test("legacy plain labels: preferences are not restored into the new picker", async () => {
+  const h = await popupHarness({ local: { token: "a".repeat(64), "labels:2": ["旧偏好"] }, libraryLabels: ["收藏", "旧偏好"] });
+  assert.equal(h.get("labels").querySelectorAll("input:checked").length, 0); await h.flush(); h.dom.window.close();
+});
 test("direct detail capture sends and confirms the remembered multiple marks", async () => {
   const h = quickCaptureHarness({ settings: { "markIds:2": [21001, 21002] } }); await h.run();
   assert.equal(h.windows.length, 0); assert.deepEqual(h.posts[0].markIds, [21001, 21002]);
@@ -252,6 +303,33 @@ test("a receiver that fails to acknowledge marks cannot produce a success badge"
   const h = quickCaptureHarness({ noMarkAck: true, settings: { "markIds:2": [21001] } }); await h.run();
   assert.equal(h.posts.length, 1); assert.equal(h.windows.length, 1); assert.equal(h.badges.at(-1), "!");
   assert.match(h.titles.at(-1), /未确认标记写入/);
+});
+test("direct detail capture sends remembered labels and declares new list names separately", async () => {
+  const h = quickCaptureHarness({ settings: { "labelNames:2": ["收藏", "某人的片单"] }, libraryLabels: ["收藏", "待看"] }); await h.run();
+  assert.equal(h.windows.length, 0);
+  assert.deepEqual(h.posts[0].labels, ["收藏"]); assert.deepEqual(h.posts[0].newLabels, ["某人的片单"]);
+  assert.match(h.titles.at(-1), /已为 1 部影片添加标签：收藏、某人的片单/);
+});
+test("label captures reject receivers without new-label support before submitting metadata", async () => {
+  const h = quickCaptureHarness({ noLabelImport: true, settings: { "labelNames:2": ["收藏"] }, libraryLabels: ["收藏"] }); await h.run();
+  assert.equal(h.posts.length, 0); assert.equal(h.windows.length, 1); assert.equal(h.badges.at(-1), "!");
+  assert.match(h.titles.at(-1), /不支持清单标签导入/);
+});
+test("a receiver that fails to acknowledge label writes cannot produce a success badge", async () => {
+  const h = quickCaptureHarness({ noLabelAck: true, settings: { "labelNames:2": ["收藏"] }, libraryLabels: ["收藏"] }); await h.run();
+  assert.equal(h.posts.length, 1); assert.equal(h.windows.length, 1); assert.equal(h.badges.at(-1), "!");
+  assert.match(h.titles.at(-1), /未确认标签写入/);
+});
+test("corrupt label preferences are rejected without submitting", async () => {
+  const h = quickCaptureHarness({ settings: { "labelNames:2": ["x".repeat(201)] }, libraryLabels: ["收藏"] }); await h.run();
+  assert.equal(h.posts.length, 0); assert.equal(h.windows.length, 1); assert.equal(h.badges.at(-1), "!");
+  assert.match(h.titles.at(-1), /无效的标签选择/);
+});
+test("mark and label captures together carry both selections in one save", async () => {
+  const h = quickCaptureHarness({ settings: { "markIds:2": [21001], "labelNames:2": ["收藏", "某人的片单"] }, libraryLabels: ["收藏", "待看"] }); await h.run();
+  assert.deepEqual(h.posts[0].markIds, [21001]);
+  assert.deepEqual(h.posts[0].labels, ["收藏"]); assert.deepEqual(h.posts[0].newLabels, ["某人的片单"]);
+  assert.match(h.titles.at(-1), /已为 1 部影片添加标记：AV/); assert.match(h.titles.at(-1), /已为 1 部影片添加标签：收藏、某人的片单/);
 });
 function quickCaptureHarness(options = {}) {
   const session = options.session || {}, posts = [], windows = [], badges = [], titles = [], live = options.live || {};
@@ -276,11 +354,15 @@ function quickCaptureHarness(options = {}) {
     if (args.body) {
       posts.push(JSON.parse(args.body));
       if (options.saveError) return { ok: false, json: async () => ({ error: "保存失败测试" }) };
-      return { ok: true, json: async () => ({ app: "Jvedio", protocol: 1, added: 1, marksApplied: options.noMarkAck ? 0 : posts.at(-1).markIds.length, markedItems: posts.at(-1).markIds.length ? posts.at(-1).items.length : 0, savedItems: [] }) };
+      return { ok: true, json: async () => ({ app: "Jvedio", protocol: 1, added: 1, marksApplied: options.noMarkAck ? 0 : posts.at(-1).markIds.length, markedItems: posts.at(-1).markIds.length ? posts.at(-1).items.length : 0,
+        labelsApplied: options.noLabelAck ? 0 : (posts.at(-1).labels?.length || 0) + (posts.at(-1).newLabels?.length || 0),
+        labeledItems: (posts.at(-1).labels?.length || posts.at(-1).newLabels?.length) ? posts.at(-1).items.length : 0, savedItems: [] }) };
     }
     statusRequests++;
     if (options.imageError && statusRequests > 1) throw new Error("图片请求失败测试");
-    return { ok: true, json: async () => ({ app: "Jvedio", protocol: 1, markImport: !options.oldReceiver, markImportVersion: options.oldReceiver ? 0 : 1, marks: options.catalog || testMarks, libraries: [{ id: options.deletedLibrary ? 1 : 2, name: "目标影片库" }], media: { savePreviewVideos: !!options.videos } }) };
+    return { ok: true, json: async () => ({ app: "Jvedio", protocol: 1, markImport: !options.oldReceiver, markImportVersion: options.oldReceiver ? 0 : 1,
+      labelImport: !options.oldReceiver && !options.noLabelImport, labelImportVersion: options.oldReceiver ? 0 : options.noLabelImport ? 2 : 3,
+      marks: options.catalog || testMarks, libraries: [{ id: options.deletedLibrary ? 1 : 2, name: "目标影片库", labels: options.libraryLabels || [] }], media: { savePreviewVideos: !!options.videos } }) };
   } };
   backgroundHarness(context);
   const run = vm.runInNewContext("handleAction", context);

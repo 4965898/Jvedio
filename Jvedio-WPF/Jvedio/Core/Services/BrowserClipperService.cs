@@ -72,6 +72,7 @@ namespace Jvedio.Core.Clipper
         public string PageUrl { get; set; }
         public List<BrowserClipItem> Items { get; set; }
         public List<string> Labels { get; set; }
+        public List<string> NewLabels { get; set; }
         public List<long> MarkIds { get; set; }
     }
 
@@ -188,7 +189,7 @@ namespace Jvedio.Core.Clipper
                             "order by case when ifnull(SortOrder,-1)<0 then 2147483647 else SortOrder end,TagID"))
                         using (var reader = command.ExecuteReader())
                             while (reader.Read()) marks.Add(new { id = reader.GetInt64(0), name = reader.GetString(1) });
-                        Reply(stream, 200, new { app = "Jvedio", protocol = 1, labelImport = true, labelImportVersion = 2,
+                        Reply(stream, 200, new { app = "Jvedio", protocol = 1, labelImport = true, labelImportVersion = 3,
                             markImport = true, markImportVersion = 1, marks, currentLibraryId = ConfigManager.Main.CurrentDBId, libraries,
                             media = new { saveImages = config.SaveImages, saveCoverImages = config.SaveImages && config.SaveCoverImages,
                                 saveActorImages = config.SaveImages && config.SaveActorImages,
@@ -410,7 +411,7 @@ namespace Jvedio.Core.Clipper
             return changed;
         }
 
-        /// <summary>Atomic batches append chosen labels, fill missing metadata and retain the source snapshot.</summary>
+        /// <summary>Atomic batches append chosen labels (creating brand-new ones declared by the request), fill missing metadata and retain the source snapshot.</summary>
         public static BrowserClipResult Import(BrowserClipRequest request)
         {
             EnsureSQLite();
@@ -421,6 +422,10 @@ namespace Jvedio.Core.Clipper
             string pageUrl = HttpUrl(request.PageUrl);
             if ((request.Labels?.Count ?? 0) > 100) throw new ArgumentException("一次最多选择 100 个标签。");
             var labels = (request.Labels ?? new List<string>()).Select(LibraryLabelService.ValidateName).Distinct(StringComparer.Ordinal).ToList();
+            if ((request.NewLabels?.Count ?? 0) > 100) throw new ArgumentException("一次最多选择 100 个标签。");
+            var newLabels = (request.NewLabels ?? new List<string>()).Select(LibraryLabelService.ValidateName).Distinct(StringComparer.Ordinal).ToList();
+            // Declared new labels join the target library's catalog; existing ones keep the strict ownership check.
+            var appliedLabels = labels.Concat(newLabels).Distinct(StringComparer.Ordinal).ToList();
             if ((request.MarkIds?.Count ?? 0) > 100) throw new ArgumentException("一次最多选择 100 个标记。");
             var markIds = (request.MarkIds ?? new List<long>()).Distinct().ToList();
             if (markIds.Any(id => id <= 0)) throw new ArgumentException("无效的标记，请重新选择。");
@@ -452,7 +457,7 @@ namespace Jvedio.Core.Clipper
                     while (reader.Read()) existing[Key(Convert.ToString(reader[0]).Trim().ToUpperInvariant())] = reader.GetInt64(1);
                 Execute(connection, transaction, "create table if not exists browser_clip_sources(DataID integer not null, SourceUrl text not null, Site text not null, SnapshotJson text not null, CapturedAt text not null, primary key(DataID,SourceUrl))");
                 Execute(connection, transaction, "create trigger if not exists browser_clip_sources_cleanup after delete on metadata begin delete from browser_clip_sources where DataID=OLD.DataID; end");
-                var result = new BrowserClipResult { LabelsApplied = labels.Count, MarksApplied = markIds.Count };
+                var result = new BrowserClipResult { LabelsApplied = appliedLabels.Count, MarksApplied = markIds.Count };
                 string now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
                 foreach (var item in items) {
                     bool isExisting = existing.TryGetValue(Key(item.Code), out long id);
@@ -480,19 +485,19 @@ namespace Jvedio.Core.Clipper
                             if (Convert.ToInt32(command.ExecuteScalar()) != markIds.Count) throw new ArgumentException("标记保存未完成，本批次已取消，请检查影片库后重试。");
                         result.MarkedItems++;
                     }
-                    foreach (string label in labels) {
+                    foreach (string label in appliedLabels) {
                         Execute(connection, transaction, "insert or ignore into metadata_label_catalog(DBId,LabelName) values(@db,@name)", "@db", request.LibraryId, "@name", label);
                         updated |= Execute(connection, transaction, "insert or ignore into metadata_to_label(DataID,LabelName) values(@id,@name)", "@id", id, "@name", label) > 0;
                     }
-                    if (labels.Count > 0) {
+                    if (appliedLabels.Count > 0) {
                         var parameters = new List<object> { "@id", id };
-                        var names = labels.Select((name, index) => {
+                        var names = appliedLabels.Select((name, index) => {
                             string parameter = "@label" + index;
                             parameters.Add(parameter); parameters.Add(name); return parameter;
                         }).ToArray();
                         using (var command = MakeCommand(connection, transaction,
                             "select count(*) from metadata_to_label where DataID=@id and LabelName in(" + string.Join(",", names) + ")", parameters.ToArray()))
-                            if (Convert.ToInt32(command.ExecuteScalar()) != labels.Count) throw new ArgumentException("标签保存未完成，本批次已取消，请检查影片库后重试。");
+                            if (Convert.ToInt32(command.ExecuteScalar()) != appliedLabels.Count) throw new ArgumentException("标签保存未完成，本批次已取消，请检查影片库后重试。");
                         result.LabeledItems++;
                     }
                     if (item.Metadata != null) {
@@ -529,7 +534,7 @@ namespace Jvedio.Core.Clipper
                         "@id", id, "@url", item.Url.Length > 0 ? item.Url : pageUrl, "@site", request.Site, "@json", JsonConvert.SerializeObject(item), "@now", now);
                 }
                 transaction.Commit();
-                if (labels.Count > 0 && result.Added + result.Updated > 0) {
+                if (appliedLabels.Count > 0 && result.Added + result.Updated > 0) {
                     try { LibraryLabelService.NotifyChanged(request.LibraryId); }
                     catch (Exception ex) { App.Logger.Error(ex); }
                 }
