@@ -43,6 +43,22 @@ test("JavDB mirror, relative link and title fallback", () => {
   const result = extract(`<div class="movie-list"><div class="item"><a class="box" href="/v/abc"><div class="video-title"><strong>300MIUM-123</strong> 示例标题</div></a></div></div>`);
   assert.equal(result.site, "JavDB"); assert.equal(result.items[0].code, "300MIUM-123"); assert.equal(result.items[0].title, "示例标题");
 });
+test("JavDB single-line titles mount the card button next to the date, tolerating third-party code wrappers", () => {
+  const open = html => {
+    const dom = new JSDOM(html, { url: "https://javdb.com/tags?c1=107", runScripts: "outside-only" });
+    dom.window.eval(extractor); return dom;
+  };
+  // 2026-11 real card: .video-title is single-line ellipsis CSS; the code sits in a third-party <savdiv> wrapper.
+  const dom = open(`<div class="movie-list h cols-4 vcols-8"><div class="item"><a href="https://javdb.com/v/1AgYJ9" class="box" title="全裸スクイーズ" target="_blank"><div class="cover"><img src="/cover.jpg"></div><div class="video-title"><strong><savdiv data-visited="0" class="sav-id infoFirst" data-av="START-662">START-662</savdiv></strong> 全裸スクイーズ 松永あかり 身体中すみずみ観察 柔らかさ追求の揉みまくりプレイ</div><div class="score"><span class="value">4.16分, 由90人評價</span></div><div class="meta">2026-12-02</div></a></div></div>`);
+  const card = dom.window.JvedioExtractor.listCards()[0];
+  assert.equal(card.code, "START-662"); assert.equal(card.position.className, "meta");
+  const result = JSON.parse(JSON.stringify(dom.window.JvedioExtractor.extract()));
+  assert.equal(result.items[0].code, "START-662"); assert.equal(result.items[0].metadata.releaseDate, "2026-12-02");
+  dom.window.close();
+  const fallback = open(`<div class="movie-list"><div class="item"><a class="box" href="/v/abc"><div class="video-title"><strong>ABP-001</strong> 无日期的旧版卡片</div></a></div></div>`);
+  assert.equal(fallback.window.JvedioExtractor.listCards()[0].position.className, "video-title");
+  fallback.window.close();
+});
 test("JAVLibrary uses identifier instead of opaque page ID", () => {
   const result = extract(`<div class="videothumblist"><div class="video" id="vid_opaque"><a href="./javabc.html"><div class="id">SSIS-012</div><div class="title">中文标题</div></a><a class="icn_want" id="opaque"></a></div></div>`, "https://mirror.example/cn/main.php");
   assert.equal(result.items[0].code, "SSIS-012"); assert.equal(result.items[0].url, "https://mirror.example/cn/javabc.html");
@@ -192,7 +208,9 @@ test("manifest uses the requested name and limits image access to supported site
   assert.equal(manifest.manifest_version, 3); assert.equal(manifest.name, "Jvedio Connector");
   assert.ok(manifest.host_permissions.includes("http://127.0.0.1/*")); assert.ok(!manifest.host_permissions.includes("<all_urls>"));
   assert.ok(manifest.host_permissions.includes("https://*.jdbstatic.com/*"));
-  assert.deepEqual(manifest.content_scripts[0].matches, ["https://*.javbus.com/*", "https://*.javdb.com/*", "https://*.javlibrary.com/*"]);
+  const sites = ["https://*.javbus.com/*", "https://*.javdb.com/*", "https://*.javdb570.com/*", "https://*.javdb571.com/*", "https://*.javdb572.com/*", "https://*.javdb573.com/*", "https://*.javdb574.com/*", "https://*.javdb575.com/*", "https://*.javlibrary.com/*"];
+  assert.deepEqual(manifest.content_scripts[0].matches, sites);
+  for (const match of sites) assert.ok(manifest.host_permissions.includes(match));
   assert.ok(manifest.content_scripts[0].js.includes("card-buttons.js")); assert.ok(manifest.permissions.includes("activeTab"));
   for (const icon of Object.values(manifest.icons)) assert.ok(fs.existsSync(path.join(root, icon)));
 });

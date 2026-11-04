@@ -200,7 +200,9 @@
         position = element.querySelector(".photo-info date:last-of-type")?.parentElement || element.querySelector(".photo-info");
       } else if (element.matches("a.box")) {
         code = text(element.querySelector(".video-title strong"));
-        position = element.querySelector(".meta, .video-title");
+        // JavDB's new single-line ellipsis .video-title clips trailing content,
+        // so mount next to the date in .meta and fall back to the title line.
+        position = element.querySelector(".meta") || element.querySelector(".video-title");
       } else {
         code = text(element.querySelector(".id")); position = element.querySelector(".id");
       }
