@@ -180,6 +180,8 @@
 
 **2026-11-05 正式发布：Jvedio 6.0.0.3（Jvedio30.4）与 Connector 0.3.1。** JavDB 改版把列表标题改为单行省略号，插件“＋Jvedio”卡片按钮原来挂在标题行尾，被 overflow:hidden 裁剪而“在页面里却看不见”；本版把按钮改挂到卡片日期旁，旧版无日期卡片自动回退标题行，番号提取、勾选与保存链路不变。同时把 JavDB 官方镜像域名 javdb570–575 纳入自动注入范围（官方镜像域名按编号轮换，新域名出现时需更新插件，轮换前可点一次工具栏图标经 activeTab 启用当前页）。**本版只需更新插件**：桌面端功能无变化，覆盖插件目录并在 chrome://extensions 重新加载即可生效。下载和安装见 [6.0.0.3 发布说明](docs/releases/6.0.0.3.md) 与插件 README。
 
+发布核验：[GitHub Actions 构建与发布通过](https://github.com/4965898/Jvedio/actions/runs/41890224757)，[发布页](https://github.com/4965898/Jvedio/releases/tag/6.0.0.3) 的 EXE、完整 ZIP 与 Connector ZIP 均已下载校验；完整包内外 EXE 一致（SHA256 340EEF48…），软件升级源已同步至 6.0.0.3。
+
 ## 插件
 
 包含以下插件
