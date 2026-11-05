@@ -183,6 +183,8 @@
 
 **2026-11-06 正式发布：Jvedio 6.0.0.4（Jvedio30.5）与 Connector 0.3.5。** 修复 JavDB 榜单与瀑布流滚动加载后“＋Jvedio”无法勾选、勾选意外丢失的问题；番号识别新增 MKBD-S03 等真实格式；榜单卡片按钮改挂到评分行旁。**本版只需更新插件**：桌面端功能无变化，覆盖插件目录并在 chrome://extensions 重新加载即可生效。下载和安装见 [6.0.0.4 发布说明](docs/releases/6.0.0.4.md) 与插件 README。
 
+发布核验：[GitHub Actions 构建与发布通过](https://github.com/4965898/Jvedio/actions/runs/42113433856)，[发布页](https://github.com/4965898/Jvedio/releases/tag/6.0.0.4) 的 EXE、完整 ZIP 与 Connector ZIP 均已上传并确认（Connector ZIP 经 upload_url 手动上传）；软件升级源已同步至 6.0.0.4。
+
 发布核验：[GitHub Actions 构建与发布通过](https://github.com/4965898/Jvedio/actions/runs/41890224757)，[发布页](https://github.com/4965898/Jvedio/releases/tag/6.0.0.3) 的 EXE、完整 ZIP 与 Connector ZIP 均已下载校验；完整包内外 EXE 一致（SHA256 340EEF48…），软件升级源已同步至 6.0.0.3。
 
 ## 插件
