@@ -12,7 +12,9 @@
     entry.button.title = checked ? "已加入本页选择；再次点击取消勾选，挑选完成后点击扩展图标统一保存" : "加入本页选择；挑选完成后点击扩展图标，再保存所选影片";
   }
   function receive(state) {
-    if (!state || state.pageUrl !== location.href || state.documentKey !== documentKey || state.revision < revision) return;
+    // Waterfall scripts rewrite the address bar inside one document; picks belong to the
+    // document, so only the document key (never the drifting URL) may reject a state.
+    if (!state || state.documentKey !== documentKey || state.revision < revision) return;
     revision = state.revision; selected = new Set(state.codes);
     for (const entry of entries) { if (entry.host.isConnected) paint(entry); else entries.delete(entry); }
   }
@@ -26,7 +28,9 @@
     if (!chrome.runtime?.id || !globalThis.JvedioExtractor) { observer.disconnect(); return; }
     if (globalThis.JvedioExtractor.extract().kind !== "list") return;
     if (pageUrl !== location.href) {
-      pageUrl = location.href; revision = -1; selected.clear();
+      // Same-document URL rewrite: re-read the background's authoritative picks
+      // without wiping the local selection, so waterfall scrolling keeps them.
+      pageUrl = location.href;
       chrome.runtime.sendMessage({ kind: "read-card-selection", pageUrl, documentKey }).then(response => {
         if (response?.ok) receive(response.state);
       }).catch(() => {});

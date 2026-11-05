@@ -21,7 +21,7 @@ function extract(html, url = "https://mirror.example/list") {
 function backgroundHarness(context) {
   context.chrome.tabs ??= {};
   context.chrome.tabs.sendMessage ??= async () => {};
-  context.chrome.tabs.onUpdated ??= { addListener() {} };
+  context.chrome.tabs.onUpdated ??= { addListener: listener => { context.onTabUpdated = listener; } };
   context.chrome.windows.onRemoved ??= { addListener() {} };
   if (context.chrome.storage.session) context.chrome.storage.session.remove ??= async () => {};
   context.chrome.contextMenus ??= { removeAll: callback => callback(), create() {}, onClicked: { addListener() {} } };
@@ -58,6 +58,9 @@ test("JavDB single-line titles mount the card button next to the date, toleratin
   const fallback = open(`<div class="movie-list"><div class="item"><a class="box" href="/v/abc"><div class="video-title"><strong>ABP-001</strong> 无日期的旧版卡片</div></a></div></div>`);
   assert.equal(fallback.window.JvedioExtractor.listCards()[0].position.className, "video-title");
   fallback.window.close();
+  const ranking = open(`<div class="movie-list h cols-4"><div class="item"><a class="box" href="/v/abc" title="超长的影片名称会让单行省略号标题裁掉行尾按钮"><div class="cover contain"><span class="ranking">112</span><img src="/cover.jpg"></div><div class="video-title"><strong>ABP-001</strong> 超长的影片名称会让单行省略号标题裁掉行尾按钮</div><div class="score"><span class="value">4.63分, 由8817人评价</span></div></a></div></div>`);
+  assert.equal(ranking.window.JvedioExtractor.listCards()[0].position.className, "score");
+  ranking.window.close();
 });
 test("JAVLibrary uses identifier instead of opaque page ID", () => {
   const result = extract(`<div class="videothumblist"><div class="video" id="vid_opaque"><a href="./javabc.html"><div class="id">SSIS-012</div><div class="title">中文标题</div></a><a class="icn_want" id="opaque"></a></div></div>`, "https://mirror.example/cn/main.php");
@@ -96,7 +99,15 @@ test("numeric uncensored IDs are accepted; dates are rejected", () => {
   const dom = new JSDOM("", { runScripts: "outside-only" }); dom.window.eval(extractor);
   const normalize = dom.window.JvedioExtractor.normalizeCode;
   assert.equal(normalize("123456_001"), "123456_001"); assert.equal(normalize("2026-10-07"), ""); assert.equal(normalize("abp—001"), "ABP-001");
+  assert.equal(normalize("MKBD-S03"), "MKBD-S03"); assert.equal(normalize("S2MBD-050"), "S2MBD-050");
+  assert.equal(normalize("T28-611"), "T28-611"); assert.equal(normalize("N0659"), "N0659");
+  assert.equal(normalize("TARGET-"), ""); assert.equal(normalize("opaqueID"), "");
   dom.window.close();
+});
+test("rankings tail cards with studio-prefixed codes are all extracted", () => {
+  const card = code => `<div class="movie-list"><div class="item"><a class="box" href="/v/x"><div class="video-title"><strong>${code}</strong> 标题</div></a></div></div>`;
+  const result = extract(["MKBD-S03", "N0659", "S2MBD-050", "T28-611"].map(card).join(""), "https://javdb.com/rankings/top?page=6");
+  assert.deepEqual(result.items.map(item => item.code), ["MKBD-S03", "N0659", "S2MBD-050", "T28-611"]);
 });
 test("waterfall pages retain all loaded identifiers beyond one receiver batch", () => {
   const cards = Array.from({ length: 510 }, (_, i) => `<div class="video"><a><div class="id">TEST-${1000 + i}</div></a></div>`).join("");
@@ -202,6 +213,26 @@ test("background ignores untrusted senders and uses the authenticated loopback e
   assert.equal(handler({ kind: "save-card", code: "ABP-001", pageUrl: "https://example.com/" }, { id: "test", url: "https://example.com/", tab: { id: 7 }, frameId: 1 }, () => assert.fail()), undefined);
   const response = await new Promise(resolve => handler({ kind: "status" }, { id: "test", url: "chrome-extension://test/popup.html" }, resolve));
   assert.equal(response.ok, true); assert.equal(captured.url, "http://127.0.0.1:18888/v1/status"); assert.equal(captured.options.headers["X-Jvedio-Token"], "a".repeat(64));
+});
+test("card clicks pass when the browser reports a stale sender.url after replaceState", async () => {
+  let handler; const session = {}, live = { pageUrl: "https://javdb.com/rankings/top?page=2" };
+  const context = { setTimeout, clearTimeout, AbortController, TypeError, Error, chrome: {
+    action: { onClicked: { addListener() {} } }, windows: { onRemoved: { addListener() {} }, onBoundsChanged: { addListener() {} } },
+    tabs: { onUpdated: { addListener() {} }, sendMessage: async () => {} },
+    runtime: { id: "test", getURL: value => value, onMessage: { addListener: fn => { handler = fn; } }, sendMessage: async () => ({ ok: true }) },
+    storage: { local: { get: async () => ({ port: 18888, token: "a".repeat(64) }) },
+      session: { get: async key => ({ [key]: session[key] }), set: async value => Object.assign(session, value) } },
+    scripting: { executeScript: async args => args.files ? [] :
+      [{ result: { pageUrl: live.pageUrl, documentKey: "source-doc", snapshot: extract(busHtml, live.pageUrl) } }] }
+  }, fetch: async () => ({ ok: true, json: async () => ({ app: "Jvedio", protocol: 1 }) }) };
+  backgroundHarness(context);
+  // The card script sends the rewritten address while this browser still reports
+  // the original document URL as sender.url; the click must not be dropped.
+  const response = await new Promise(resolve => handler({ kind: "select-card", code: "ABP-001",
+    pageUrl: "https://javdb.com/rankings/top?page=2", documentKey: "source-doc" },
+    { id: "test", url: "https://javdb.com/rankings/top", tab: { id: 7 }, frameId: 0 }, resolve));
+  assert.equal(response.ok, true);
+  assert.deepEqual(Array.from(session["selection:7"].codes), ["ABP-001"]);
 });
 test("manifest uses the requested name and limits image access to supported sites and image hosts", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
@@ -364,7 +395,7 @@ function quickCaptureHarness(options = {}) {
       if (args.files) return [];
       if (args.args) { resolutions++; if (options.previewError) throw new Error("blocked"); return [{ result: ["https://cdn.example/trailer.mp4"] }]; }
       const pageUrl = live.pageUrl || "https://mirror.example/list", documentKey = live.documentKey || "source-doc";
-      if (args.func.toString().includes("performance.timeOrigin")) return [{ result: { pageUrl, documentKey } }];
+      if (args.func.toString().includes("performance.timeOrigin")) return [{ result: { pageUrl, documentKey, snapshot: extract(live.html || html, pageUrl) } }];
       return [{ result: extract(live.html || html, pageUrl) }];
     } }
   }, fetch: async (url, args) => {
@@ -385,7 +416,7 @@ function quickCaptureHarness(options = {}) {
   backgroundHarness(context);
   const run = vm.runInNewContext("handleAction", context);
   const card = vm.runInNewContext("selectCard", context), selection = vm.runInNewContext("pageSelection", context), clear = vm.runInNewContext("clearPageSelection", context);
-  return { session, posts, windows, badges, titles, run: () => run({ id: 7, url: "https://mirror.example/list" }), resolutions: () => resolutions,
+  return { session, posts, windows, badges, titles, onTabUpdated: () => context.onTabUpdated, run: () => run({ id: 7, url: "https://mirror.example/list" }), resolutions: () => resolutions,
     card: (code, pageUrl = live.pageUrl || "https://mirror.example/list", documentKey = live.documentKey || "source-doc") => card(7, { code, pageUrl, documentKey })
       .then(state => ({ ok: true, state }), error => ({ ok: false, error: error.message })),
     selection: (expected, change) => selection(7, expected, change), clear: () => clear(7),
@@ -436,11 +467,31 @@ test("card buttons accumulate different films; clicking a checked card again unc
   assert.deepEqual(Array.from(h.session["selection:7"].codes), ["FC2-PPV-1234567"]);
 });
 
-test("absent cards and switched pages are rejected without opening a window", async () => {
-  for (const [code, url] of [["ABSENT-001", "https://mirror.example/list"], ["ABP-001", "https://mirror.example/other"]]) {
-    const h = quickCaptureHarness({ html: coverBase }); const response = await h.card(code, url);
+test("absent codes and switched documents are rejected without opening a window", async () => {
+  for (const [code, pageUrl, documentKey] of [["ABSENT-001", "https://mirror.example/list", "source-doc"], ["ABP-001", "https://mirror.example/other", "other-doc"]]) {
+    const h = quickCaptureHarness({ html: coverBase }); const response = await h.card(code, pageUrl, documentKey);
     assert.equal(response.ok, false); assert.equal(h.posts.length, 0); assert.equal(h.windows.length, 0);
   }
+});
+
+test("waterfall address-bar rewrites keep picks until a real navigation", async () => {
+  const live = {}, h = quickCaptureHarness({ html: busHtml, live }), flush = () => new Promise(resolve => setImmediate(resolve));
+  await h.card("ABP-001");
+  // Waterfall scripts (JAV-JHS) rewrite the address bar with history.replaceState
+  // while appending cards; the picks must survive and follow the displayed URL.
+  h.onTabUpdated()(7, { url: "https://mirror.example/list?page=2" }); await flush();
+  assert.deepEqual(Array.from(h.session["selection:7"].codes), ["ABP-001"]);
+  assert.equal(h.session["selection:7"].pageUrl, "https://mirror.example/list?page=2");
+  assert.equal((await h.selection({ pageUrl: "https://mirror.example/list?page=2", documentKey: "source-doc" })).codes.length, 1);
+  // A card click whose URL drifted while scrolling still toggles in the same document.
+  assert.equal((await h.card("FC2-PPV-1234567", "https://mirror.example/list?page=2", "source-doc")).ok, true);
+  assert.deepEqual(Array.from(h.session["selection:7"].codes), ["ABP-001", "FC2-PPV-1234567"]);
+  // A real navigation replaces the document; subframe "loading" blips alone must not
+  // clear anything. The first interaction on the new document starts a fresh session.
+  h.onTabUpdated()(7, { status: "loading", url: "https://mirror.example/list" }); await flush();
+  assert.deepEqual(Array.from(h.session["selection:7"].codes), ["ABP-001", "FC2-PPV-1234567"]);
+  live.documentKey = "page-two";
+  assert.equal((await h.selection({ pageUrl: "https://mirror.example/list", documentKey: "page-two" })).codes.length, 0);
 });
 
 test("simultaneous card traffic queues loopback requests without exceeding three connections", async () => {
@@ -476,13 +527,18 @@ test("card picks before opening and during window selection merge with checkbox 
   await h.flush(); h.dom.window.close();
 });
 
-test("reload, manual pagination and close clear choices; stale messages cannot restore them", async () => {
+test("reload and manual pagination clear choices; same-document waterfall rewrites keep them", async () => {
   const live = {}, h = quickCaptureHarness({ html: busHtml, live });
   await h.card("ABP-001"); live.documentKey = "reloaded";
   const read = () => h.selection({ pageUrl: live.pageUrl || "https://mirror.example/list", documentKey: live.documentKey });
   assert.equal((await read()).codes.length, 0);
   assert.equal((await h.card("ABP-001", "https://mirror.example/list", "source-doc")).ok, false);
-  await h.card("ABP-001"); live.pageUrl = "https://mirror.example/list?page=2";
+  await h.card("ABP-001");
+  // Waterfall scrolling rewrites the address bar inside the same document: picks persist.
+  live.pageUrl = "https://mirror.example/list?page=2";
+  assert.equal((await read()).codes.length, 1);
+  // Manual pagination loads a new document: that starts a fresh picking session.
+  live.documentKey = "page-two";
   assert.equal((await read()).codes.length, 0);
   await h.card("FC2-PPV-1234567"); await h.clear(); assert.equal((await read()).codes.length, 0);
 });
@@ -515,6 +571,21 @@ test("waterfall additions preserve choices and explicit refresh clears all choic
   assert.equal(h.get("items").querySelectorAll("input:checked").length, 1);
   h.get("rescan").click(); await h.flush(); await h.flush();
   assert.equal(h.get("items").querySelectorAll("input:checked").length, 0); await h.flush(); h.dom.window.close();
+});
+test("waterfall address rewrites keep popup choices on the same document", async () => {
+  const store = { local: { token: "a".repeat(64) } }, h = await popupHarness(store);
+  const check = h.get("items").querySelector("input"); check.checked = true; check.dispatchEvent(new h.dom.window.Event("change"));
+  await h.flush();
+  assert.equal(h.get("items").querySelectorAll("input:checked").length, 1);
+  // Broadcasts and page pushes from the waterfall keep the document, so the
+  // rewritten address must not reject them or clear the checkboxes.
+  store.onSelection?.({ kind: "selection-changed", sourceTabId: 7, state: { pageUrl: "https://mirror.example/list?page=2",
+    documentKey: "source-doc", revision: 5, codes: ["ABP-001", "FC2-PPV-1234567"] } }, { id: "test" });
+  assert.equal(h.get("items").querySelectorAll("input:checked").length, 2);
+  store.onPage({ ...extract(busHtml, "https://mirror.example/list?page=2"), documentKey: "source-doc" });
+  assert.equal(h.get("items").querySelectorAll("input").length, 2);
+  assert.equal(h.get("items").querySelectorAll("input:checked").length, 2);
+  await h.flush(); h.dom.window.close();
 });
 test("multiple marks are appended to one save and cleared when switching libraries", async () => {
   const h = await popupHarness({ local: { token: "a".repeat(64) } });

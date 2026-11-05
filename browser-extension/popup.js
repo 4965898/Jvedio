@@ -23,7 +23,9 @@ function displaySelection() {
   update();
 }
 function receiveSelection(state) {
-  if (!state || state.pageUrl !== snapshot.pageUrl || state.documentKey !== snapshot.documentKey || state.revision < selectionRevision) return;
+  // Waterfall scripts rewrite the source tab's address bar within one document;
+  // picks belong to that document, so the document key alone gates the state.
+  if (!state || state.documentKey !== snapshot.documentKey || state.revision < selectionRevision) return;
   selectionRevision = state.revision; confirmedSelection = state.codes; displaySelection();
 }
 function changeSelection(add = [], remove = []) {
@@ -221,7 +223,9 @@ async function scan(reset = false) {
 function applySnapshot(next) {
   if (JSON.stringify(next) === JSON.stringify(snapshot)) return;
   const offset = $("items").scrollTop;
-  if (next.pageUrl !== snapshot.pageUrl || next.documentKey !== snapshot.documentKey) { scan(); return; }
+  // A different document means a real navigation; a mere address-bar rewrite from
+  // waterfall scrolling keeps the same cards and choices, so only re-render.
+  if (next.documentKey !== snapshot.documentKey) { scan(); return; }
   snapshot = next;
   $("source").textContent = `${snapshot.site || "未支持的页面"} · ${snapshot.pageTitle || ""}`;
   $("source").title = snapshot.pageUrl;

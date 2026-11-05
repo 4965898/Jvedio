@@ -9,7 +9,11 @@
     const fc2 = code.match(/^FC2[\s_-]*(?:PPV[\s_-]*)?(\d{5,10})$/);
     if (fc2) return `FC2-PPV-${fc2[1]}`;
     // Accept explicit identifier fields, never scan the whole page for numbers.
-    if (/^\d{0,6}[A-Z]{2,15}[-_]\d{2,10}(?:[-_][A-Z0-9]{1,8})?$/.test(code)) return code;
+    // The prefix must contain a letter (dates fail) and the tail a digit (words fail);
+    // alnum prefixes cover T28/S2MBD, letter-digit tails cover MKBD-S03.
+    if (/^\d{0,6}(?=[A-Z0-9]{1,15}[-_][A-Z0-9]{0,9}\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{1,15}[-_][A-Z0-9]{1,10}(?:[-_][A-Z0-9]{1,8})?$/.test(code)) return code;
+    // Separator-less studio codes such as N0659.
+    if (/^[A-Z]\d{3,6}$/.test(code)) return code;
     if (/^\d{6}[-_]\d{2,4}$/.test(code)) return code;
     return "";
   }
@@ -200,9 +204,10 @@
         position = element.querySelector(".photo-info date:last-of-type")?.parentElement || element.querySelector(".photo-info");
       } else if (element.matches("a.box")) {
         code = text(element.querySelector(".video-title strong"));
-        // JavDB's new single-line ellipsis .video-title clips trailing content,
-        // so mount next to the date in .meta and fall back to the title line.
-        position = element.querySelector(".meta") || element.querySelector(".video-title");
+        // JavDB's new single-line ellipsis .video-title clips trailing content, so
+        // mount next to the date in .meta; ranking cards without a date go beside
+        // the "4.6分, 由N人評價" score line, and only bare cards use the title line.
+        position = element.querySelector(".meta") || element.querySelector(".score") || element.querySelector(".video-title");
       } else {
         code = text(element.querySelector(".id")); position = element.querySelector(".id");
       }

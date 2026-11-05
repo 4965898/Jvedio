@@ -32,10 +32,13 @@ function pageSelection(tabId, expected, change = {}) {
       pageUrl: location.href, documentKey: String(performance.timeOrigin)
     }) });
     const page = response.result;
-    if (page.pageUrl !== expected.pageUrl || page.documentKey !== expected.documentKey)
+    // Waterfall scripts (JAV-JHS etc.) rewrite the address bar with history.replaceState
+    // while appending cards to the same document, so the document key — not the URL —
+    // decides whether the picking session continues.
+    if (page.documentKey !== expected.documentKey)
       throw new Error("页面已切换，请在当前页面重新勾选。");
     const key = `selection:${tabId}`, previous = (await chrome.storage.session.get(key))[key];
-    const samePage = previous?.version === 3 && previous.pageUrl === page.pageUrl && previous.documentKey === page.documentKey;
+    const samePage = previous?.version === 3 && previous.documentKey === page.documentKey;
     const state = { version: 3, ...page, kind: expected.kindHint || previous?.kind || "list", codes: samePage ? previous.codes : [],
       viewKey: samePage ? previous.viewKey : "", revision: (previous?.revision || 0) + 1 };
     // Reloading the selection window starts a new picking session. Its first opening keeps card picks.
@@ -143,11 +146,16 @@ async function clipDestination() {
 }
 async function selectCard(tabId, message) {
   await chrome.scripting.executeScript({ target: { tabId }, files: ["extractor.js"] });
-  const [response] = await chrome.scripting.executeScript({ target: { tabId }, func: () => globalThis.JvedioExtractor.extract() });
-  const snapshot = response.result;
-  if (snapshot?.pageUrl !== message.pageUrl || snapshot.kind !== "list" || !snapshot.items.some(item => item.code === message.code))
+  const [response] = await chrome.scripting.executeScript({ target: { tabId }, func: () => ({
+    pageUrl: location.href, documentKey: String(performance.timeOrigin), snapshot: globalThis.JvedioExtractor.extract() }) });
+  const page = response.result;
+  // The waterfall rewrites the URL as pages load, so the same document may report a
+  // different address between the card click and this check; compare document keys.
+  if (page.documentKey !== message.documentKey)
+    throw new Error("页面已切换，请在当前页面重新勾选。");
+  if (page.snapshot?.kind !== "list" || !page.snapshot.items.some(item => item.code === message.code))
     throw new Error("当前列表中未找到这个番号，请刷新页面后重试。");
-  return pageSelection(tabId, { ...message, kindHint: "list" }, { toggle: [message.code] });
+  return pageSelection(tabId, { ...message, pageUrl: page.pageUrl, kindHint: "list" }, { toggle: [message.code] });
 }
 async function captureFromToolbar(tab) {
   let snapshot;
@@ -195,8 +203,19 @@ chrome.windows.onRemoved.addListener(windowId => {
     await chrome.storage.session.remove(key);
   });
 });
+// A same-document address-bar rewrite (history.replaceState from waterfall scripts)
+// keeps the document and its picks. Even a tab "loading" blip (subframe dialogs from
+// userscripts) must not clear anything: the document key checked by pageSelection is
+// the only authority for whether a new document really replaced the old one.
+async function followSelectionUrl(tabId, url) {
+  const key = `selection:${tabId}`, previous = (await chrome.storage.session.get(key))[key];
+  if (!previous || previous.version !== 3 || previous.pageUrl === url) return;
+  const state = { ...previous, pageUrl: url, revision: (previous.revision || 0) + 1 };
+  await chrome.storage.session.set({ [key]: state });
+  await publishSelection(tabId, state);
+}
 chrome.tabs.onUpdated.addListener((tabId, change) => {
-  if (change.status === "loading" || change.url) clearPageSelection(tabId).catch(() => {});
+  if (change.url) followSelectionUrl(tabId, change.url).catch(() => {});
   if (change.status === "complete") chrome.runtime.sendMessage({ kind: "refresh-capture-window", sourceTabId: tabId }).catch(() => {});
 });
 
@@ -411,8 +430,11 @@ async function saveClips(payload, tabId, connection) {
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (["select-card", "read-card-selection"].includes(message?.kind)) {
+    // message.pageUrl is not trusted for validation (live page values are re-read
+    // server-side), so it is not compared against sender.url: some Chromium builds
+    // report a stale sender.url after history.replaceState from waterfall scripts.
     if (sender.id !== chrome.runtime.id || !Number.isInteger(sender.tab?.id) || sender.frameId !== 0 ||
-      !/^https?:\/\//.test(sender.url || "") || message.pageUrl !== sender.url || typeof message.documentKey !== "string") return;
+      !/^https?:\/\//.test(sender.url || "") || typeof message.documentKey !== "string") return;
     if (message.kind === "select-card" && (typeof message.code !== "string" || message.code.length > 40)) return;
     (message.kind === "select-card" ? selectCard(sender.tab.id, message) : pageSelection(sender.tab.id, message))
       .then(state => respond({ ok: true, state }), error => respond({ ok: false, error: error.message }));
