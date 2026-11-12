@@ -1,0 +1,24 @@
+{
+  "PluginMetaData": {
+    "PluginName": "AvMoo 信息同步",
+    "PluginType": 0,
+    "Reboot": true,
+    "Authors": [
+      {
+        "Name": "chao"
+      }
+    ],
+    "ReleaseNotes": {
+      "Files": ["./AvmooCrawler.dll"],
+      "Version": "1.0.0",
+      "Date": "2026-11-12",
+      "Desc": "AvMoo 备胎信息同步（排在内置源之后，仅当前置源失败时请求）",
+      "KeyWords": [
+        {
+          "Key": "类别",
+          "Value": "爬虫"
+        }
+      ]
+    }
+  }
+}

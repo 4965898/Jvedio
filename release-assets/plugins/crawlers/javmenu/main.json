@@ -1,0 +1,24 @@
+{
+  "PluginMetaData": {
+    "PluginName": "JavMenu 信息同步",
+    "PluginType": 0,
+    "Reboot": true,
+    "Authors": [
+      {
+        "Name": "chao"
+      }
+    ],
+    "ReleaseNotes": {
+      "Files": ["./JavmenuCrawler.dll"],
+      "Version": "1.0.0",
+      "Date": "2026-11-12",
+      "Desc": "JavMenu 备胎信息同步（系列信息等字段补齐）",
+      "KeyWords": [
+        {
+          "Key": "类别",
+          "Value": "爬虫"
+        }
+      ]
+    }
+  }
+}
