@@ -45,6 +45,12 @@ jobs:
           }
           "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
 
+      - name: Check i18n key parity
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-i18n-keys.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'i18n key check failed: language files are not in sync.' }
+
       - name: Restore NuGet packages and .NET Framework references
         shell: pwsh
         run: |
@@ -61,7 +67,11 @@ jobs:
           $projects = @(
             'Jvedio-WPF/Jvedio/Jvedio.csproj',
             'Jvedio-WPF/Jvedio/Core/Crawler/Bus2/BusCrawler/BusCrawler.csproj',
-            'Jvedio-WPF/Jvedio/Core/Crawler/Db2/DbCrawler/DbCrawler.csproj'
+            'Jvedio-WPF/Jvedio/Core/Crawler/Db2/DbCrawler/DbCrawler.csproj',
+            'Jvedio-WPF/Jvedio/Core/Crawler/Extra/AvmooCrawler/AvmooCrawler.csproj',
+            'Jvedio-WPF/Jvedio/Core/Crawler/Extra/JavmenuCrawler/JavmenuCrawler.csproj',
+            'Jvedio-WPF/Jvedio/Core/Crawler/Extra/MinnanoavCrawler/MinnanoavCrawler.csproj',
+            'Jvedio-WPF/Jvedio/Core/Crawler/Extra/JavdatabaseCrawler/JavdatabaseCrawler.csproj'
           )
           foreach ($project in $projects) {
             msbuild $project /t:Rebuild /p:Configuration=Release /p:TargetFrameworkRootPath="$refs" /p:LangVersion=9.0 /nologo /v:minimal
