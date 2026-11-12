@@ -186,6 +186,8 @@
 
 **2026-11-13 正式发布：Jvedio 6.0.0.5（Jvedio30.6）与 Connector 0.4.0。** 本版为功能大版本：新增定时增量扫描+幂等刮削、演员资料自动补齐（JAVDatabase 主源 + MinnanoAV 备源，串行防风控，支持整个库一键补齐、强制覆写与同时保存头像开关）、JavDB 源网页/API 双模式、AvMoo/Javmenu 备胎源；演员界面全面优化——与影片一致的多选高亮、整卡点选与右键、全选本页、信息标签化展示（含鞋码）、按任意信息排序、去到顶部/底部、转换英文名与导出演员列表分档、任务按入队顺序显示。**本版需同时更新桌面端与插件**。下载和安装见 [6.0.0.5 发布说明](docs/releases/6.0.0.5.md) 与插件 README。
 
+发布核验：[GitHub Actions 构建与发布通过](https://github.com/4965898/Jvedio/actions/runs/43312401407)，[发布页](https://github.com/4965898/Jvedio/releases/tag/6.0.0.5) 的 EXE、完整 ZIP 与 Connector ZIP 均已上传并确认（Connector ZIP 经 upload_url 手动上传；EXE 下载核验 FileVersion=6.0.0.5）；软件升级源已同步至 6.0.0.5。
+
 发布核验：[GitHub Actions 构建与发布通过](https://github.com/4965898/Jvedio/actions/runs/42113433856)，[发布页](https://github.com/4965898/Jvedio/releases/tag/6.0.0.4) 的 EXE、完整 ZIP 与 Connector ZIP 均已上传并确认（Connector ZIP 经 upload_url 手动上传）；软件升级源已同步至 6.0.0.4。
 
 发布核验：[GitHub Actions 构建与发布通过](https://github.com/4965898/Jvedio/actions/runs/41890224757)，[发布页](https://github.com/4965898/Jvedio/releases/tag/6.0.0.3) 的 EXE、完整 ZIP 与 Connector ZIP 均已下载校验；完整包内外 EXE 一致（SHA256 340EEF48…），软件升级源已同步至 6.0.0.3。
