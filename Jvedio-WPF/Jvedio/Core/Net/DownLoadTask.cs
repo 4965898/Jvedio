@@ -314,6 +314,8 @@ namespace Jvedio.Core.Net
                         actorInfo.ActorName = actorName;
                         SetActorNameEN(actorInfo, enNames, i);
                         actorMapper.Insert(actorInfo);
+                        // 新建演员资料为空 → 交给后台队列按需补齐（低优先级串行，防风控）
+                        Jvedio.Core.Tasks.ActorScrapeManager.EnqueueActorIfIncomplete(actorInfo);
                     } else {
                         SetActorNameEN(actorInfo, enNames, i);
                     }
@@ -332,7 +334,8 @@ namespace Jvedio.Core.Net
         {
             if (enNames is List<string> enList && index < enList.Count && !string.IsNullOrEmpty(enList[index])) {
                 string en = RomajiConverter.SlugToDisplay(enList[index]);
-                if (string.IsNullOrEmpty(actorInfo.ActorNameEN) && !string.IsNullOrEmpty(en)) {
+                // JavDB 部分演员页 URL 是随机 ID(QE4G/7e8V 之类)而非罗马字 slug——含数字的转换结果拒收
+                if (string.IsNullOrEmpty(actorInfo.ActorNameEN) && !string.IsNullOrEmpty(en) && !en.Any(char.IsDigit)) {
                     actorInfo.ActorNameEN = en;
                     if (actorInfo.ActorID > 0)
                         actorMapper.UpdateFieldById("ActorNameEN", en, actorInfo.ActorID);
@@ -389,6 +392,8 @@ namespace Jvedio.Core.Net
                             actorInfo.ImageUrl = url;
                             SetActorNameEN(actorInfo, enNames, i);
                             actorMapper.Insert(actorInfo);
+                            // 新建演员资料为空 → 交给后台队列按需补齐（低优先级串行，防风控）
+                            Jvedio.Core.Tasks.ActorScrapeManager.EnqueueActorIfIncomplete(actorInfo);
                         } else {
                             SetActorNameEN(actorInfo, enNames, i);
                         }

@@ -428,14 +428,44 @@ async function saveClips(payload, tabId, connection) {
   }
   return { ...total, videoNote, markNames, labelNames };
 }
+// 「已拥有」角标：列表页卡片/popup 批量查询番号是否已在库（桌面端 POST /v1/owned）。
+// 由桌面端 /v1/status 的 ownedQuery 能力位门控，老桌面端自动停用（enabled:false）。
+let ownedQueryEnabled = null, ownedQueryCheckedAt = 0;
+async function ownedQueryAvailable() {
+  if (ownedQueryEnabled !== null && Date.now() - ownedQueryCheckedAt < 60000) return ownedQueryEnabled;
+  try {
+    const status = await request("status");
+    ownedQueryEnabled = status.ownedQuery === true && status.ownedQueryVersion >= 1;
+  } catch { ownedQueryEnabled = false; }
+  ownedQueryCheckedAt = Date.now();
+  return ownedQueryEnabled;
+}
+async function queryOwned(message) {
+  const settings = await chrome.storage.local.get({ token: "", libraryId: "" });
+  if (!settings.token || !settings.libraryId) return { ok: true, enabled: false, items: [] };
+  if (!(await ownedQueryAvailable())) return { ok: true, enabled: false, items: [] };
+  const codes = [...new Set((Array.isArray(message.codes) ? message.codes : [])
+    .filter(code => typeof code === "string" && code.length > 0 && code.length <= 40))].slice(0, 500);
+  if (!codes.length) return { ok: true, enabled: true, items: [] };
+  const result = await request("owned", { libraryId: Number(settings.libraryId), codes });
+  return { ok: true, enabled: true, items: Array.isArray(result.items) ? result.items : [] };
+}
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (["select-card", "read-card-selection"].includes(message?.kind)) {
+  // popup 发来的 query-owned 走下方 popup 分支（此处没有 sender.tab 会被误拒）
+  if (["select-card", "read-card-selection", "query-owned"].includes(message?.kind) &&
+    sender.url?.split("?")[0] !== chrome.runtime.getURL("popup.html")) {
     // message.pageUrl is not trusted for validation (live page values are re-read
     // server-side), so it is not compared against sender.url: some Chromium builds
     // report a stale sender.url after history.replaceState from waterfall scripts.
     if (sender.id !== chrome.runtime.id || !Number.isInteger(sender.tab?.id) || sender.frameId !== 0 ||
       !/^https?:\/\//.test(sender.url || "") || typeof message.documentKey !== "string") return;
     if (message.kind === "select-card" && (typeof message.code !== "string" || message.code.length > 40)) return;
+    if (message.kind === "query-owned" && (!Array.isArray(message.codes) || message.codes.length > 500 ||
+      !message.codes.every(code => typeof code === "string" && code.length <= 40))) return;
+    if (message.kind === "query-owned") {
+      queryOwned(message).then(result => respond(result), error => respond({ ok: false, error: error.message }));
+      return true;
+    }
     (message.kind === "select-card" ? selectCard(sender.tab.id, message) : pageSelection(sender.tab.id, message))
       .then(state => respond({ ok: true, state }), error => respond({ ok: false, error: error.message }));
     return true;
@@ -448,7 +478,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     pageSelection(message.sourceTabId, message, message).then(state => respond({ ok: true, state }), error => respond({ ok: false, error: error.message }));
     return true;
   }
-  if (!message || !["status", "save"].includes(message.kind)) return;
+  if (!message || !["status", "save", "query-owned"].includes(message.kind)) return;
   (async () => {
     if (message.kind === "save") {
       const result = await saveClips(message.payload, message.sourceTabId);
@@ -456,6 +486,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         captureMessage(message.payload, result, message.libraryName || `影片库 ${message.payload.libraryId}`), captureKind(result));
       return result;
     }
+    if (message.kind === "query-owned") return queryOwned(message);
     return request("status");
   })().then(result => respond({ ok: true, result }), error => respond({ ok: false, error: error.message }));
   return true;

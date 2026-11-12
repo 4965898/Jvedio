@@ -453,6 +453,8 @@
     <Compile Include="Windows\Window_ScrapePreview.cs" />
     <Compile Include="Core\Tasks\DurationIndexManager.cs" />
     <Compile Include="Core\Tasks\TranslateTaskManager.cs" />
+    <Compile Include="Core\Tasks\ActorScrapeTask.cs" />
+    <Compile Include="Core\Tasks\ActorScrapeManager.cs" />
     <Compile Include="Core\Translation\TranslateManager.cs" />
     <Compile Include="Core\Translation\TranslateTask.cs" />
     <Compile Include="Mapper\Common\AssociationMapper.cs" />

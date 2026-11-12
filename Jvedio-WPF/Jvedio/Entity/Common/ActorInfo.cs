@@ -19,6 +19,15 @@ using System.Windows.Media.Imaging;
 
 namespace Jvedio.Entity
 {
+    /// <summary>
+    /// 演员卡片信息条目（不入库，仅供 UI 展示）：小标签 + 数值
+    /// </summary>
+    public class ActorInfoChip
+    {
+        public string Label { get; set; }
+        public string Value { get; set; }
+    }
+
     [Table(tableName: "actor_info")]
     public class ActorInfo : INotifyPropertyChanged
     {
@@ -229,10 +238,30 @@ namespace Jvedio.Entity
         public long ImageID { get; set; }
 
         /// <summary>
-        /// 出演的作品的数量
+        /// 出演的作品的数量（UI 角标绑定，需 INPC：条目替换后补赋值必须通知刷新，否则角标停在 0）
         /// </summary>
+        private long _Count;
         [TableField(exist: false)]
-        public long Count { get; set; }
+        public long Count {
+            get { return _Count; }
+            set {
+                _Count = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 编辑模式下的勾选状态(仅 UI 使用,不入库)
+        /// </summary>
+        private bool _IsSelected;
+        [TableField(exist: false)]
+        public bool IsSelected {
+            get { return _IsSelected; }
+            set {
+                _IsSelected = value;
+                RaisePropertyChanged();
+            }
+        }
 
         private BitmapSource _smallimage;
 
@@ -244,6 +273,95 @@ namespace Jvedio.Entity
                 _smallimage = value;
                 RaisePropertyChanged();
             }
+        }
+
+        private List<ActorInfoChip> _InfoChips;
+
+        /// <summary>
+        /// 演员卡片信息条目（完整版，列表模式）：身高/体重/生日/三围/罩杯/鞋码/血型/出身/国家/民族/爱好，
+        /// 空字段自动跳过，每条为「标签+数值」小卡片；标签经多语言资源解析（缺失时回退中文）
+        /// </summary>
+        [TableField(exist: false)]
+        public List<ActorInfoChip> InfoChips {
+            get { return BuildInfoChips(false); }
+            set { _InfoChips = value; }// 兼容反射刷新（RefreshData 会写回），实际展示以 getter 计算为准
+        }
+
+        /// <summary>演员卡片信息条目（精简版，缩略图模式）：生日只显年龄，省略出身/国家/民族/爱好</summary>
+        [TableField(exist: false)]
+        public List<ActorInfoChip> InfoChipsCompact {
+            get { return BuildInfoChips(true); }
+            set { _InfoChips = value; }
+        }
+
+        private static string ChipLabel(string key, string fallback)
+        {
+            string value = SuperControls.Style.LangManager.GetValueByKey(key);
+            if (string.IsNullOrEmpty(value) || value.Equals(key))
+                return fallback;
+            return value;
+        }
+
+        private static string ChipValue(string value)
+        {
+            // 超长值截断展示，完整内容走 ToolTip
+            if (string.IsNullOrEmpty(value) || value.Length <= 24)
+                return value;
+            return value.Substring(0, 24) + "…";
+        }
+
+        private List<ActorInfoChip> BuildInfoChips(bool compact)
+        {
+            List<ActorInfoChip> chips = new List<ActorInfoChip>();
+            if (Height > 0)
+                chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_Height", "身高"), Value = $"{Height}cm" });
+            if (Weight > 0)
+                chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_Weight", "体重"), Value = $"{Weight}kg" });
+            if (compact) {
+                if (Age > 0)
+                    chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_Age", "年龄"), Value = $"{Age}岁" });
+            } else if (!string.IsNullOrEmpty(Birthday)) {
+                chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_Birthday", "生日"), Value = ChipValue(Age > 0 ? $"{Birthday} ({Age}岁)" : Birthday) });
+            } else if (Age > 0) {
+                chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_Age", "年龄"), Value = $"{Age}岁" });
+            }
+            if (Chest > 0 && Waist > 0 && Hipline > 0) {
+                chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_Measurements", "三围"), Value = $"{Chest}-{Waist}-{Hipline}" });
+            } else {
+                if (Chest > 0)
+                    chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_Chest", "胸围"), Value = Chest.ToString() });
+                if (Waist > 0)
+                    chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_Waist", "腰围"), Value = Waist.ToString() });
+                if (Hipline > 0)
+                    chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_Hipline", "臀围"), Value = Hipline.ToString() });
+            }
+            if (Cup >= 'A' && Cup < 'Z')
+                chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_Cup", "罩杯"), Value = Cup.ToString() });
+            if (!string.IsNullOrEmpty(ShoeSize))
+                chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_ShoeSize", "鞋码"), Value = ShoeSize });
+            if (!string.IsNullOrEmpty(BloodType))
+                chips.Add(new ActorInfoChip { Label = ChipLabel("BloodType", "血型"), Value = BloodType });
+            if (!compact) {
+                if (!string.IsNullOrEmpty(BirthPlace))
+                    chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_Birthplace", "出身"), Value = ChipValue(BirthPlace) });
+                if (!string.IsNullOrEmpty(Country))
+                    chips.Add(new ActorInfoChip { Label = ChipLabel("Country", "国家"), Value = ChipValue(Country) });
+                if (!string.IsNullOrEmpty(Nation))
+                    chips.Add(new ActorInfoChip { Label = ChipLabel("Nationality", "民族"), Value = ChipValue(Nation) });
+                if (!string.IsNullOrEmpty(Hobby))
+                    chips.Add(new ActorInfoChip { Label = ChipLabel("Actress_Hobby", "爱好"), Value = ChipValue(Hobby) });
+            }
+            return chips;
+        }
+
+        /// <summary>
+        /// 通知资料展示相关计算属性已变化（列表刷新时由外部调用，避免 RefreshData 逐字段反射写入后卡片信息不更新）
+        /// </summary>
+        public void NotifyInfoDisplayChanged()
+        {
+            RaisePropertyChanged(nameof(InfoChips));
+            RaisePropertyChanged(nameof(InfoChipsCompact));
+            RaisePropertyChanged(nameof(InfoString));
         }
 
         private string _InfoString;

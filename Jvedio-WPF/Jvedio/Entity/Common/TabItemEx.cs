@@ -26,7 +26,8 @@ namespace Jvedio.Entity.Common
         Download,
         Scan,
         Translate,
-        Rename
+        Rename,
+        ActorScrape
     }
 
 

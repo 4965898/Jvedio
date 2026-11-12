@@ -189,6 +189,12 @@ namespace Jvedio
                         timer.Restart();
                         bool success = await BackupData();
                         Logger.Info($"startup background backup completed in {timer.ElapsedMilliseconds} ms, success: {success}");
+                        // 演员资料自动补齐：备份后低优先级执行（串行队列 + 间隔长歇防风控）
+                        try {
+                            Jvedio.Core.Tasks.ActorScrapeManager.Instance.EnqueueAllIncomplete();
+                        } catch (Exception ex) {
+                            Logger.Error(ex);
+                        }
                     } catch (Exception ex) {
                         Logger.Error(ex);
                     }

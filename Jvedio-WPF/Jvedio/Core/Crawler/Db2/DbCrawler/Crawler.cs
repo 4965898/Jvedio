@@ -34,6 +34,11 @@ namespace Jvedio.Crawler
 
         private string Host = "";
 
+        // 0=自动（网页优先，失败回退 API）、1=仅网页、2=仅 API（来自源配置 Mode）
+        private int CrawlerMode = 0;
+
+        private string ApiToken = "";
+
         private Dictionary<string, object> Info = new Dictionary<string, object>();
 
         public DBCrawler()
@@ -165,6 +170,10 @@ namespace Jvedio.Crawler
                 if (dictionary != null && dictionary.TryGetValue("RemoteValue", out string value) && !string.IsNullOrEmpty(value))
                     DataCode = value;
             }
+            if (DataInfo.ContainsKey("CrawlerMode") && int.TryParse(DataInfo["CrawlerMode"]?.ToString(), out int crawlerMode))
+                CrawlerMode = crawlerMode;
+            if (DataInfo.TryGetValue("ApiToken", out object apiTokenObj) && apiTokenObj is string apiToken)
+                ApiToken = apiToken;
         }
 
         public override async Task<Dictionary<string, object>> GetInfo(RequestHeader header, Dictionary<string, object> dict)
@@ -174,6 +183,26 @@ namespace Jvedio.Crawler
             DataInfo = dict;
             ParseDataInfo();
             Logs.Add(string.Format("crawler recv vid: {0}", dict["VID"]));
+            if (CrawlerMode != 2) {
+                Dictionary<string, object> webInfo = await WebGetInfo();
+                if (CrawlerMode == 1 || webInfo.ContainsKey("Title"))
+                    return webInfo;
+                // 自动模式：网页优先，未取得标题时用 JavDB App API 兜底
+                //（网页的失败原因保留在 Error，不被 API 覆盖；API 失败原因进 Logs）
+                Logs.Add("网页模式未取得标题，尝试 JavDB API 兜底");
+                Dictionary<string, object> apiInfo = await JavDbApiClient.GetInfo(VID, header, ApiToken, Logs);
+                if (apiInfo.ContainsKey("Title"))
+                    return apiInfo;
+                if (!webInfo.ContainsKey("Error") && apiInfo.TryGetValue("Error", out object apiError))
+                    webInfo["Error"] = apiError;
+                return webInfo;
+            }
+            // 仅 API 模式：完全不走网页解析
+            return await JavDbApiClient.GetInfo(VID, header, ApiToken, Logs);
+        }
+
+        private async Task<Dictionary<string, object>> WebGetInfo()
+        {
             if (string.IsNullOrEmpty(DataCode))
                 DataCode = await GetDataCode();
             if (!Info.ContainsKey("DataCode"))

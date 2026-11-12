@@ -130,6 +130,10 @@ namespace Jvedio.Core.Config
                     server.Headers = Headers;
                 if (d.ContainsKey("Available") && int.TryParse(d["Available"].ToString(), out int available))
                     server.Available = available;
+                if (d.ContainsKey("Mode") && int.TryParse(d["Mode"].ToString(), out int mode))
+                    server.Mode = mode;
+                if (d.ContainsKey("ApiToken") && d["ApiToken"] is string apiToken)
+                    server.ApiToken = apiToken;
                 servers.Add(server);
             }
             CrawlerServers = servers;

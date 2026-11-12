@@ -194,6 +194,10 @@ namespace Jvedio.Core.Net
             if (pluginMetaDatas.Count == 0)
                 throw new CrawlerNotFoundException();
 
+            // 稳定优先序：内置 bus/db/library 在前，备胎插件（avmoo/javmenu 等）殿后——
+            // 备胎仅在前置源全部失败时才会被请求（OrderBy 是稳定排序，同级保持加载顺序）
+            pluginMetaDatas = pluginMetaDatas.OrderBy(GetCrawlerPriority).ToList();
+
             Dictionary<PluginMetaData, List<CrawlerServer>> result =
                 new Dictionary<PluginMetaData, List<CrawlerServer>>();
             for (int i = 0; i < pluginMetaDatas.Count; i++) {
@@ -246,7 +250,9 @@ namespace Jvedio.Core.Net
                         }
                         result[metaData] = crawlerServers;
                     } else {
-                        TaskLogger.Error($"刮削失败，原因：{reason}");
+                        // 插件声明不适用（如演员资料插件不参与影片刮削、FC2 插件跳过非 FC2）：
+                        // 属正常跳过而非失败，记 Info 避免每个任务都刷错误
+                        LogSafely(() => TaskLogger.Info($"刮削器[{metaData.PluginID}]不适用：{reason}"));
                     }
                 } catch (Exception ex) {
                     MessageCard.Error($"插件 {metaData.PluginName} 发生了异常：" + ex.Message);
@@ -259,6 +265,25 @@ namespace Jvedio.Core.Net
 
             // todo 爬虫调度器
             return result;
+        }
+
+        /// <summary>
+        /// 插件刮削优先序（小者先尝试）：内置源在前，备胎插件殿后——
+        /// avmoo/javmenu 仅在前置源全部失败时才会被请求。
+        /// PluginID 真实格式为「crawler/<目录名>」（枚举名小写 + '/'，用户库实测确认）
+        /// </summary>
+        private static int GetCrawlerPriority(PluginMetaData metaData)
+        {
+            string id = metaData?.PluginID?.ToLowerInvariant() ?? "";
+            switch (id) {
+                case "crawler/bus": return 0;
+                case "crawler/db": return 1;
+                case "crawler/library": return 2;
+                case "crawler/avmoo": return 8;
+                case "crawler/javmenu": return 9;
+                case "crawler/javdatabase": return 7;
+                default: return 5; // 其他自定义插件在内置源之后、备胎之前
+            }
         }
 
         /// <summary>

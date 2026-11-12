@@ -15,6 +15,10 @@ $pluginAssets = Join-Path $repoRoot 'release-assets\plugins\crawlers'
 $busDll = Join-Path $repoRoot 'Jvedio-WPF\Jvedio\Core\Crawler\Bus2\BusCrawler\bin\Release\BusCrawler.dll'
 $dbDll = Join-Path $repoRoot 'Jvedio-WPF\Jvedio\Core\Crawler\Db2\DbCrawler\bin\Release\DBCrawler.dll'
 $libraryDll = Join-Path $repoRoot 'Jvedio-WPF\Jvedio\Core\Crawler\Library2\LibraryCrawler\bin\Release\LibraryCrawler.dll'
+$avmooDll = Join-Path $repoRoot 'Jvedio-WPF\Jvedio\Core\Crawler\Extra\AvmooCrawler\bin\Release\AvmooCrawler.dll'
+$javmenuDll = Join-Path $repoRoot 'Jvedio-WPF\Jvedio\Core\Crawler\Extra\JavmenuCrawler\bin\Release\JavmenuCrawler.dll'
+$minnanoavDll = Join-Path $repoRoot 'Jvedio-WPF\Jvedio\Core\Crawler\Extra\MinnanoavCrawler\bin\Release\MinnanoavCrawler.dll'
+$javdatabaseDll = Join-Path $repoRoot 'Jvedio-WPF\Jvedio\Core\Crawler\Extra\JavdatabaseCrawler\bin\Release\JavdatabaseCrawler.dll'
 $stage = Join-Path $artifacts ('.stage-' + [guid]::NewGuid().ToString('N'))
 $package = Join-Path $stage ('Jvedio-' + $Version)
 $zip = Join-Path $artifacts ('Jvedio-' + $Version + '.zip')
@@ -28,7 +32,7 @@ function Assert-StagePath([string]$Path) {
     }
 }
 
-foreach ($path in @($source, $compressionDll, $pluginAssets, $busDll, $dbDll, $libraryDll)) {
+foreach ($path in @($source, $compressionDll, $pluginAssets, $busDll, $dbDll, $libraryDll, $avmooDll, $javmenuDll, $minnanoavDll, $javdatabaseDll)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Required release input is missing: $path"
     }
@@ -84,10 +88,21 @@ try {
 
     $references = Join-Path $repoRoot 'Jvedio-WPF\Jvedio\Reference'
     Copy-Item -LiteralPath (Join-Path $references 'CommonNet.dll') -Destination $crawlerDest -Force
+    Copy-Item -LiteralPath (Join-Path $references 'Newtonsoft.Json.dll') -Destination $crawlerDest -Force
     Copy-Item -LiteralPath (Join-Path $references 'HtmlAgilityPack.dll') -Destination $crawlerDest -Force
     Copy-Item -LiteralPath $busDll -Destination (Join-Path $crawlerDest 'bus\BusCrawler.dll') -Force
     Copy-Item -LiteralPath $dbDll -Destination (Join-Path $crawlerDest 'db\DBCrawler.dll') -Force
     Copy-Item -LiteralPath $libraryDll -Destination (Join-Path $crawlerDest 'library\LibraryCrawler.dll') -Force
+    Copy-Item -LiteralPath $avmooDll -Destination (Join-Path $crawlerDest 'avmoo\AvmooCrawler.dll') -Force
+    Copy-Item -LiteralPath $javmenuDll -Destination (Join-Path $crawlerDest 'javmenu\JavmenuCrawler.dll') -Force
+    Copy-Item -LiteralPath $minnanoavDll -Destination (Join-Path $crawlerDest 'minnanoav\MinnanoavCrawler.dll') -Force
+    Copy-Item -LiteralPath $javdatabaseDll -Destination (Join-Path $crawlerDest 'javdatabase\JavdatabaseCrawler.dll') -Force
+
+    # 修复五兜底：db 与新插件目录各自的依赖解析链不含根目录 Newtonsoft，逐目录补拷
+    foreach ($pluginDir in @('db', 'avmoo', 'javmenu', 'minnanoav', 'javdatabase')) {
+        Copy-Item -LiteralPath (Join-Path $references 'Newtonsoft.Json.dll') `
+            -Destination (Join-Path $crawlerDest "$pluginDir\Newtonsoft.Json.dll") -Force
+    }
 
     $required = @(
         'Jvedio.exe', 'Jvedio.exe.config', 'SuperUpdate.exe', 'SuperUtils.dll',
@@ -95,11 +110,17 @@ try {
         'System.IO.Compression.dll',
         'x64\SQLite.Interop.dll', 'x86\SQLite.Interop.dll',
         'AvalonEdit\Highlighting\LogRule.xshd',
-        'plugins\crawlers\CommonNet.dll', 'plugins\crawlers\HtmlAgilityPack.dll',
+        'plugins\crawlers\CommonNet.dll', 'plugins\crawlers\HtmlAgilityPack.dll', 'plugins\crawlers\Newtonsoft.Json.dll',
         'plugins\crawlers\bus\main.json', 'plugins\crawlers\bus\BusCrawler.dll',
         'plugins\crawlers\db\main.json', 'plugins\crawlers\db\DBCrawler.dll',
         'plugins\crawlers\fc2\main.json', 'plugins\crawlers\fc2\FC2Crawler.dll',
-        'plugins\crawlers\library\main.json', 'plugins\crawlers\library\LibraryCrawler.dll'
+        'plugins\crawlers\library\main.json', 'plugins\crawlers\library\LibraryCrawler.dll',
+        'plugins\crawlers\avmoo\main.json', 'plugins\crawlers\avmoo\AvmooCrawler.dll',
+        'plugins\crawlers\javmenu\main.json', 'plugins\crawlers\javmenu\JavmenuCrawler.dll',
+        'plugins\crawlers\minnanoav\main.json', 'plugins\crawlers\minnanoav\MinnanoavCrawler.dll',
+        'plugins\crawlers\javdatabase\main.json', 'plugins\crawlers\javdatabase\JavdatabaseCrawler.dll',
+        'plugins\crawlers\javdatabase\Newtonsoft.Json.dll',
+        'plugins\crawlers\db\Newtonsoft.Json.dll'
     )
     foreach ($relative in $required) {
         $path = Join-Path $package $relative

@@ -2,6 +2,7 @@ using SuperUtils.CustomEventArgs;
 using SuperUtils.Framework.Tasks;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Jvedio.Core.Tasks
@@ -62,6 +63,28 @@ namespace Jvedio.Core.Tasks
             lock (_gate) {
                 if (!_waiting.Contains(task) && !_working.Contains(task)) {
                     _waiting.Enqueue(task);
+                    _completionNotified = false;
+                }
+                StartWorkerLocked();
+            }
+        }
+
+        /// <summary>
+        /// 插队到等待队列最前：手动操作应优先于批量后台任务执行
+        /// （否则一次大批量入队后，手动任务要排到队尾等几小时）
+        /// </summary>
+        public void EnqueueFront(T task)
+        {
+            if (task == null)
+                throw new ArgumentNullException(nameof(task));
+
+            lock (_gate) {
+                if (!_waiting.Contains(task) && !_working.Contains(task)) {
+                    List<T> rest = _waiting.ToList();
+                    _waiting.Clear();
+                    _waiting.Enqueue(task);
+                    foreach (T item in rest)
+                        _waiting.Enqueue(item);
                     _completionNotified = false;
                 }
                 StartWorkerLocked();

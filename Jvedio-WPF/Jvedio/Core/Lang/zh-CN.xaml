@@ -92,6 +92,7 @@
     <sys:String x:Key="TranslateRetry">补翻未翻译标题（只翻没有中文标题的）</sys:String>
     <sys:String x:Key="TranslateNoneRetry">选中的影片都有中文标题，无需补翻</sys:String>
     <sys:String x:Key="RenameTask">重命名任务</sys:String>
+    <sys:String x:Key="ActorScrapeTask">演员资料补齐</sys:String>
     <sys:String x:Key="RenameWaiting">等待重命名</sys:String>
     <sys:String x:Key="Renaming">正在重命名</sys:String>
     <sys:String x:Key="RenameSuccess">重命名成功</sys:String>
@@ -100,6 +101,22 @@
     <sys:String x:Key="RenameQueuedTip">已加入重命名任务队列，进度请到右下角任务页查看</sys:String>
     <sys:String x:Key="ScrapeAfterScan">扫描/导入后自动同步新增影片（刮削）</sys:String>
     <sys:String x:Key="ScrapeAfterScanTip">扫描或拖放导入完成后，对本次新增的影片自动开始同步信息；大扫描会连续请求刮削站点，请按需开启</sys:String>
+    <sys:String x:Key="ScheduledScan">定时增量扫描</sys:String>
+    <sys:String x:Key="ScheduledScanTip">按设定间隔在后台静默扫描当前库目录，并对新增影片与缺字段（标题/网页/封面缺失）的影片自动刮削：只补缺、不覆盖已有值；软件关闭时不会扫描。0 为关闭</sys:String>
+    <sys:String x:Key="ScheduledScanOff">关闭</sys:String>
+    <sys:String x:Key="MinuteUnit">分钟</sys:String>
+    <sys:String x:Key="CrawlerMode">模式</sys:String>
+    <sys:String x:Key="CrawlerModeTip">JavDB 刮削模式：自动=网页优先、失败回退 App API；网页=仅网页解析；API=仅 App API（需在右侧填入 API Token）</sys:String>
+    <sys:String x:Key="CrawlerModeAuto">自动</sys:String>
+    <sys:String x:Key="CrawlerModeWeb">网页</sys:String>
+    <sys:String x:Key="CrawlerModeApi">API</sys:String>
+    <sys:String x:Key="CrawlerApiTokenTip">JavDB App API 登录 token（可留空）。留空时 API 匿名请求，当前镜像要求登录而失败，自动模式会回退网页。token 可用 javdb-cli（github.com/FlanChanXwO/javdb-cli）执行 javdb auth login 后，从 %USERPROFILE%\.javdb-cli\auth.json 获取</sys:String>
+    <sys:String x:Key="ActorAutoEnrich">演员资料自动补齐（MinnanoAV）</sys:String>
+    <sys:String x:Key="ActorAutoEnrichTip">后台串行队列按名字到 MinnanoAV 查询身高/三围/罩杯/生日/罗马字，只填空字段、不覆盖手填资料；每 10 个长歇 15 秒防风控。需先在「同步信息」里启用 MinnanoAV 源</sys:String>
+    <sys:String x:Key="ActorOverwriteScraped">演员资料：刮削时强制覆写已有信息（默认只补空字段）</sys:String>
+    <sys:String x:Key="ActorOverwriteScrapedTip">勾选后，演员资料补齐/右键同步信息会用站点数据覆盖已有的身高、三围、罩杯、生日、鞋码、血型、出身地、英文名等（日文原名永不覆盖）；不勾选则只填空字段，与影片「保留已有资料；批量刮削只补空字段」语义对应</sys:String>
+    <sys:String x:Key="ActorScrapeSaveImage">演员资料：补齐时同时保存头像</sys:String>
+    <sys:String x:Key="ActorScrapeSaveImageTip">勾选后，演员资料补齐/同步信息时会从资料源下载演员头像保存到本地头像目录（已有头像的演员不覆盖，避免冲掉 Gfriends 等来源的图）；不勾选则只补文字资料</sys:String>
     <sys:String x:Key="SettingsSearchTip">搜索设置项（回车跳转）</sys:String>
     <sys:String x:Key="BatchEdit">批量编辑</sys:String>
     <sys:String x:Key="BatchEditTip">对选中的 {0} 部影片统一赋值：勾选要修改的字段并填写内容（留空的字段不会被修改）；「追加标记」勾选后可为全部选中影片添加所选标记</sys:String>
@@ -152,6 +169,7 @@
     <sys:String x:Key="UiFontScaleInputTip">界面缩放倍数（0.8–1.5），输入后失焦生效</sys:String>
     <sys:String x:Key="ScrollSpeedInputTip">滚动速度倍数（0.1–3.0），输入后失焦生效</sys:String>
     <sys:String x:Key="SyncInfoGesture">同步信息（S）</sys:String>
+    <sys:String x:Key="SyncInfoLibrary">同步信息（整个库）</sys:String>
     <sys:String x:Key="AddTagStampGesture">添加标记（A）</sys:String>
     <sys:String x:Key="ActorOnlineSearch">在线搜索</sys:String>
     <sys:String x:Key="OnlineJumpTip">在线观看/在线搜索跳转站点根地址（域名，可自定义，留空 = 使用内置默认）。影片详情页与演员详情页共用此根地址：影片页跳影片地址（用番号），演员页跳搜索地址（用演员名），路径已内置。示例：默认 https://javbus.com，改用镜像站就填 https://镜像域名。点「填默认」可把内置根地址填入输入框后修改。</sys:String>
@@ -180,14 +198,20 @@
     <sys:String x:Key="Translating">翻译中</sys:String>
     <sys:String x:Key="ExportVideoData">导出影片数据</sys:String>
     <sys:String x:Key="ExportActorList">导出演员列表</sys:String>
+    <sys:String x:Key="ExportActorListPage">导出演员列表（仅本页）</sys:String>
+    <sys:String x:Key="ExportActorListLibrary">导出演员列表（整个库）</sys:String>
     <sys:String x:Key="ExportSuccess">导出成功，共</sys:String>
     <sys:String x:Key="ExportEmpty">当前无查询结果，无法导出</sys:String>
     <sys:String x:Key="Export">导出</sys:String>
     <sys:String x:Key="ExportLibraryAll">导出本库所有影片</sys:String>
     <sys:String x:Key="ExportLibraryTip">支持 CSV / Excel / JSON 格式，导出当前库的全部影片数据</sys:String>
     <sys:String x:Key="Actress_ShoeSize">鞋码</sys:String>
+    <sys:String x:Key="Actress_Measurements">三围</sys:String>
     <sys:String x:Key="ActorNameEN">英文名</sys:String>
     <sys:String x:Key="ConvertActorNameEN">转换英文名</sys:String>
+    <sys:String x:Key="ConvertActorNameENPage">转换英文名（仅本页）</sys:String>
+    <sys:String x:Key="ConvertActorNameENSelected">转换英文名（选中演员）</sys:String>
+    <sys:String x:Key="ConvertActorNameENLibrary">转换英文名（整个库）</sys:String>
     <sys:String x:Key="ExportNormal">常规导出（CSV / Excel / JSON）</sys:String>
     <sys:String x:Key="ExportNfo">导出为 NFO</sys:String>
     <sys:String x:Key="ExportLibraryAllNfo">导出本库所有影片为 NFO</sys:String>

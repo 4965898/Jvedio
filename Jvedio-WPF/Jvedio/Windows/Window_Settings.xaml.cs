@@ -1002,7 +1002,11 @@ namespace Jvedio
             ConfigManager.ScanConfig.DataExistsIndexAfterScan = vieModel.DataExistsIndexAfterScan;
             ConfigManager.ScanConfig.ImageExistsIndexAfterScan = vieModel.ImageExistsIndexAfterScan;
             ConfigManager.ScanConfig.ScrapeAfterScan = vieModel.ScrapeAfterScan;
+            ConfigManager.ScanConfig.ScheduledScanMinutes = vieModel.ScheduledScanMinutes;
             ConfigManager.ScanConfig.ScanOnStartUp = vieModel.ScanOnStartUp;
+            ConfigManager.Settings.ActorAutoEnrich = vieModel.ActorAutoEnrich;
+            ConfigManager.Settings.ActorOverwriteScraped = vieModel.ActorOverwriteScraped;
+            ConfigManager.Settings.ActorScrapeSaveImage = vieModel.ActorScrapeSaveImage;
             ConfigManager.ScanConfig.CopyNFOOverwriteImage = vieModel.CopyNFOOverwriteImage;
             ConfigManager.ScanConfig.CopyNFOPicture = vieModel.CopyNFOPicture;
             ConfigManager.ScanConfig.CopyNFOActorPicture = vieModel.CopyNFOActorPicture;
@@ -1797,6 +1801,10 @@ namespace Jvedio
                 vieModel.LoadDataAfterScan = true;
                 vieModel.MinFileSize = ScanConfig.DEFAULT_MIN_FILE_SIZE;
                 vieModel.DataExistsIndexAfterScan = true;
+                vieModel.ScheduledScanMinutes = 0;
+                vieModel.ActorAutoEnrich = true;
+                vieModel.ActorOverwriteScraped = false;
+                vieModel.ActorScrapeSaveImage = true;
 
                 ConfigManager.ScanConfig.ScanNfo = false;
                 ConfigManager.ScanConfig.Save();

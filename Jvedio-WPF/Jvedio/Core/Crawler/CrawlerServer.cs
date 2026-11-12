@@ -108,6 +108,41 @@ namespace Jvedio.Core.Crawler
                 RaisePropertyChanged();
             }
         }
+
+        /// <summary>
+        /// JavDB 刮削模式（仅 db 插件的源生效）：0=自动（网页优先，失败回退 API）、
+        /// 1=仅网页解析、2=仅 App API。API 通道见 DbCrawler 插件内的 JavDbApiClient
+        /// </summary>
+        private int _Mode;
+
+        public int Mode {
+            get {
+                return _Mode;
+            }
+
+            set {
+                _Mode = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// JavDB App API 的登录 token（Bearer）。留空则匿名请求——当前镜像
+        /// （jdforrepam.com）对搜索/详情要求登录，匿名会报 JWTVerificationError，
+        /// 此时自动模式会回退网页模式
+        /// </summary>
+        private string _ApiToken;
+
+        public string ApiToken {
+            get {
+                return _ApiToken;
+            }
+
+            set {
+                _ApiToken = value;
+                RaisePropertyChanged();
+            }
+        }
         #endregion
 
 
@@ -183,6 +218,8 @@ namespace Jvedio.Core.Crawler
             dict["Url"] = Url;
             dict["UrlCode"] = JsonUtils.TrySerializeObject(UrlCode);
             dict["Header"] = JsonUtils.TryDeserializeObject<Dictionary<string, string>>(Headers);
+            dict["CrawlerMode"] = Mode;
+            dict["ApiToken"] = ApiToken;
         }
     }
 }

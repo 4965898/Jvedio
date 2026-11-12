@@ -133,6 +133,7 @@ async function popupHarness(store = {}, html = busHtml) {
     } },
     runtime: { id: "test", onMessage: { addListener: listener => { store.onSelection = listener; } }, sendMessage: async message => {
       if (["selection-read", "selection-change"].includes(message.kind)) return { ok: true, state: await store.service.selection(message, message) };
+      if (message.kind === "query-owned") return { ok: true, enabled: false, items: [] };
       if (message.kind === "status") return { ok: true, result: { markImport: !store.oldReceiver, markImportVersion: store.oldReceiver ? 0 : 1,
         labelImport: !store.oldReceiver, labelImportVersion: store.oldReceiver ? 0 : 3, marks: store.catalog || testMarks,
         libraries: [{ id: 1, name: "片库一", labels: [] }, { id: 2, name: "片库二", labels: store.libraryLabels || [] }], currentLibraryId: 2, media: store.media || {} } };
@@ -597,6 +598,66 @@ test("multiple marks are appended to one save and cleared when switching librari
   h.get("library").value = "1"; h.get("library").dispatchEvent(new h.dom.window.Event("change")); await h.flush(); await h.flush();
   assert.equal(h.get("marks").querySelectorAll("input:checked").length, 0);
   assert.match(h.get("marks").textContent, /AV/); assert.match(h.get("marks").textContent, /其他/); await h.flush(); h.dom.window.close();
+});
+test("owned badge: content-script query is capability-gated, deduped and desktop-invalid codes are dropped", async () => {
+  let handler; const posts = [];
+  const respondVia = (message, sender) => new Promise(resolve => {
+    const timer = setTimeout(() => resolve(undefined), 300);
+    handler(message, sender, result => { clearTimeout(timer); resolve(result); });
+  });
+  const context = { setTimeout, clearTimeout, AbortController, TextEncoder, TypeError, Error, chrome: {
+    action: { onClicked: { addListener() {} } }, windows: { onBoundsChanged: { addListener() {} } },
+    storage: { local: { get: async () => ({ port: 18888, token: "a".repeat(64), libraryId: 1 }) } },
+    runtime: { id: "test", getURL: file => `chrome-extension://test/${file}`, onMessage: { addListener: fn => { handler = fn; } } }
+  }, fetch: async (url, options) => {
+    const endpoint = new URL(url).pathname;
+    if (endpoint === "/v1/status") return { ok: true, json: async () => ({ app: "Jvedio", protocol: 1, ownedQuery: true, ownedQueryVersion: 1, libraries: [], marks: [] }) };
+    if (endpoint === "/v1/owned") { posts.push(JSON.parse(options.body)); return { ok: true, json: async () => ({ app: "Jvedio", protocol: 1, items: [{ code: "ABP-001", owned: true, dataId: 9, javdbCode: "wqmpe" }] }) }; }
+    return { ok: false, json: async () => ({ error: "Unknown endpoint" }) };
+  } };
+  backgroundHarness(context);
+  const contentSender = { id: "test", tab: { id: 7 }, frameId: 0, url: "https://www.javbus.com/list" };
+  const response = await respondVia({ kind: "query-owned", codes: ["ABP-001", "ABP-001", "!!!!"], documentKey: "1" }, contentSender);
+  assert.equal(response.ok, true); assert.equal(response.enabled, true);
+  assert.deepEqual(posts[0], { libraryId: 1, codes: ["ABP-001", "!!!!"] });
+  assert.equal(response.items[0].owned, true); assert.equal(response.items[0].javdbCode, "wqmpe");
+  // 子框架消息不可信；超长番号列表拒收
+  assert.equal(await respondVia({ kind: "query-owned", codes: ["ABP-001"], documentKey: "1" },
+    { id: "test", tab: { id: 7 }, frameId: 3, url: "https://www.javbus.com/list" }), undefined);
+  assert.equal(await respondVia({ kind: "query-owned", codes: Array.from({ length: 501 }, (_, i) => `T-${i}`), documentKey: "1" }, contentSender), undefined);
+  // popup 发来的同一 kind 走 popup 分支，不被 content-script 分支误拒
+  const fromPopup = await respondVia({ kind: "query-owned", codes: ["ABP-001"] },
+    { id: "test", url: "chrome-extension://test/popup.html?tabId=7" });
+  assert.equal(fromPopup.ok, true); assert.equal(fromPopup.result.enabled, true);
+});
+test("card buttons show the owned state and a JavDB jump link with the cached DataCode", async () => {
+  const dom = new JSDOM(busHtml, { url: "https://www.javbus.com/list", runScripts: "outside-only" });
+  dom.window.chrome = { runtime: { id: "test", onMessage: { addListener() {} }, sendMessage: async message => {
+    if (message.kind === "read-card-selection") return { ok: true, state: { documentKey: String(performance.timeOrigin), revision: 1, codes: [] } };
+    if (message.kind === "query-owned") return { ok: true, enabled: true, items: [{ code: "ABP-001", owned: true, dataId: 9, javdbCode: "wqmpe" }] };
+    return { ok: true };
+  } } };
+  dom.window.eval(extractor); dom.window.eval(fs.readFileSync(path.join(root, "card-buttons.js"), "utf8"));
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const host = dom.window.document.querySelector("[data-jvedio-card]");
+  const button = host.shadowRoot.querySelector("button");
+  assert.equal(button.textContent, "已入库"); assert.equal(button.dataset.owned, "true");
+  const jump = host.shadowRoot.querySelector("a");
+  assert.equal(jump.getAttribute("href"), "https://javdb.com/v/wqmpe");
+  dom.window.close();
+  // 旧桌面端（无 ownedQuery 能力位）不显示角标，回退搜索页跳转
+  const oldDom = new JSDOM(busHtml, { url: "https://www.javbus.com/list", runScripts: "outside-only" });
+  oldDom.window.chrome = { runtime: { id: "test", onMessage: { addListener() {} }, sendMessage: async message => {
+    if (message.kind === "read-card-selection") return { ok: true, state: { documentKey: String(performance.timeOrigin), revision: 1, codes: [] } };
+    if (message.kind === "query-owned") return { ok: true, enabled: false, items: [] };
+    return { ok: true };
+  } } };
+  oldDom.window.eval(extractor); oldDom.window.eval(fs.readFileSync(path.join(root, "card-buttons.js"), "utf8"));
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const oldHost = oldDom.window.document.querySelector("[data-jvedio-card]");
+  assert.equal(oldHost.shadowRoot.querySelector("button").textContent, "＋Jvedio");
+  assert.equal(oldHost.shadowRoot.querySelector("a").getAttribute("href"), "https://javdb.com/search?q=ABP-001&f=all");
+  oldDom.window.close();
 });
 test("page observation follows DOM appends and stops when its window disconnects", async () => {
   const dom = new JSDOM(busHtml, { url: "https://mirror.example/list", runScripts: "outside-only" });

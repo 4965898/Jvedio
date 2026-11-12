@@ -76,6 +76,44 @@ SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
         public bool SkipExistImage { get; set; }
         public bool DownloadWhenTitleNull { get; set; }
 
+        /// <summary>
+        /// 演员资料自动补齐（后台串行队列调用 MinnanoAV 源，只填空字段不覆盖手填资料）。
+        /// 需同时启用 MinnanoAV 源才生效
+        /// </summary>
+        public bool _ActorAutoEnrich = true;
+        public bool ActorAutoEnrich {
+            get { return _ActorAutoEnrich; }
+            set {
+                _ActorAutoEnrich = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 演员资料刮削时强制覆写已有信息（身高/三围/罩杯/生日/鞋码/血型/出身地/英文名等，
+        /// 日文原名永不覆盖）；默认关=只补空字段，与影片「保留已有资料」语义对应
+        /// </summary>
+        public bool _ActorOverwriteScraped = false;
+        public bool ActorOverwriteScraped {
+            get { return _ActorOverwriteScraped; }
+            set {
+                _ActorOverwriteScraped = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 演员资料补齐时同时下载保存演员头像（默认开；已有本地头像的演员不覆盖）
+        /// </summary>
+        public bool _ActorScrapeSaveImage = true;
+        public bool ActorScrapeSaveImage {
+            get { return _ActorScrapeSaveImage; }
+            set {
+                _ActorScrapeSaveImage = value;
+                RaisePropertyChanged();
+            }
+        }
+
         public bool IgnoreCertVal { get; set; }
 
         public bool AutoHandleHeader { get; set; }

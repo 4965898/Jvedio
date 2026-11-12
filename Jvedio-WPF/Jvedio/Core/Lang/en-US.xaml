@@ -93,6 +93,7 @@
     <sys:String x:Key="TranslateRetry">Translate untranslated (only those without a translated title)</sys:String>
     <sys:String x:Key="TranslateNoneRetry">All selected videos already have translated titles</sys:String>
     <sys:String x:Key="RenameTask">Rename Tasks</sys:String>
+    <sys:String x:Key="ActorScrapeTask">Actress Profiles</sys:String>
     <sys:String x:Key="RenameWaiting">Waiting to rename</sys:String>
     <sys:String x:Key="Renaming">Renaming</sys:String>
     <sys:String x:Key="RenameSuccess">Renamed</sys:String>
@@ -101,6 +102,22 @@
     <sys:String x:Key="RenameQueuedTip">queued; see the task page (bottom-right) for progress</sys:String>
     <sys:String x:Key="ScrapeAfterScan">Scrape new videos after scan/import</sys:String>
     <sys:String x:Key="ScrapeAfterScanTip">After a scan or drag-drop import finishes, start syncing info for newly imported videos. Large scans will hit scraper sites continuously - enable as needed</sys:String>
+    <sys:String x:Key="ScheduledScan">Scheduled incremental scan</sys:String>
+    <sys:String x:Key="ScheduledScanTip">Silently rescan the current library at the set interval and scrape new videos plus videos with missing fields (title/webpage/cover): fills blanks only, never overwrites existing values. No scanning while the app is closed. 0 = off</sys:String>
+    <sys:String x:Key="ScheduledScanOff">Off</sys:String>
+    <sys:String x:Key="MinuteUnit">min</sys:String>
+    <sys:String x:Key="CrawlerMode">Mode</sys:String>
+    <sys:String x:Key="CrawlerModeTip">JavDB scrape mode: Auto = web first, fallback to App API; Web = web parsing only; API = App API only (requires the API Token on the right)</sys:String>
+    <sys:String x:Key="CrawlerModeAuto">Auto</sys:String>
+    <sys:String x:Key="CrawlerModeWeb">Web</sys:String>
+    <sys:String x:Key="CrawlerModeApi">API</sys:String>
+    <sys:String x:Key="CrawlerApiTokenTip">JavDB App API login token (optional). Empty = anonymous request; the current mirror requires login, so API fails and Auto mode falls back to web. Get a token via javdb-cli (github.com/FlanChanXwO/javdb-cli): run "javdb auth login" then copy it from %USERPROFILE%\.javdb-cli\auth.json</sys:String>
+    <sys:String x:Key="ActorAutoEnrich">Auto-enrich actress profiles (MinnanoAV)</sys:String>
+    <sys:String x:Key="ActorAutoEnrichTip">A background serial queue looks up height/bust/waist/hip/cup/birthday/roman name on MinnanoAV by name; fills blanks only, never overwrites manually entered data; pauses 15s every 10 lookups for rate limiting. Enable the MinnanoAV source in "Sync info" first</sys:String>
+    <sys:String x:Key="ActorOverwriteScraped">Actor info: overwrite existing fields when scraping (default: fill blanks only)</sys:String>
+    <sys:String x:Key="ActorOverwriteScrapedTip">When checked, actor profile enrichment / right-click "Sync info" overwrites existing height, measurements, cup, birthday, shoe size, blood type, birthplace and English name with site data (the Japanese name is never overwritten); when unchecked, only empty fields are filled, matching the video option "Keep existing metadata; bulk scraping fills empty fields"</sys:String>
+    <sys:String x:Key="ActorScrapeSaveImage">Actor info: also save portrait image when scraping</sys:String>
+    <sys:String x:Key="ActorScrapeSaveImageTip">When checked, actor profile enrichment / "Sync info" also downloads the actress portrait from the source and saves it to the local actress image folder (actors that already have a local image are skipped, so images from Gfriends etc. are never overwritten); when unchecked, only text data is filled</sys:String>
     <sys:String x:Key="SettingsSearchTip">Search settings (Enter to jump)</sys:String>
     <sys:String x:Key="BatchEdit">Batch Edit</sys:String>
     <sys:String x:Key="BatchEditTip">Assign values to the selected {0} videos: check the fields to modify and fill in values (blank fields stay untouched); check "Add tag" to append chosen tags to all selected videos</sys:String>
@@ -153,6 +170,7 @@
     <sys:String x:Key="UiFontScaleInputTip">UI scale factor (0.8-1.5), applies on focus loss</sys:String>
     <sys:String x:Key="ScrollSpeedInputTip">Scroll speed factor (0.1-3.0), applies on focus loss</sys:String>
     <sys:String x:Key="SyncInfoGesture">Sync Info（S）</sys:String>
+    <sys:String x:Key="SyncInfoLibrary">Sync Info (Entire Library)</sys:String>
     <sys:String x:Key="AddTagStampGesture">Add Tag（A）</sys:String>
     <sys:String x:Key="ActorOnlineSearch">Search Online</sys:String>
     <sys:String x:Key="OnlineJumpTip">Customize the site root URL (domain) for online watch/search jump buttons (leave empty for built-in defaults). The movie detail page and actor detail page share this root URL: the movie page jumps to the video page (using the code), the actor page jumps to the search page (using the actor name); paths are built-in. Example: default is https://javbus.com, for a mirror site enter https://mirror-domain. Click "Use Default" to fill the built-in root URL for editing.</sys:String>
@@ -181,14 +199,20 @@
     <sys:String x:Key="Translating">Translating</sys:String>
     <sys:String x:Key="ExportVideoData">Export Videos</sys:String>
     <sys:String x:Key="ExportActorList">Export Actors</sys:String>
+    <sys:String x:Key="ExportActorListPage">Export Actors (This Page Only)</sys:String>
+    <sys:String x:Key="ExportActorListLibrary">Export Actors (Entire Library)</sys:String>
     <sys:String x:Key="ExportSuccess">Exported</sys:String>
     <sys:String x:Key="ExportEmpty">No query result to export</sys:String>
     <sys:String x:Key="Export">Export</sys:String>
     <sys:String x:Key="ExportLibraryAll">Export All Videos in This Library</sys:String>
     <sys:String x:Key="ExportLibraryTip">Supports CSV / Excel / JSON, exports all videos of the current library</sys:String>
     <sys:String x:Key="Actress_ShoeSize">Shoe Size</sys:String>
+    <sys:String x:Key="Actress_Measurements">Measurements</sys:String>
     <sys:String x:Key="ActorNameEN">English Name</sys:String>
     <sys:String x:Key="ConvertActorNameEN">Convert to English Name</sys:String>
+    <sys:String x:Key="ConvertActorNameENPage">Convert to English Name (This Page Only)</sys:String>
+    <sys:String x:Key="ConvertActorNameENSelected">Convert to English Name (Selected Actors)</sys:String>
+    <sys:String x:Key="ConvertActorNameENLibrary">Convert to English Name (Entire Library)</sys:String>
     <sys:String x:Key="ExportNormal">Normal Export (CSV / Excel / JSON)</sys:String>
     <sys:String x:Key="ExportNfo">Export as NFO</sys:String>
     <sys:String x:Key="ExportLibraryAllNfo">Export All Videos in This Library as NFO</sys:String>

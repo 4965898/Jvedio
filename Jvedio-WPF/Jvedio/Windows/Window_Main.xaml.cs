@@ -2,6 +2,7 @@ using Jvedio.AvalonEdit;
 using Jvedio.Core.Enums;
 using Jvedio.Core.Global;
 using Jvedio.Core.Media;
+using Jvedio.Core.Net;
 using Jvedio.Core.Plugins.Crawler;
 using Jvedio.Core.Scan;
 using Jvedio.Core.Server;
@@ -172,6 +173,7 @@ namespace Jvedio
             CheckServerStatus();
             InitAvalonEdit();
             InitSideMenu();
+            InitScheduledScan();
             Core.Clipper.BrowserClipperService.Instance.Saved -= OnBrowserClipSaved;
             Core.Clipper.BrowserClipperService.Instance.Saved += OnBrowserClipSaved;
             if (ConfigManager.BrowserClipperConfig.Enabled) {
@@ -768,6 +770,12 @@ namespace Jvedio
                 .Add(TabType.GeoTask, LangManager.GetValueByKey("RenameTask"), TaskType.Rename);
         }
 
+        public void ShowActorScrapePopup(object sender, MouseButtonEventArgs e)
+        {
+            vieModel.TabItemManager
+                .Add(TabType.GeoTask, LangManager.GetValueByKey("ActorScrapeTask"), TaskType.ActorScrape);
+        }
+
         private void ShowLibraryHealth(object sender, MouseButtonEventArgs e)
         {
             new Windows.Window_LibraryHealth(ConfigManager.Main.CurrentDBId) { Owner = this }.ShowDialog();
@@ -920,7 +928,7 @@ namespace Jvedio
         }
 
         /// <summary>
-        /// 启动时后台静默扫描完成后调用：刷新统计、按需加载新影片并截图
+        /// 启动时后台静默扫描完成后调用：刷新主界面统计与数据（不弹窗打扰）
         /// </summary>
         public void OnBackgroundScanComplete(List<Video> insertVideos)
         {
@@ -933,6 +941,146 @@ namespace Jvedio
             if (ConfigManager.ScanConfig.DataExistsIndexAfterScan)
                 DataIndexManager.RebuildSilently();
         }
+
+        #region "定时增量扫描（ScheduledScanMinutes）"
+
+        private DispatcherTimer ScheduledScanTimer { get; set; }
+        private DateTime LastScheduledScan { get; set; } = DateTime.MinValue;
+        private bool ScheduledScanRunning { get; set; }
+
+        private void InitScheduledScan()
+        {
+            // 上次触发时间取 now：启动后先等满一个完整间隔，避免与启动静默扫描叠加
+            LastScheduledScan = DateTime.Now;
+            ScheduledScanTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
+            ScheduledScanTimer.Tick += ScheduledScanTick;
+            ScheduledScanTimer.Start();
+        }
+
+        private void ScheduledScanTick(object sender, EventArgs e)
+        {
+            try {
+                int minutes = ConfigManager.ScanConfig.ScheduledScanMinutes;
+                if (minutes <= 0)
+                    return;
+                if ((DateTime.Now - LastScheduledScan).TotalMinutes < minutes)
+                    return;
+                if (ScheduledScanRunning || DownloadManager.Exiting)
+                    return;
+                // 手动/启动扫描进行中 → 本轮跳过，下个 tick 再试
+                if (ScanManager.CurrentTasks != null && ScanManager.CurrentTasks.Any(t =>
+                    t != null && (t.Status == System.Threading.Tasks.TaskStatus.Running ||
+                                  t.Status == System.Threading.Tasks.TaskStatus.WaitingToRun)))
+                    return;
+                List<string> scanPaths = GetScheduledScanPaths();
+                if (scanPaths == null || scanPaths.Count == 0)
+                    return;
+                LastScheduledScan = DateTime.Now;
+                ScheduledScanRunning = true;
+                ScanTask scanTask = new ScanTask(scanPaths, null, ScanTask.VIDEO_EXTENSIONS_LIST);
+                scanTask.Title = "-";
+                scanTask.onCanceled += (s, ev) => ScheduledScanRunning = false;
+                scanTask.onError += (s, ev) => Logger.Error("scheduled scan error: " + (ev as MessageCallBackEventArgs)?.Message);
+                scanTask.onCompleted += ScheduledScanComplete;
+                ScanManager.AddTask(scanTask);
+                scanTask.Start();
+                Logger.Info($"scheduled scan started (interval={minutes}min)");
+            } catch (Exception ex) {
+                ScheduledScanRunning = false;
+                Logger.Error(ex);
+            }
+        }
+
+        private List<string> GetScheduledScanPaths()
+        {
+            // 与启动静默扫描同源：当前库的扫描路径
+            AppDatabase database = appDatabaseMapper.SelectList()?.FirstOrDefault(arg => arg != null && arg.DBId == ConfigManager.Main.CurrentDBId);
+            if (database == null || string.IsNullOrEmpty(database.ScanPath))
+                return null;
+            return JsonUtils.TryDeserializeObject<List<string>>(database.ScanPath);
+        }
+
+        /// <summary>
+        /// 定时扫描完成回调：不弹汇总卡片；有新增或存在缺字段影片时刷新统计，
+        /// 随后对新增影片（跟随 ScrapeAfterScan 开关）与缺字段影片（幂等补齐）自动刮削
+        /// </summary>
+        private void ScheduledScanComplete(object sender, EventArgs ev)
+        {
+            ScanTask scanTask = sender as ScanTask;
+            ScheduledScanRunning = false;
+            if (scanTask == null || !scanTask.Success)
+                return;
+            Dispatcher.Invoke(() => {
+                try {
+                    List<Video> insertVideos = scanTask.ScanResult?.InsertVideos;
+                    bool hasNew = insertVideos != null && insertVideos.Count > 0;
+                    List<Video> incompleteVideos = GetIncompleteVideos();
+                    if (!hasNew && incompleteVideos.Count == 0)
+                        return;
+                    vieModel.Statistic();
+                    if (ConfigManager.ScanConfig.LoadDataAfterScan && hasNew)
+                        LoadAll();
+                    if (ConfigManager.FFmpegConfig.ScreenShotAfterImport && hasNew)
+                        ScreenShotAfterImport(insertVideos);
+                    if (ConfigManager.ScanConfig.ScrapeAfterScan && hasNew)
+                        ScrapeAfterImport(insertVideos);
+                    ScrapeIncompleteVideos(incompleteVideos);
+                    if (ConfigManager.ScanConfig.DataExistsIndexAfterScan && hasNew)
+                        DataIndexManager.RebuildSilently();
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                }
+            });
+        }
+
+        /// <summary>查当前库缺字段影片（ToDownload 语义：标题/网页/封面缺失，只补缺不覆盖）</summary>
+        private List<Video> GetIncompleteVideos()
+        {
+            try {
+                SelectWrapper<Video> wrapper = Video.InitWrapper();
+                string select = "SELECT DISTINCT metadata.DataID, MVID, VID, metadata.Title, metadata_video.WebUrl, metadata_video.ImageUrls ";
+                string sql = select + Jvedio.Mapper.VideoMapper.SQL_BASE + wrapper.ToWhere(false);
+                List<Dictionary<string, object>> list = metaDataMapper.Select(sql);
+                if (list == null || list.Count == 0)
+                    return new List<Video>();
+                List<Video> videos = metaDataMapper.ToEntity<Video>(list, typeof(Video).GetProperties(), false);
+                return videos.Where(video => video != null && video.ToDownload()).ToList();
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                return new List<Video>();
+            }
+        }
+
+        /// <summary>
+        /// 对缺字段影片幂等刮削：队列中不存在的直接入队，已失败（取消）的任务原位重启，
+        /// 排队/进行中的跳过——每个扫描周期每个影片最多尝试一次
+        /// </summary>
+        private void ScrapeIncompleteVideos(List<Video> incompleteVideos)
+        {
+            if (incompleteVideos == null || incompleteVideos.Count == 0)
+                return;
+            int added = 0;
+            int restarted = 0;
+            foreach (Video video in incompleteVideos) {
+                DownLoadTask exists = DownloadManager.CurrentTasks?
+                    .OfType<DownLoadTask>().FirstOrDefault(t => t != null && t.DataID == video.DataID);
+                if (exists != null) {
+                    if (exists.Status == System.Threading.Tasks.TaskStatus.Canceled) {
+                        exists.Restart();
+                        restarted++;
+                    }
+                    continue;
+                }
+                DownLoadTask.DownloadVideo(video);
+                added++;
+            }
+            if (added + restarted > 0) {
+                Logger.Info($"scheduled scrape: added {added}, restarted {restarted}, rest skipped (queued/running)");
+                DownloadManager.Start();
+            }
+        }
+
+        #endregion
 
         private void OnDragFileOver(object sender, DragEventArgs e)
         {

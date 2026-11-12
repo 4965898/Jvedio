@@ -190,7 +190,8 @@ namespace Jvedio.Core.Clipper
                         using (var reader = command.ExecuteReader())
                             while (reader.Read()) marks.Add(new { id = reader.GetInt64(0), name = reader.GetString(1) });
                         Reply(stream, 200, new { app = "Jvedio", protocol = 1, labelImport = true, labelImportVersion = 3,
-                            markImport = true, markImportVersion = 1, marks, currentLibraryId = ConfigManager.Main.CurrentDBId, libraries,
+                            markImport = true, markImportVersion = 1, ownedQuery = true, ownedQueryVersion = 1, marks,
+                            currentLibraryId = ConfigManager.Main.CurrentDBId, libraries,
                             media = new { saveImages = config.SaveImages, saveCoverImages = config.SaveImages && config.SaveCoverImages,
                                 saveActorImages = config.SaveImages && config.SaveActorImages,
                                 savePreviewImages = config.SaveImages && config.SavePreviewImages, savePreviewVideos = config.SavePreviewVideos } }, origin);
@@ -255,6 +256,23 @@ namespace Jvedio.Core.Clipper
                         int saved = BrowserClipperImages.Save(image);
                         Reply(stream, 200, new { app = "Jvedio", protocol = 1, saved }, origin);
                         try { Saved?.Invoke(image.LibraryId, 0, 1, 0); } catch (Exception ex) { App.Logger.Error(ex); }
+                    } else if (requestLine[0] == "POST" && requestLine[1] == "/v1/owned") {
+                        if (!headers.TryGetValue("Content-Length", out string ownedSize) || !int.TryParse(ownedSize, out int ownedLength) ||
+                            ownedLength <= 0 || ownedLength > 1048576)
+                            throw new ArgumentException("请选择不超过 500 个番号（请求上限 1 MB）。");
+                        if (!headers.TryGetValue("Content-Type", out string ownedType) ||
+                            !ownedType.Split(';')[0].Trim().Equals("application/json", StringComparison.OrdinalIgnoreCase))
+                            throw new ArgumentException("JSON request required");
+                        var ownedBody = new byte[ownedLength];
+                        int ownedOffset = 0;
+                        while (ownedOffset < ownedLength) {
+                            int count = stream.Read(ownedBody, ownedOffset, ownedLength - ownedOffset);
+                            if (count == 0) throw new ArgumentException("Incomplete request");
+                            ownedOffset += count;
+                        }
+                        var ownedRequest = JsonConvert.DeserializeObject<OwnedQueryRequest>(new UTF8Encoding(false, true).GetString(ownedBody),
+                            new JsonSerializerSettings { MaxDepth = 16, TypeNameHandling = TypeNameHandling.None });
+                        Reply(stream, 200, QueryOwned(ownedRequest), origin);
                     } else Reply(stream, 404, new { error = "Unknown endpoint" }, origin);
                 } catch (ArgumentException ex) { Reply(stream, 400, new { error = ex.Message }); }
                 catch (JsonException) { Reply(stream, 400, new { error = "无效的剪藏数据。" }); }
@@ -306,6 +324,59 @@ namespace Jvedio.Core.Clipper
             return uri.AbsoluteUri;
         }
         private static string Key(string code) => code.Replace('_', '-').Replace("FC2-PPV-", "FC2-");
+
+        private sealed class OwnedQueryRequest
+        {
+            public long LibraryId { get; set; }
+            public List<string> Codes { get; set; }
+        }
+
+        /// <summary>
+        /// 供扩展批量查询番号是否已在库（「已拥有」角标），并附带 JavDB DataCode 供直达详情页跳转。
+        /// 无效番号静默跳过（扩展侧的放宽番号可能被本端 CodePattern 拒收，不应让整批失败）。
+        /// </summary>
+        private static object QueryOwned(OwnedQueryRequest request)
+        {
+            EnsureSQLite();
+            if (request?.Codes == null || request.Codes.Count == 0)
+                throw new ArgumentException("请提供要查询的番号列表。");
+            if (request.Codes.Count > 500)
+                throw new ArgumentException("请选择不超过 500 个番号（请求上限 1 MB）。");
+            var codes = new List<string>();
+            foreach (string raw in request.Codes) {
+                try {
+                    string normalized = NormalizeCode(raw);
+                    if (!codes.Contains(normalized))
+                        codes.Add(normalized);
+                } catch (ArgumentException) { }
+            }
+            if (codes.Count == 0)
+                throw new ArgumentException("请求中的番号均无效。");
+            var owned = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            var javdbCodes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            using (var connection = Open(true)) {
+                using (var command = MakeCommand(connection, null,
+                    "select v.VID, m.DataID from metadata_video v join metadata m on m.DataID=v.DataID " +
+                    "where m.DBId=@db and m.DataType=0", "@db", request.LibraryId))
+                using (var reader = command.ExecuteReader())
+                    while (reader.Read())
+                        owned[Key(Convert.ToString(reader[0]).Trim().ToUpperInvariant())] = reader.GetInt64(1);
+                using (var command = MakeCommand(connection, null,
+                    "select LocalValue, RemoteValue from common_url_code where ValueType='video' and WebType='db' and LocalValue is not null"))
+                using (var reader = command.ExecuteReader())
+                    while (reader.Read()) {
+                        string local = Key(Convert.ToString(reader[0]).Trim().ToUpperInvariant());
+                        if (!javdbCodes.ContainsKey(local))
+                            javdbCodes[local] = Convert.ToString(reader[1]);
+                    }
+            }
+            var items = codes.Select(code => {
+                bool isOwned = owned.TryGetValue(Key(code), out long dataId);
+                javdbCodes.TryGetValue(Key(code), out string javdbCode);
+                return new { code, owned = isOwned, dataId = isOwned ? dataId : 0L, javdbCode = javdbCode ?? "" };
+            }).ToList();
+            return new { app = "Jvedio", protocol = 1, items };
+        }
 
         private static void ValidateMetadata(BrowserClipMetadata info)
         {

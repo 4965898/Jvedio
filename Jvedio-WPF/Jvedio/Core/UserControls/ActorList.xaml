@@ -71,8 +71,31 @@
                 Name="rootGrid"
                 Width="450"
                 Margin="5"
+                PreviewMouseUp="Card_PreviewMouseUp"
+                ContextMenuService.IsEnabled="{Binding Path=ViewMode, ElementName=actorList, Converter={StaticResource OppositeBooleanConverter}}"
                 Tag="{Binding ActorID, Mode=OneWay}">
-                <Border Name="rootBorder" CornerRadius="6">
+                <!--  右键菜单挂在整卡上:对整个演员卡片任意位置右键均有效(不再仅限头像)  -->
+                <Grid.ContextMenu>
+                    <ContextMenu Tag="{Binding ActorID}">
+                        <MenuItem Click="SelectAllActors" Header="{DynamicResource SelectAll}" />
+                        <Separator />
+                        <MenuItem
+                            Click="DownLoadSelectedActor"
+                            Header="{DynamicResource SyncInfo}"
+                             />
+                        <MenuItem Click="DownLoadAllActors" Header="{DynamicResource SyncInfoLibrary}" />
+                        <MenuItem Click="OpenActorImagePath" Header="{DynamicResource OpenPath}" />
+                        <MenuItem Click="DeleteActors" Header="{DynamicResource Delete}" />
+                        <Separator />
+                        <MenuItem Click="ConvertActorNameENSelected" Header="{DynamicResource ConvertActorNameENSelected}" />
+                        <MenuItem Click="ConvertActorNameENPage" Header="{DynamicResource ConvertActorNameENPage}" />
+                        <MenuItem Click="ConvertActorNameENLibrary" Header="{DynamicResource ConvertActorNameENLibrary}" />
+                        <MenuItem Click="ExportActorListPage" Header="{DynamicResource ExportActorListPage}" />
+                        <MenuItem Click="ExportActorListLibrary" Header="{DynamicResource ExportActorListLibrary}" />
+                    </ContextMenu>
+                </Grid.ContextMenu>
+                <!--  Effect 与影片卡 ViewVideo 的 rootBorder 同款:淡蓝色(SkyBlue #87CEEB)光晕常驻,勾选时配合亮蓝边框=外框一圈淡蓝亮光  -->
+                <Border Name="rootBorder" CornerRadius="6" Effect="{StaticResource BlueDropShadowEffect}">
                     <Border.Background>
                         <VisualBrush Viewbox="0.1,0.5,0.85,0.7">
                             <VisualBrush.Visual>
@@ -90,6 +113,7 @@
                     </Border.Background>
                     <Border.Style>
                         <Style BasedOn="{StaticResource ActorBorder}" TargetType="Border">
+                            <Setter Property="BorderThickness" Value="2" />
                             <Setter Property="BorderBrush" Value="Transparent" />
                             <Style.Triggers>
                                 <MultiDataTrigger>
@@ -103,6 +127,10 @@
                                 </MultiDataTrigger>
                                 <DataTrigger Binding="{Binding Path=ViewMode, ElementName=actorList}" Value="True">
                                     <Setter Property="Cursor" Value="Hand" />
+                                </DataTrigger>
+                                <!--  编辑模式勾选:与影片多选一致,高亮边框框住整卡(替代仅框住头像)  -->
+                                <DataTrigger Binding="{Binding IsSelected, Mode=OneWay}" Value="True">
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Common.HighLight.BorderBrush}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
@@ -134,28 +162,14 @@
                             Height="125"
                             Margin="2"
                             VerticalAlignment="Top"
-                            ContextMenuService.IsEnabled="{Binding Path=ViewMode, ElementName=actorList, Converter={StaticResource OppositeBooleanConverter}}"
-                            CornerRadius="4"
-                            PreviewMouseUp="Border_PreviewMouseUp"
-                            Tag="{Binding ActorID}">
-                            <Border.ContextMenu>
-                                <ContextMenu Tag="{Binding ActorID}">
-                                    <MenuItem Click="DeleteActors" Header="{DynamicResource Delete}" />
-                                    <MenuItem Click="OpenActorImagePath" Header="{DynamicResource OpenPath}" />
-                                    <MenuItem
-                                        Click="DownLoadSelectedActor"
-                                        Header="{DynamicResource SyncInfo}"
-                                        IsEnabled="False" />
-                                    <Separator />
-                                    <MenuItem Click="ConvertActorNameEN" Header="{DynamicResource ConvertActorNameEN}" />
-                                    <MenuItem Click="ExportActorList" Header="{DynamicResource ExportActorList}" />
-                                </ContextMenu>
-                            </Border.ContextMenu>
+                            BorderThickness="2"
+                            CornerRadius="4">
                             <Border.Background>
                                 <ImageBrush ImageSource="{Binding SmallImage}" Stretch="UniformToFill" />
                             </Border.Background>
                             <Border.Style>
                                 <Style TargetType="Border">
+                                    <Setter Property="BorderBrush" Value="Transparent" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Path=ViewMode, ElementName=actorList}" Value="True">
                                             <Setter Property="Cursor" Value="Hand" />
@@ -219,22 +233,23 @@
                             <RowDefinition Height="auto" />
                             <RowDefinition Height="auto" />
                             <RowDefinition Height="auto" />
-                            <RowDefinition Height="auto" />
                         </Grid.RowDefinitions>
 
-                        <TextBox
-                            Name="ActorNameTextBox"
+                        <!--  姓名:正白加粗(与影片信息一致),不用 TextBox 禁用态(多选模式下不再变暗)  -->
+                        <TextBlock
+                            Name="ActorNameTextBlock"
                             Grid.Row="0"
                             Margin="5"
+                            MaxHeight="42"
                             HorizontalAlignment="Left"
                             FontSize="{DynamicResource GlobalFontSize}"
+                            FontWeight="Bold"
                             Foreground="{DynamicResource Window.Foreground}"
-                            IsEnabled="{Binding ActorEditMode, Source={x:Static config:ConfigManager.VideoConfig}, Converter={StaticResource OppositeBooleanConverter}}"
-                            MaxLines="2"
-                            Opacity="0.7"
-                            Style="{StaticResource ReadOnlyWrapTextBox}"
+                            Style="{StaticResource BaseTextBlock}"
                             Text="{Binding ActorName}"
                             TextAlignment="Left"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="Wrap"
                             ToolTip="{Binding RelativeSource={RelativeSource Mode=Self}, Path=Text}" />
 
                         <!--  演员星标  -->
@@ -254,16 +269,43 @@
                             Visibility="Visible"
                             Value="{Binding Grade, Mode=TwoWay}" />
 
-                        <TextBox
+                        <!--  演员资料:标签+数值小卡片,分行分块展示(含鞋码),空字段自动隐藏  -->
+                        <ItemsControl
                             Grid.Row="2"
-                            MaxHeight="60"
-                            Margin="4"
+                            Margin="6,2,4,4"
                             HorizontalAlignment="Left"
-                            FontSize="{DynamicResource GlobalFontSize12}"
-                            Foreground="{DynamicResource Window.Sub.Foreground}"
-                            Style="{StaticResource ReadOnlyWrapTextBox}"
-                            Text="{Binding InfoString}"
-                            TextAlignment="Left" />
+                            ItemsSource="{Binding InfoChips, Mode=OneWay}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border
+                                        Margin="1,2"
+                                        Padding="6,2"
+                                        VerticalAlignment="Top"
+                                        Background="{DynamicResource Window.Title.Background}"
+                                        CornerRadius="3"
+                                        ToolTip="{Binding Value}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock
+                                                VerticalAlignment="Center"
+                                                FontSize="11"
+                                                Foreground="{DynamicResource Window.Foreground}"
+                                                Text="{Binding Label}" />
+                                            <TextBlock
+                                                Margin="4,0,0,0"
+                                                VerticalAlignment="Center"
+                                                FontSize="12"
+                                                Foreground="{DynamicResource Window.Foreground}"
+                                                Text="{Binding Value}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </Grid>
                 </Grid>
             </Grid>
@@ -275,8 +317,31 @@
                 Name="rootGrid"
                 Width="auto"
                 Margin="5"
+                PreviewMouseUp="Card_PreviewMouseUp"
+                ContextMenuService.IsEnabled="{Binding Path=ViewMode, ElementName=actorList, Converter={StaticResource OppositeBooleanConverter}}"
                 Tag="{Binding ActorID, Mode=OneWay}">
-                <Border Name="rootBorder" CornerRadius="6">
+                <!--  右键菜单挂在整卡上:对整个演员卡片任意位置右键均有效(不再仅限头像)  -->
+                <Grid.ContextMenu>
+                    <ContextMenu Tag="{Binding ActorID}">
+                        <MenuItem Click="SelectAllActors" Header="{DynamicResource SelectAll}" />
+                        <Separator />
+                        <MenuItem
+                            Click="DownLoadSelectedActor"
+                            Header="{DynamicResource SyncInfo}"
+                             />
+                        <MenuItem Click="DownLoadAllActors" Header="{DynamicResource SyncInfoLibrary}" />
+                        <MenuItem Click="OpenActorImagePath" Header="{DynamicResource OpenPath}" />
+                        <MenuItem Click="DeleteActors" Header="{DynamicResource Delete}" />
+                        <Separator />
+                        <MenuItem Click="ConvertActorNameENSelected" Header="{DynamicResource ConvertActorNameENSelected}" />
+                        <MenuItem Click="ConvertActorNameENPage" Header="{DynamicResource ConvertActorNameENPage}" />
+                        <MenuItem Click="ConvertActorNameENLibrary" Header="{DynamicResource ConvertActorNameENLibrary}" />
+                        <MenuItem Click="ExportActorListPage" Header="{DynamicResource ExportActorListPage}" />
+                        <MenuItem Click="ExportActorListLibrary" Header="{DynamicResource ExportActorListLibrary}" />
+                    </ContextMenu>
+                </Grid.ContextMenu>
+                <!--  Effect 与影片卡 ViewVideo 的 rootBorder 同款:淡蓝色(SkyBlue #87CEEB)光晕常驻,勾选时配合亮蓝边框=外框一圈淡蓝亮光  -->
+                <Border Name="rootBorder" CornerRadius="6" Effect="{StaticResource BlueDropShadowEffect}">
                     <Border.Background>
                         <VisualBrush Viewbox="0.06,0.1,0.85,0.7">
                             <VisualBrush.Visual>
@@ -294,6 +359,7 @@
                     </Border.Background>
                     <Border.Style>
                         <Style BasedOn="{StaticResource ActorBorder}" TargetType="Border">
+                            <Setter Property="BorderThickness" Value="2" />
                             <Setter Property="BorderBrush" Value="Transparent" />
                             <Style.Triggers>
                                 <MultiDataTrigger>
@@ -307,6 +373,10 @@
                                 </MultiDataTrigger>
                                 <DataTrigger Binding="{Binding Path=ViewMode, ElementName=actorList}" Value="True">
                                     <Setter Property="Cursor" Value="Hand" />
+                                </DataTrigger>
+                                <!--  编辑模式勾选:与影片多选一致,高亮边框框住整卡(替代仅框住头像)  -->
+                                <DataTrigger Binding="{Binding IsSelected, Mode=OneWay}" Value="True">
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Common.HighLight.BorderBrush}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
@@ -339,28 +409,14 @@
                             Height="125"
                             Margin="2"
                             VerticalAlignment="Top"
-                            ContextMenuService.IsEnabled="{Binding Path=ViewMode, ElementName=actorList, Converter={StaticResource OppositeBooleanConverter}}"
-                            CornerRadius="4"
-                            PreviewMouseUp="Border_PreviewMouseUp"
-                            Tag="{Binding ActorID}">
-                            <Border.ContextMenu>
-                                <ContextMenu Tag="{Binding ActorID}">
-                                    <MenuItem Click="DeleteActors" Header="{DynamicResource Delete}" />
-                                    <MenuItem Click="OpenActorImagePath" Header="{DynamicResource OpenPath}" />
-                                    <MenuItem
-                                        Click="DownLoadSelectedActor"
-                                        Header="{DynamicResource SyncInfo}"
-                                        IsEnabled="False" />
-                                    <Separator />
-                                    <MenuItem Click="ConvertActorNameEN" Header="{DynamicResource ConvertActorNameEN}" />
-                                    <MenuItem Click="ExportActorList" Header="{DynamicResource ExportActorList}" />
-                                </ContextMenu>
-                            </Border.ContextMenu>
+                            BorderThickness="2"
+                            CornerRadius="4">
                             <Border.Background>
                                 <ImageBrush ImageSource="{Binding SmallImage}" Stretch="UniformToFill" />
                             </Border.Background>
                             <Border.Style>
                                 <Style TargetType="Border">
+                                    <Setter Property="BorderBrush" Value="Transparent" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Path=ViewMode, ElementName=actorList}" Value="True">
                                             <Setter Property="Cursor" Value="Hand" />
@@ -420,19 +476,64 @@
                     </Grid>
 
 
-                    <TextBox
-                        Name="ActorNameTextBox"
+                    <!--  姓名:正白加粗(与影片信息一致),不用 TextBox 禁用态(多选模式下不再变暗)  -->
+                    <TextBlock
+                        Name="ActorNameTextBlock"
                         Grid.Row="1"
-                        Width="125"
+                        Width="129"
                         Margin="0,5"
+                        HorizontalAlignment="Left"
+                        MaxHeight="42"
                         FontSize="{DynamicResource GlobalFontSize}"
+                        FontWeight="Bold"
                         Foreground="{DynamicResource Window.Foreground}"
-                        IsEnabled="{Binding ActorEditMode, Source={x:Static config:ConfigManager.VideoConfig}, Converter={StaticResource OppositeBooleanConverter}}"
-                        MaxLines="2"
-                        Opacity="0.7"
-                        Style="{StaticResource ReadOnlyWrapTextBox}"
+                        Style="{StaticResource BaseTextBlock}"
                         Text="{Binding ActorName}"
+                        TextAlignment="Left"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="Wrap"
                         ToolTip="{Binding RelativeSource={RelativeSource Mode=Self}, Path=Text}" />
+
+                    <!--  演员资料:标签+数值小卡片(精简版,含鞋码),空字段自动隐藏  -->
+                    <ItemsControl
+                        Grid.Row="2"
+                        Width="131"
+                        Margin="0,2"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        ItemsSource="{Binding InfoChipsCompact, Mode=OneWay}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border
+                                    Margin="1,2"
+                                    Padding="6,2"
+                                    VerticalAlignment="Top"
+                                    Background="{DynamicResource Window.Title.Background}"
+                                    CornerRadius="3"
+                                    ToolTip="{Binding Value}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            FontSize="11"
+                                            Foreground="{DynamicResource Window.Foreground}"
+                                            Text="{Binding Label}" />
+                                        <TextBlock
+                                            Margin="4,0,0,0"
+                                            VerticalAlignment="Center"
+                                            FontSize="12"
+                                            FontWeight="SemiBold"
+                                            Foreground="{DynamicResource Window.Foreground}"
+                                            Text="{Binding Value}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
 
                 </Grid>
@@ -512,18 +613,15 @@
                 </Button>
 
                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                    <!--  显示数目开关(与多选开关对调:显示数目在前,多选移至工具栏末尾)  -->
                     <super:Switch
-                        Height="25"
-                        Background="{DynamicResource Window.Side.Background}"
-                        CheckedBackground="{DynamicResource CheckBox.Checked.Background}"
-                        Click="SetActorSelectMode"
-                        IsChecked="{Binding ActorEditMode, Mode=TwoWay, Source={x:Static config:ConfigManager.VideoConfig}}"
-                        Visibility="Collapsed" />
+                        Height="20"
+                        Background="{DynamicResource Window.Title.Background}"
+                        IsChecked="{Binding ActorShowCount, Mode=TwoWay, Source={x:Static config:ConfigManager.VideoConfig}}" />
                     <TextBlock
-                        VerticalAlignment="Center"
+                        FontSize="{DynamicResource GlobalFontSize12}"
                         Style="{StaticResource BaseTextBlock}"
-                        Text="{DynamicResource MultiSelect}"
-                        Visibility="Collapsed" />
+                        Text="显示数目" />
                     <Border
                         VerticalAlignment="Center"
                         Background="{DynamicResource Window.Side.Background}"
@@ -572,6 +670,7 @@
                                 <MenuItem Header="{DynamicResource Actress_Hipline}" IsCheckable="True" />
                                 <MenuItem Header="{DynamicResource Rating}" IsCheckable="True" />
                                 <MenuItem Header="{DynamicResource Actress_Age}" IsCheckable="True" />
+                                <MenuItem Header="{DynamicResource Actress_ShoeSize}" IsCheckable="True" />
 
                             </ContextMenu>
                         </super:HoverPath.ContextMenu>
@@ -579,16 +678,25 @@
 
 
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Visibility="{Binding ShowTable, ElementName=actorList, Converter={StaticResource BoolToOppositeVisibilityConverter}}">
-                    <super:Switch
-                        Height="20"
-                        Background="{DynamicResource Window.Title.Background}"
-                        IsChecked="{Binding ActorShowCount, Mode=TwoWay, Source={x:Static config:ConfigManager.VideoConfig}}" />
-                    <TextBlock
-                        FontSize="{DynamicResource GlobalFontSize12}"
-                        Style="{StaticResource BaseTextBlock}"
-                        Text="显示数目" />
-                </StackPanel>
+                <!--  多选开关(与显示数目对调:移至工具栏末尾),刷新按钮在其右边  -->
+                <super:Switch
+                    Height="20"
+                    Background="{DynamicResource Window.Side.Background}"
+                    CheckedBackground="{DynamicResource CheckBox.Checked.Background}"
+                    Click="SetActorSelectMode"
+                    IsChecked="{Binding ActorEditMode, Mode=TwoWay, Source={x:Static config:ConfigManager.VideoConfig}}"
+                    Visibility="Visible" />
+                <TextBlock
+                    Margin="2,0,10,0"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource BaseTextBlock}"
+                    Text="{DynamicResource MultiSelect}"
+                    Visibility="Visible" />
+                <super:PathMsg
+                    MouseLeftButtonUp="RefreshActors"
+                    Path="M753.4 270.9C691.2 209.1 606.4 170.7 512 170.7A341.3 341.3 0 0 0 170.7 512A341.3 341.3 0 0 0 512 853.3C671.1 853.3 804 744.6 845.7 597.3H753.4C718.1 697.1 623.5 768 512 768A256 256 0 0 1 256 512A256 256 0 0 1 512 256C554.7 256 622.9 285.5 645.7 331.9L554.7 469.3H853.3V170.7L753.4 270.9Z"
+                    Style="{StaticResource NormalPathMsg}"
+                    ToolTip="刷新演员信息" />
 
             </StackPanel>
         </Grid>
@@ -731,6 +839,7 @@
                             <DataTemplate>
                                 <TextBox
                                     Cursor="Arrow"
+                                    FontWeight="Bold"
                                     Style="{StaticResource ReadOnlyNoWrapTextBox}"
                                     Text="{Binding ActorName}"
                                     ToolTip="{Binding RelativeSource={RelativeSource Mode=Self}, Path=Text}" />
@@ -887,6 +996,16 @@
 
 
                     <DataGridTextColumn
+                        Width="60"
+                        MinWidth="60"
+                        Binding="{Binding ShoeSize}"
+                        ElementStyle="{StaticResource DataGridTextBlockStyle}"
+                        Header="{DynamicResource Actress_ShoeSize}"
+                        IsReadOnly="True"
+                        SortMemberPath="ShoeSize" />
+
+
+                    <DataGridTextColumn
                         Width="100"
                         MinWidth="100"
                         Binding="{Binding Nation}"
@@ -936,6 +1055,16 @@
             </DataGrid>
 
 
+            <!--  去到顶部/底部（与影片信息界面同款，悬浮内容区右下角；必须挂 Grid.Row=1，
+                  否则落进第 0 行把进度条行撑出一条空白）  -->
+            <super:GoToTop
+                Grid.Row="1"
+                Margin="20,10"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                Panel.ZIndex="99"
+                OnGoToBottom="GotoBottom"
+                OnGoToTop="GotoTop" />
 
         </Grid>
 

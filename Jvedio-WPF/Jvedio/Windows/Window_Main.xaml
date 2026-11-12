@@ -846,10 +846,12 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="auto" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <super:SysInfo />
+                <!--  图标组整体居中(左右各一个 * 列配平),不再挤在右下角  -->
                 <StackPanel
-                    Grid.Column="2"
+                    Grid.Column="1"
                     Margin="5,0"
                     Orientation="Horizontal">
                     <Grid
@@ -911,6 +913,21 @@
                         </Border>
 
                     </Grid>
+                    <!--  下载任务（下载箭头图标）：移至资料体检中心左侧  -->
+                    <Grid>
+                        <super:PathMsg
+                            Name="downloadPathMsg"
+                            MouseLeftButtonUp="ShowDownloadPopup"
+                            MsgCount="{Binding RunningCount, Source={x:Static local:App.DownloadManager}, Mode=OneWay}"
+                            Path="M942.545455 676.584727a34.909091 34.909091 0 0 1 34.90909 34.909091v139.636364c0 70.562909-57.437091 128-128 128h-674.90909a128.139636 128.139636 0 0 1-128-128v-139.636364a34.909091 34.909091 0 1 1 69.818181 0v139.636364c0 32.046545 26.088727 58.181818 58.181819 58.181818h674.90909c32.093091 0 58.181818-26.135273 58.181819-58.181818v-139.636364a34.909091 34.909091 0 0 1 34.909091-34.909091z m-455.214546 129.396364l-164.584727-164.561455a34.909091 34.909091 0 1 1 49.361454-49.361454l104.983273 104.96V81.454545a34.909091 34.909091 0 1 1 69.818182 0v615.563637l104.96-104.96a34.909091 34.909091 0 1 1 49.361454 49.361454l-164.538181 164.561455a34.792727 34.792727 0 0 1-24.669091 10.216727c-8.96 0-17.873455-3.397818-24.715637-10.216727z"
+                            Style="{StaticResource NormalPathMsg}" />
+                    </Grid>
+                    <!--  演员资料补齐任务（半高人像图标），点击打开演员补齐任务页：移至资料体检中心左侧  -->
+                    <super:PathMsg
+                        MouseLeftButtonUp="ShowActorScrapePopup"
+                        Path="M304 336A208 208 0 1 0 720 336A208 208 0 1 0 304 336ZM512 640C694.6 640 853.3 741 853.3 856V960H170.7V856C170.7 741 329.4 640 512 640Z"
+                        Style="{StaticResource NormalPathMsg}"
+                        ToolTip="{DynamicResource ActorScrapeTask}" />
                     <!--  资料体检中心：与任务图标同为 30x30，位于翻译任务左侧  -->
                     <super:PathMsg
                         MouseLeftButtonUp="ShowLibraryHealth"
@@ -1113,14 +1130,6 @@
                                 </Grid>
                             </Grid>
                         </Viewbox>
-                    </Grid>
-                    <Grid>
-                        <super:PathMsg
-                            Name="downloadPathMsg"
-                            MouseLeftButtonUp="ShowDownloadPopup"
-                            MsgCount="{Binding RunningCount, Source={x:Static local:App.DownloadManager}, Mode=OneWay}"
-                            Path="M942.545455 676.584727a34.909091 34.909091 0 0 1 34.90909 34.909091v139.636364c0 70.562909-57.437091 128-128 128h-674.90909a128.139636 128.139636 0 0 1-128-128v-139.636364a34.909091 34.909091 0 1 1 69.818181 0v139.636364c0 32.046545 26.088727 58.181818 58.181819 58.181818h674.90909c32.093091 0 58.181818-26.135273 58.181819-58.181818v-139.636364a34.909091 34.909091 0 0 1 34.909091-34.909091z m-455.214546 129.396364l-164.584727-164.561455a34.909091 34.909091 0 1 1 49.361454-49.361454l104.983273 104.96V81.454545a34.909091 34.909091 0 1 1 69.818182 0v615.563637l104.96-104.96a34.909091 34.909091 0 1 1 49.361454 49.361454l-164.538181 164.561455a34.792727 34.792727 0 0 1-24.669091 10.216727c-8.96 0-17.873455-3.397818-24.715637-10.216727z"
-                            Style="{StaticResource NormalPathMsg}" />
                     </Grid>
                 </StackPanel>
             </Grid>

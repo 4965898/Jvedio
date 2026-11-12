@@ -59,26 +59,32 @@ namespace Jvedio.Core.UserControls
         public static Dictionary<int, string> SortDict { get; set; } = new Dictionary<int, string>();
 
 
+        /// <summary>
+        /// 排序字段表：索引与排序右键菜单项一一对应（0=我的收藏…17=鞋码）。
+        /// 注意此前多了一项 Grade 且 BirthPlace/Birthday 错位，导致「血型」起全部字段错位一格、
+        /// 「年龄」实际按评分排序——表现为排序无效，已对齐（SQL 复合查询的 ORDER BY 已实测
+        /// 带表前缀/裸列名均可，见 build-output/theme-probe/SortProbe）
+        /// </summary>
         public static List<string> SortDictList { get; set; } = new List<string>()
         {
-            "actor_info.Grade",
-            "actor_info.ActorName",
-            "Count",
-            "actor_info.Country",
-            "Nation",
-            "BirthPlace",
-            "Birthday",
-            "BloodType",
-            "Height",
-            "Weight",
-            "Gender",
-            "Hobby",
-            "Cup",
-            "Chest",
-            "Waist",
-            "Hipline",
-            "actor_info.Grade",
-            "Age",
+            "actor_info.Grade",     // 0 我的收藏
+            "actor_info.ActorName", // 1 名称
+            "Count",                // 2 作品数量
+            "actor_info.Country",   // 3 国家
+            "Nation",               // 4 民族
+            "Birthday",             // 5 生日
+            "BloodType",            // 6 血型
+            "Height",               // 7 高度
+            "Weight",               // 8 体重
+            "Gender",               // 9 性别
+            "Hobby",                // 10 爱好
+            "Cup",                  // 11 罩杯
+            "Chest",                // 12 胸围
+            "Waist",                // 13 腰围
+            "Hipline",              // 14 臀围
+            "actor_info.Grade",     // 15 评分
+            "Age",                  // 16 年龄
+            "ShoeSize",             // 17 鞋码
         };
 
 
@@ -547,6 +553,8 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                 Rendering = true;
                 ActorInfo actorInfo = Actors[i];
                 ActorInfo.SetImage(ref actorInfo);
+                // 编辑模式勾选状态在翻页/重渲染后保持(与 SelectedActors 同步)
+                actorInfo.IsSelected = SelectedActors.Any(a => a.ActorID == actorInfo.ActorID);
                 await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new LoadActorDelegate(LoadActor), actorInfo, i);
                 RenderProgress = (int)(100 * (i + 1) / (float)Actors.Count);
             }
@@ -599,6 +607,9 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                     item.SetValue(origin, v);
                 }
             }
+            // 资料字段逐个反射写入,计算属性(信息卡片/资料串)不会自动感知,手动通知刷新,
+            // 保证补齐结果刷新按钮后立即上屏
+            origin.NotifyInfoDisplayChanged();
         }
 
         private void Page_PreviewKeyUp(object sender, KeyEventArgs e)
@@ -610,13 +621,56 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                 CurrentPage = 1;
                 //SetSelected();
 
+            } else if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control && e.Key == Key.A) {
+                // Ctrl+A 全选本页演员；焦点在搜索框等文本框内时放行(Ctrl+A 应选中搜索文本)
+                if (searchBox.IsKeyboardFocusWithin || Keyboard.FocusedElement is TextBox)
+                    return;
+                SelectAllCurrentPage();
+                e.Handled = true;
             }
+        }
+
+        // 刷新按钮:重新从库加载演员信息(补齐结果立即上屏)
+        public void RefreshActors(object sender, RoutedEventArgs e)
+        {
+            Select();
         }
 
         private void SetActorSelectMode(object sender, RoutedEventArgs e)
         {
             SelectedActors.Clear();
-            //SetSelected();
+            // 关闭多选开关时清除所有蓝框
+            if (CurrentList != null)
+                foreach (ActorInfo actor in CurrentList)
+                    if (actor != null)
+                        actor.IsSelected = false;
+        }
+
+        /// <summary>
+        /// 右键「全选」：一键勾选本页所有演员（与 Ctrl+A 共用 SelectAllCurrentPage）
+        /// </summary>
+        private void SelectAllActors(object sender, RoutedEventArgs e)
+        {
+            SelectAllCurrentPage();
+        }
+
+        /// <summary>
+        /// 一键勾选本页所有演员。未打开多选开关时自动打开（开关经绑定联动），便于直接批量同步信息
+        /// </summary>
+        private void SelectAllCurrentPage()
+        {
+            if (!ConfigManager.VideoConfig.ActorEditMode)
+                ConfigManager.VideoConfig.ActorEditMode = true;
+            SelectedActors.Clear();
+            if (CurrentList == null)
+                return;
+            foreach (ActorInfo actor in CurrentList) {
+                if (actor == null || actor.ActorID <= 0)
+                    continue;
+                actor.IsSelected = true;
+                if (!SelectedActors.Any(arg => arg.ActorID == actor.ActorID))
+                    SelectedActors.Add(actor);
+            }
         }
 
         private void CurrentActorPageChange(object sender, EventArgs e)
@@ -649,21 +703,41 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                 if (CurrentList[i]?.ActorID == actorID) {
                     long count = CurrentList[i].Count;
                     CurrentList[i] = new ActorInfo();
-                    CurrentList[i] = ActorInfo.GetById(actorID);
-                    CurrentList[i].Count = count;
+                    // 影片数量必须随对象一起上屏：条目替换引发行重绑时先读到 Count=0，
+                    // 之后补赋值若不通知(Count 现已带 INPC)角标会一直显示 0
+                    ActorInfo fresh = ActorInfo.GetById(actorID);
+                    fresh.Count = count;
+                    CurrentList[i] = fresh;
                     break;
                 }
             }
         }
 
         /// <summary>
-        /// 导出当前筛选条件下的全部演员（hitchao/Jvedio#346/#212，支持 CSV/Excel/JSON）
+        /// 导出演员列表（hitchao/Jvedio#346/#212，支持 CSV/Excel/JSON）。
+        /// 分两级：仅本页（当前页演员）/ 当前筛选条件下的整个库
         /// </summary>
-        public async void ExportActorList(object sender, RoutedEventArgs e)
+        public void ExportActorListPage(object sender, RoutedEventArgs e)
+        {
+            List<long> ids = CurrentList?.Where(arg => arg != null && arg.ActorID > 0)
+                .Select(arg => arg.ActorID).Distinct().ToList() ?? new List<long>();
+            if (ids.Count == 0) {
+                MessageNotify.Info("本页没有演员");
+                return;
+            }
+            ExportActorListRange($" WHERE ActorID in ({string.Join(",", ids)})", $"Jvedio演员列表_本页_{DateTime.Now:yyyyMMdd_HHmmss}");
+        }
+
+        public void ExportActorListLibrary(object sender, RoutedEventArgs e)
+        {
+            ExportActorListRange(string.Empty, $"Jvedio演员列表_{DateTime.Now:yyyyMMdd_HHmmss}");
+        }
+
+        private async void ExportActorListRange(string outerFilter, string fileName)
         {
             Microsoft.Win32.SaveFileDialog dlg = new Microsoft.Win32.SaveFileDialog();
             dlg.Filter = "CSV 文件 (*.csv)|*.csv|Excel 文件 (*.xls)|*.xls|JSON 文件 (*.json)|*.json";
-            dlg.FileName = $"Jvedio演员列表_{DateTime.Now:yyyyMMdd_HHmmss}";
+            dlg.FileName = fileName;
             if (dlg.ShowDialog() != true)
                 return;
             string savePath = dlg.FileName;
@@ -684,13 +758,16 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                         $"{unionSelect} FROM actor_info " +
                         "WHERE NOT EXISTS(SELECT 1 from metadata_to_actor where metadata_to_actor.ActorID=actor_info.ActorID )" +
                         $"{(search ? $"and actor_info.ActorName like '%{searchText}%' " : string.Empty)}  GROUP BY actor_info.ActorID";
+                    // 仅本页：整查询包一层，按当前页演员 ID 过滤（列结构与整库导出一致）
+                    if (!string.IsNullOrEmpty(outerFilter))
+                        sql = $"SELECT * FROM ({sql}){outerFilter}";
                     int count = Jvedio.Core.Export.ExportHelper.ExportActors(savePath, format, sql);
                     App.Current.Dispatcher.BeginInvoke(new Action(() => {
-                        MessageCard.Info($"{LangManager.GetValueByKey("ExportSuccess")} {count}");
+                        MessageNotify.Success($"{LangManager.GetValueByKey("ExportSuccess")} {count}");
                     }));
                 } catch (Exception ex) {
                     Logger.Error(ex);
-                    App.Current.Dispatcher.BeginInvoke(new Action(() => MessageCard.Error(ex.Message)));
+                    App.Current.Dispatcher.BeginInvoke(new Action(() => MessageNotify.Error(ex.Message)));
                 }
             });
         }
@@ -732,14 +809,50 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
         }
 
         /// <summary>
-        /// 批量转换英文名：对 ActorNameEN 为空的演员，用假名→罗马字算法兜底转换（结果含汉字/假名残留则跳过）
+        /// 批量转换英文名：对 ActorNameEN 为空的演员，用假名→罗马字算法兜底转换（结果含汉字/假名残留则跳过）。
+        /// 分三级：选中演员（编辑模式=勾选项，否则=右键这一位，与删除/同步信息语义一致）/ 仅本页 / 整个库
         /// </summary>
-        private async void ConvertActorNameEN(object sender, RoutedEventArgs e)
+        private void ConvertActorNameENSelected(object sender, RoutedEventArgs e)
+        {
+            MenuItem mnu = sender as MenuItem;
+            ContextMenu contextMenu = mnu?.Parent as ContextMenu;
+            if (contextMenu == null || !long.TryParse(contextMenu.Tag?.ToString(), out long actorID) || actorID <= 0)
+                return;
+            List<long> ids = new List<long>();
+            if (ConfigManager.VideoConfig.ActorEditMode) {
+                foreach (ActorInfo selected in SelectedActors)
+                    if (selected != null && selected.ActorID > 0 && !ids.Contains(selected.ActorID))
+                        ids.Add(selected.ActorID);
+            }
+            // 一个都没勾选(或未开多选)时退回右键的这一位,与「删除/同步信息」语义一致
+            if (!ids.Contains(actorID))
+                ids.Add(actorID);
+            ConvertActorNameEnRange($"and actor_info.ActorID in ({string.Join(",", ids)})", "选中演员");
+        }
+
+        private void ConvertActorNameENPage(object sender, RoutedEventArgs e)
+        {
+            List<long> ids = CurrentList?.Where(arg => arg != null && arg.ActorID > 0)
+                .Select(arg => arg.ActorID).Distinct().ToList() ?? new List<long>();
+            if (ids.Count == 0) {
+                MessageNotify.Info("本页没有演员");
+                return;
+            }
+            ConvertActorNameEnRange($"and actor_info.ActorID in ({string.Join(",", ids)})", "本页");
+        }
+
+        private void ConvertActorNameENLibrary(object sender, RoutedEventArgs e)
+        {
+            ConvertActorNameEnRange(string.Empty, "整个库");
+        }
+
+        private async void ConvertActorNameEnRange(string idFilter, string scopeLabel)
         {
             int converted = 0;
             await Task.Run(() => {
                 List<Dictionary<string, object>> list = actorMapper.Select(
-                    "select ActorID, ActorName from actor_info where ActorNameEN is null or ActorNameEN = ''");
+                    "select ActorID, ActorName from actor_info " +
+                    $"where (ActorNameEN is null or ActorNameEN = '') {idFilter}");
                 if (list == null)
                     return;
                 foreach (Dictionary<string, object> row in list) {
@@ -756,29 +869,59 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                 }
             });
             Select();
-            MessageNotify.Success($"英文名转换完成：成功 {converted} 个");
+            MessageNotify.Success($"英文名转换完成（{scopeLabel}）：成功 {converted} 个");
         }
 
-        // todo 演员信息下载
+        /// <summary>
+        /// 右键「同步信息」：手动补齐演员资料（MinnanoAV）。
+        /// 选择语义与「删除」一致：编辑模式下批量补齐已勾选的演员，否则仅右键的这一位。
+        /// 显式操作不受「演员资料自动补齐」开关限制，但需先启用 MinnanoAV 源
+        /// </summary>
         public void DownLoadSelectedActor(object sender, RoutedEventArgs e)
         {
-            // if (downLoadActress?.State == DownLoadState.DownLoading)
-            // {
-            //    msgCard.Info(SuperControls.Style.LangManager.GetValueByKey("Message_WaitForDownload")); return;
-            // }
+            MenuItem mnu = sender as MenuItem;
+            ContextMenu contextMenu = mnu?.Parent as ContextMenu;
+            if (contextMenu == null || !long.TryParse(contextMenu.Tag?.ToString(), out long actorID) || actorID <= 0)
+                return;
 
-            // if (!ConfigManager.VideoConfig.ActorEditMode) SelectedActress.Clear();
-            // StackPanel sp = null;
-            // if (sender is MenuItem mnu)
-            // {
-            //    sp = ((ContextMenu)mnu.Parent).PlacementTarget as StackPanel;
-            //    string name = sp.Tag.ToString();
-            //    Actress CurrentActress = GetActressFromVieModel(name);
-            //    if (!SelectedActress.Select(g => g.name).ToList().Contains(CurrentActress.name)) SelectedActress.Add(CurrentActress);
-            //    StartDownLoadActor(SelectedActress);
+            List<ActorInfo> targets = new List<ActorInfo>();
+            if (ConfigManager.VideoConfig.ActorEditMode) {
+                foreach (ActorInfo selected in SelectedActors) {
+                    if (selected != null && selected.ActorID > 0 && !targets.Any(arg => arg.ActorID == selected.ActorID))
+                        targets.Add(selected);
+                }
+            }
+            ActorInfo current = CurrentList?.Where(arg => arg != null && arg.ActorID == actorID).FirstOrDefault();
+            if (current == null)
+                current = ActorInfo.GetById(actorID);
+            if (current == null)
+                return;
+            if (!targets.Any(arg => arg.ActorID == actorID))
+                targets.Add(current);
 
-            // }
-            // if (!ConfigManager.VideoConfig.ActorEditMode) SelectedActress.Clear();
+            int result = Jvedio.Core.Tasks.ActorScrapeManager.EnqueueManual(targets);
+            if (result < 0)
+                MessageNotify.Warning("尚未启用演员资料源：请在「选项 → 同步信息」中启用 JAVDatabase(推荐)或 MinnanoAV 后重试");
+            else if (result == 0)
+                MessageNotify.Info("所选演员已在补齐队列中");
+            else
+                MessageNotify.Success($"已加入演员资料补齐队列：{result} 位（串行执行，进度见右下角任务页）");
+        }
+
+        /// <summary>
+        /// 右键「同步信息（整个库）」：全库演员全量入队补齐。
+        /// 显式手动操作不受「演员资料自动补齐」开关限制；是否覆盖已有字段由
+        /// 「演员资料：刮削时强制覆写已有信息」开关决定
+        /// </summary>
+        public void DownLoadAllActors(object sender, RoutedEventArgs e)
+        {
+            int result = Jvedio.Core.Tasks.ActorScrapeManager.EnqueueAllLibrary();
+            if (result < 0)
+                MessageNotify.Warning("尚未启用演员资料源：请在「选项 → 同步信息」中启用 JAVDatabase(推荐)或 MinnanoAV 后重试");
+            else if (result == 0)
+                MessageNotify.Info("库内没有可入队的演员");
+            else
+                MessageNotify.Success($"已加入演员资料补齐队列：{result} 位（串行执行，每 10 个长歇 15 秒，进度见右下角任务页）");
         }
 
         private void OpenActorImagePath(object sender, RoutedEventArgs e)
@@ -847,11 +990,47 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                 Select();
         }
 
-        private void Border_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        /// <summary>
+        /// 整卡点击：编辑模式=点击卡片任意位置(头像/姓名/信息)切换勾选；
+        /// 普通模式=跳转该演员的影片页。星星(评分)与按钮等交互控件除外。
+        /// 仅响应左键——右键必须放行给右键菜单(此前右键被当点击吞掉导致菜单弹不出)
+        /// </summary>
+        private void Card_PreviewMouseUp(object sender, MouseButtonEventArgs e)
         {
-            if (ViewMode && sender is FrameworkElement ele && ele.Tag != null &&
-                long.TryParse(ele.Tag.ToString(), out long actorID))
+            if (e.ChangedButton != MouseButton.Left)
+                return;
+
+            // 命中星星/按钮时不触发选中或跳转(否则评分、编辑/查看按钮失效)
+            DependencyObject source = e.OriginalSource as DependencyObject;
+            while (source != null) {
+                if (source is SuperControls.Style.Rate || source is System.Windows.Controls.Primitives.ButtonBase)
+                    return;
+                source = System.Windows.Media.VisualTreeHelper.GetParent(source);
+            }
+
+            if (!(sender is FrameworkElement ele) || ele.Tag == null ||
+                !long.TryParse(ele.Tag.ToString(), out long actorID))
+                return;
+
+            // 编辑模式:点击切换勾选(蓝框),不导航;普通模式:跳转该演员的影片页
+            if (ConfigManager.VideoConfig.ActorEditMode) {
+                ActorInfo actor = CurrentList?.Where(arg => arg != null && arg.ActorID == actorID).FirstOrDefault();
+                if (actor == null)
+                    return;
+                if (SelectedActors.Where(arg => arg.ActorID == actorID).Any()) {
+                    SelectedActors.RemoveAll(arg => arg.ActorID == actorID);
+                    actor.IsSelected = false;
+                } else {
+                    SelectedActors.Add(actor);
+                    actor.IsSelected = true;
+                }
+                e.Handled = true;
+                return;
+            }
+            if (ViewMode) {
+                e.Handled = true;
                 onShowSameActor?.Invoke(actorID);
+            }
         }
 
         public void NextPage()
@@ -864,14 +1043,27 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
             pagination.PrevPage();
         }
 
+        /// <summary>去到顶部（Ctrl+Up 与右下角悬浮按钮共用）</summary>
         public void GoToTop()
         {
-
+            scrollViewer?.ScrollToTop();
         }
 
+        /// <summary>去到底部（Ctrl+Down 与右下角悬浮按钮共用）</summary>
         public void GoToBottom()
         {
+            scrollViewer?.ScrollToBottom();
+        }
 
+        /// <summary>去到顶部/底部悬浮按钮（与影片信息界面同款 super:GoToTop）</summary>
+        public void GotoTop(object sender, RoutedEventArgs e)
+        {
+            scrollViewer?.ScrollToTop();
+        }
+
+        public void GotoBottom(object sender, RoutedEventArgs e)
+        {
+            scrollViewer?.ScrollToBottom();
         }
 
         public void FirstPage()

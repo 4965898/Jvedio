@@ -37,3 +37,5 @@ footer{margin-top:8px}
 #metadata p{margin:3px 0;overflow-wrap:anywhere}
 @media(prefers-color-scheme:dark){#metadata{border-color:#3a455d}}
 .brand{background:transparent;object-fit:contain;border-radius:0}
+.owned-badge{display:inline-block;margin-left:6px;padding:0 6px;border:1px solid #a33;border-radius:6px;background:#7f1d1d;color:#fff;font-size:11px;line-height:1.6;vertical-align:1px}
+@media(prefers-color-scheme:dark){.owned-badge{background:#303b59;border-color:#3a455d;color:#a8b3cb}}

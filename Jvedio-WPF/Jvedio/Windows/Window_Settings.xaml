@@ -632,6 +632,36 @@
                                     Visibility="Visible">
                                     <TextBlock
                                         Style="{StaticResource BaseTextBlock}"
+                                        Text="{DynamicResource ScheduledScan}"
+                                        TextAlignment="Left"
+                                        ToolTip="{DynamicResource ScheduledScanTip}" />
+                                    <ComboBox
+                                        MinWidth="100"
+                                        Margin="5,0,0,0"
+                                        DisplayMemberPath="Label"
+                                        ItemsSource="{Binding ScheduledScanOptions}"
+                                        SelectedValue="{Binding ScheduledScanMinutes, Mode=TwoWay}"
+                                        SelectedValuePath="Value"
+                                        ToolTip="{DynamicResource ScheduledScanTip}" />
+                                </StackPanel>
+                                <CheckBox
+                                    Content="{DynamicResource ActorAutoEnrich}"
+                                    IsChecked="{Binding ActorAutoEnrich, Mode=TwoWay}"
+                                    ToolTip="{DynamicResource ActorAutoEnrichTip}" />
+                                <CheckBox
+                                    Content="{DynamicResource ActorOverwriteScraped}"
+                                    IsChecked="{Binding ActorOverwriteScraped, Mode=TwoWay}"
+                                    ToolTip="{DynamicResource ActorOverwriteScrapedTip}" />
+                                <CheckBox
+                                    Content="{DynamicResource ActorScrapeSaveImage}"
+                                    IsChecked="{Binding ActorScrapeSaveImage, Mode=TwoWay}"
+                                    ToolTip="{DynamicResource ActorScrapeSaveImageTip}" />
+                                <StackPanel
+                                    Margin="5"
+                                    Orientation="Horizontal"
+                                    Visibility="Visible">
+                                    <TextBlock
+                                        Style="{StaticResource BaseTextBlock}"
                                         Text="{DynamicResource ScanMinFileSize}"
                                         TextAlignment="Left"
                                         ToolTip="[0-2000]" />
@@ -2769,6 +2799,61 @@
 
 
 
+
+                                    <DataGridTemplateColumn Width="auto" Header="{DynamicResource CrawlerMode}">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <!--  可见性开关放在包装层：元素级 Style 会覆盖主题隐式样式导致黑字  -->
+                                                <Grid>
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding PluginID}" Value="crawler/db">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
+                                                    <ComboBox
+                                                        MinWidth="80"
+                                                        Margin="2"
+                                                        SelectedIndex="{Binding Mode, Mode=TwoWay}"
+                                                        ToolTip="{DynamicResource CrawlerModeTip}">
+                                                        <ComboBoxItem Content="{DynamicResource CrawlerModeAuto}" />
+                                                        <ComboBoxItem Content="{DynamicResource CrawlerModeWeb}" />
+                                                        <ComboBoxItem Content="{DynamicResource CrawlerModeApi}" />
+                                                    </ComboBox>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
+                                    <DataGridTemplateColumn Width="150" Header="API Token">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding PluginID}" Value="crawler/db">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
+                                                    <super:SearchBox
+                                                        MinWidth="100"
+                                                        Margin="2"
+                                                        HorizontalAlignment="Stretch"
+                                                        PlaceHolder="API Token"
+                                                        Text="{Binding ApiToken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                        ToolTip="{DynamicResource CrawlerApiTokenTip}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
 
                                     <DataGridTextColumn
                                         Width="auto"

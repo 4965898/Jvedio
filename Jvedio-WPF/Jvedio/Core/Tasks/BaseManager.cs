@@ -128,6 +128,35 @@ namespace Jvedio.Core.Tasks
             }
         }
 
+        /// <summary>
+        /// 入队并插到等待队列最前：手动操作应优先于批量后台任务，
+        /// 否则一次大批量入队后手动任务要排到队尾等几小时
+        /// </summary>
+        public void AddTaskFront(AbstractTask task)
+        {
+            if (!CurrentTasks.Contains(task)) {
+                task.onCanceled += DecreaseRunCount;
+                task.onCompleted += DecreaseRunCount;
+                RunningCount++;
+                CurrentTasks.Add(task);
+                try {
+                    AddToDispatcherFront(task);
+                } catch {
+                    CurrentTasks.Remove(task);
+                    RunningCount--;
+                    task.onCanceled -= DecreaseRunCount;
+                    task.onCompleted -= DecreaseRunCount;
+                    throw;
+                }
+            }
+        }
+
+        /// <summary>默认退化为普通入队；支持插队的调度器自行覆写</summary>
+        public virtual void AddToDispatcherFront(AbstractTask task)
+        {
+            AddToDispatcher(task);
+        }
+
         public bool Exists(AbstractTask task)
         {
             return CurrentTasks.Contains(task);

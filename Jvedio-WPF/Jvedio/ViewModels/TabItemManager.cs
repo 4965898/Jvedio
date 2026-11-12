@@ -429,6 +429,36 @@ taskList.onRestart += App.DownloadManager.Restart;
 
                     break;
 
+                case TaskType.ActorScrape:
+                    taskList.TaskStatusList = App.ActorScrapeManager.CurrentTasks;
+                    // 任务显示按入队序号从旧到新固定排序（Status 等变化不引起重排；
+                    // 排在手动插队任务仍优先执行，仅显示顺序与队列解耦）
+                    System.ComponentModel.ICollectionView actorTaskView =
+                        System.Windows.Data.CollectionViewSource.GetDefaultView(App.ActorScrapeManager.CurrentTasks);
+                    actorTaskView.SortDescriptions.Clear();
+                    actorTaskView.SortDescriptions.Add(new System.ComponentModel.SortDescription(
+                        nameof(Jvedio.Core.Tasks.ActorScrapeTask.EnqueueSeq), System.ComponentModel.ListSortDirection.Ascending));
+                    taskList.onRemoveAll += () => App.ActorScrapeManager.RemoveTask(TaskStatus.Canceled | TaskStatus.RanToCompletion);
+                    taskList.onRemoveCancel += () => App.ActorScrapeManager.RemoveTask(TaskStatus.Canceled);
+                    taskList.onRemoveComplete += () => App.ActorScrapeManager.RemoveTask(TaskStatus.RanToCompletion);
+                    taskList.onCancel += App.ActorScrapeManager.CancelTask;
+                    taskList.onCancelAll += App.ActorScrapeManager.CancelAll;
+                    taskList.onRestart += App.ActorScrapeManager.Restart;
+                    taskList.onRestartAll += App.ActorScrapeManager.RestartAllFailed;
+                    taskList.onShowDetail += (tList, id) => {
+                        string logs = App.ActorScrapeManager.GetTaskLogs(id);
+                        tList.SetLogs(logs);
+                        tList.ShowLog = true;
+                    };
+
+                    App.ActorScrapeManager.onRunning += () => {
+                        TaskList list = GetTaskListByType(type);
+                        if (list != null)
+                            list.AllTaskProgress = App.ActorScrapeManager.Progress;
+                    };
+
+                    break;
+
                 case TaskType.Rename:
                     taskList.TaskStatusList = App.RenameTaskManager.CurrentTasks;
                     taskList.onRemoveAll += () => App.RenameTaskManager.RemoveTask(TaskStatus.Canceled | TaskStatus.RanToCompletion);

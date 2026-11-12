@@ -7,6 +7,8 @@ const viewKey = crypto.randomUUID();
 let confirmedSelection = [], selectionRevision = -1, pendingChoices = [];
 let markWrite = Promise.resolve(), restoringMarks = false, markImport = false;
 let libraryLabels = [], selectedLabels = new Set(), labelImport = false, restoringLabels = false, labelWrite = Promise.resolve();
+// 「已拥有」标记：ownedMap 缓存本会话查询结果，ownedAsked 防止重复查询（含桌面端拒收的番号）。
+let ownedMap = new Map(), ownedAsked = new Set();
 const chosen = () => snapshot.items.filter(item => selected.has(item.code));
 const visible = () => {
   const query = $("search").value.trim().toUpperCase();
@@ -171,9 +173,16 @@ function render() {
     const content = document.createElement("div");
     const code = document.createElement("strong"); code.textContent = item.code;
     const title = document.createElement("span"); title.textContent = item.title || "暂无标题";
-    content.append(code, title); row.append(check, content); $("items").append(row);
+    content.append(code, title);
+    if (ownedMap.get(item.code) === true) {
+      const badge = document.createElement("span"); badge.className = "owned-badge";
+      badge.textContent = "已入库"; badge.title = "该番号已在所选影片库中；保存时会自动补全";
+      content.append(badge);
+    }
+    row.append(check, content); $("items").append(row);
   }
   $("empty").hidden = snapshot.items.length > 0; update();
+  annotateOwned();
   $("metadata").replaceChildren();
   $("metadata").hidden = snapshot.kind !== "detail";
   if (snapshot.kind === "detail" && snapshot.items[0]?.metadata) {
@@ -183,6 +192,17 @@ function render() {
       const row = document.createElement("p"); row.textContent = `${mark}：${value}`; $("metadata").append(row);
     }
   }
+}
+function annotateOwned() {
+  const codes = [...new Set(snapshot.items.map(item => item.code).filter(code => !ownedAsked.has(code)))];
+  if (!codes.length) return;
+  codes.forEach(code => ownedAsked.add(code));
+  chrome.runtime.sendMessage({ kind: "query-owned", codes }).then(response => {
+    if (response?.ok && response.enabled && (response.items || []).length) {
+      for (const item of response.items) ownedMap.set(item.code, item.owned === true);
+      render();
+    }
+  }).catch(() => {});
 }
 async function scan(reset = false) {
   if (scanning || busy) return;

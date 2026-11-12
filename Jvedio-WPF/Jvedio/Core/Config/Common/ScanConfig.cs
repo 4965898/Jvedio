@@ -78,6 +78,22 @@ namespace Jvedio.Core.Config
             }
         }
 
+        /// <summary>
+        /// 定时增量扫描间隔（分钟），0 表示关闭。
+        /// 主窗口存活期间按间隔静默扫描当前库目录，并对新增影片与缺字段影片
+        /// 自动刮削（幂等：只补缺，不覆盖已有值）；0 为默认值，不产生任何后台任务
+        /// </summary>
+        public int _ScheduledScanMinutes;
+        public int ScheduledScanMinutes {
+            get { return _ScheduledScanMinutes; }
+            set {
+                if (value < 0)
+                    value = 0;
+                _ScheduledScanMinutes = value;
+                RaisePropertyChanged();
+            }
+        }
+
         public string NFOParseConfig { get; set; }
         public bool _ScanNfo;
         public bool ScanNfo {

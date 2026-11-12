@@ -154,6 +154,7 @@
             HorizontalContentAlignment="Left"
             d:ItemsSource="{d:SampleData}"
             CanUserResizeColumns="True"
+            CanUserSortColumns="False"
             IsReadOnly="True"
             ItemsSource="{Binding TaskStatusList, ElementName=taskList}"
             RowHeight="40"

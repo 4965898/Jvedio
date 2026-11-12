@@ -505,6 +505,66 @@ private int _SyncConcurrency = (int)ConfigManager.Settings.SyncConcurrency;
             }
         }
 
+        private int _ScheduledScanMinutes = ConfigManager.ScanConfig.ScheduledScanMinutes;
+
+        public int ScheduledScanMinutes {
+            get { return _ScheduledScanMinutes; }
+
+            set {
+                _ScheduledScanMinutes = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>定时增量扫描间隔候选项（0=关闭），供 ComboBox 绑定</summary>
+        public List<ScheduledScanOption> ScheduledScanOptions { get; } = BuildScheduledScanOptions();
+
+        private static List<ScheduledScanOption> BuildScheduledScanOptions()
+        {
+            int[] values = new int[] { 0, 30, 60, 120, 180, 360, 720, 1440 };
+            List<ScheduledScanOption> options = new List<ScheduledScanOption>();
+            foreach (int value in values) {
+                string label = value <= 0
+                    ? SuperControls.Style.LangManager.GetValueByKey("ScheduledScanOff")
+                    : value + " " + SuperControls.Style.LangManager.GetValueByKey("MinuteUnit");
+                options.Add(new ScheduledScanOption { Value = value, Label = label });
+            }
+            return options;
+        }
+
+        private bool _ActorAutoEnrich = ConfigManager.Settings.ActorAutoEnrich;
+
+        public bool ActorAutoEnrich {
+            get { return _ActorAutoEnrich; }
+
+            set {
+                _ActorAutoEnrich = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        private bool _ActorOverwriteScraped = ConfigManager.Settings.ActorOverwriteScraped;
+
+        public bool ActorOverwriteScraped {
+            get { return _ActorOverwriteScraped; }
+
+            set {
+                _ActorOverwriteScraped = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        private bool _ActorScrapeSaveImage = ConfigManager.Settings.ActorScrapeSaveImage;
+
+        public bool ActorScrapeSaveImage {
+            get { return _ActorScrapeSaveImage; }
+
+            set {
+                _ActorScrapeSaveImage = value;
+                RaisePropertyChanged();
+            }
+        }
+
         #endregion
 
         #region "常规设置"
@@ -970,5 +1030,12 @@ private int _SyncConcurrency = (int)ConfigManager.Settings.SyncConcurrency;
             ActorImagePath = dict["ActorImagePath"];
         }
 
+    }
+
+    /// <summary>定时扫描间隔选项（WPF 绑定只认公有属性，勿改为公有字段）</summary>
+    public class ScheduledScanOption
+    {
+        public int Value { get; set; }
+        public string Label { get; set; }
     }
 }

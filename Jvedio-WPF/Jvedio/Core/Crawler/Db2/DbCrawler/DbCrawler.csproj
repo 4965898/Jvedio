@@ -37,6 +37,9 @@
     <Reference Include="HtmlAgilityPack">
       <HintPath>..\..\..\..\Reference\HtmlAgilityPack.dll</HintPath>
     </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\..\..\..\Reference\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="SuperUtils">
       <HintPath>..\..\..\..\Reference\SuperUtils.dll</HintPath>
     </Reference>
@@ -50,6 +53,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ApiClient.cs" />
     <Compile Include="Crawler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
