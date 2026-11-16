@@ -103,6 +103,7 @@
                 Name="OnlineJumpMenuItems"
                 Header="{DynamicResource OnlineJump}"
                 Icon="pack://application:,,,/Resources/menuitem/openwebsite.png" />
+            <MenuItem Click="DownloadSubtitle" Header="{DynamicResource Menu_DownloadSubtitle}" />
             <MenuItem
                 Click="EditInfo"
                 Header="{DynamicResource Menu_EditInfo}"

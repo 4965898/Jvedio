@@ -776,6 +776,12 @@ namespace Jvedio
                 .Add(TabType.GeoTask, LangManager.GetValueByKey("ActorScrapeTask"), TaskType.ActorScrape);
         }
 
+        public void ShowSubtitlePopup(object sender, MouseButtonEventArgs e)
+        {
+            vieModel.TabItemManager
+                .Add(TabType.GeoTask, LangManager.GetValueByKey("SubtitleTask"), TaskType.Subtitle);
+        }
+
         private void ShowLibraryHealth(object sender, MouseButtonEventArgs e)
         {
             new Windows.Window_LibraryHealth(ConfigManager.Main.CurrentDBId) { Owner = this }.ShowDialog();

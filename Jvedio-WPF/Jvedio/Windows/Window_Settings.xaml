@@ -656,6 +656,62 @@
                                     Content="{DynamicResource ActorScrapeSaveImage}"
                                     IsChecked="{Binding ActorScrapeSaveImage, Mode=TwoWay}"
                                     ToolTip="{DynamicResource ActorScrapeSaveImageTip}" />
+                                <CheckBox
+                                    Content="{DynamicResource GfriendsAvatar}"
+                                    IsChecked="{Binding GfriendsAvatar, Mode=TwoWay}"
+                                    ToolTip="{DynamicResource GfriendsAvatarTip}" />
+                                <StackPanel Margin="0,5,0,0" Orientation="Vertical">
+                                    <CheckBox
+                                        Content="{DynamicResource SubtitleAutoDownload}"
+                                        IsChecked="{Binding SubtitleAutoDownload, Mode=TwoWay}"
+                                        ToolTip="{DynamicResource SubtitleAutoDownloadTip}" />
+                                    <StackPanel Margin="5,3,0,0" Orientation="Horizontal">
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource BaseTextBlock}"
+                                            Text="{DynamicResource SubtitleSaveModeLabel}" />
+                                        <ComboBox
+                                            Margin="10,0,0,0"
+                                            DisplayMemberPath="Label"
+                                            ItemsSource="{Binding SubtitleSaveModeOptions}"
+                                            SelectedValue="{Binding SubtitleSaveMode, Mode=TwoWay}"
+                                            SelectedValuePath="Value" />
+                                    </StackPanel>
+                                    <StackPanel
+                                        Margin="5,3,0,0"
+                                        Orientation="Horizontal"
+                                        ToolTip="{DynamicResource SubtitleSaveFolderTip}">
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource BaseTextBlock}"
+                                            Text="{DynamicResource SubtitleSaveFolderLabel}" />
+                                        <super:SearchBox
+                                            Name="SubtitleFolderBox"
+                                            MinWidth="260"
+                                            Margin="10,0,0,0"
+                                            ShowClearButton="False"
+                                            Text="{Binding SubtitleSaveFolder, Mode=TwoWay}" />
+                                        <Button
+                                            Margin="5,0"
+                                            BorderBrush="{DynamicResource Button.Selected.BorderBrush}"
+                                            Click="SelectSubtitleFolder"
+                                            Content="{DynamicResource Choose}"
+                                            Style="{StaticResource BorderButton}" />
+                                    </StackPanel>
+                                    <StackPanel Margin="5,3,0,0" Orientation="Horizontal">
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource BaseTextBlock}"
+                                            Text="{DynamicResource SubtitleLanguagesLabel}" />
+                                        <ComboBox
+                                            MinWidth="200"
+                                            Margin="10,0,0,0"
+                                            IsEditable="True"
+                                            ItemsSource="{Binding SubtitleLanguageOptions}"
+                                            Text="{Binding SubtitleLanguages, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                            ToolTip="{DynamicResource SubtitleLanguagesTip}" />
+                                    </StackPanel>
+                                </StackPanel>
                                 <StackPanel
                                     Margin="5"
                                     Orientation="Horizontal"
@@ -2243,7 +2299,13 @@
                                     </ComboBox>
                                     <TextBlock Grid.Row="3" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource BackupDirectoryLabel}" />
                                     <DockPanel Grid.Row="3" Grid.Column="1" Margin="0,4,0,4">
-                                        <Button DockPanel.Dock="Right" Margin="5,0" Click="SelectBackupDirectory" Content="{DynamicResource Browse}" />
+                                        <Button
+                                            DockPanel.Dock="Right"
+                                            Margin="5,0"
+                                            BorderBrush="{DynamicResource Button.Selected.BorderBrush}"
+                                            Click="SelectBackupDirectory"
+                                            Content="{DynamicResource Choose}"
+                                            Style="{StaticResource BorderButton}" />
                                         <TextBox x:Name="BackupDirectoryBox" Style="{StaticResource BackupFieldTextBox}" />
                                     </DockPanel>
                                     <TextBlock Grid.Row="4" Style="{StaticResource BackupFieldLabel}" Text="{DynamicResource BackupRetentionLabel}" />

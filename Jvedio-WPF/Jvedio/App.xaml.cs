@@ -34,6 +34,7 @@ namespace Jvedio
         public static TranslateTaskManager TranslateTaskManager { get; private set; }
         public static ActorScrapeManager ActorScrapeManager { get; private set; }
         public static RenameTaskManager RenameTaskManager { get; private set; }
+        public static Jvedio.Core.Tasks.SubtitleTaskManager SubtitleTaskManager { get; private set; }
 
 
         public EventWaitHandle ProgramStarted { get; set; }
@@ -79,6 +80,7 @@ namespace Jvedio
             TranslateTaskManager = TranslateTaskManager.CreateInstance();
             ActorScrapeManager = ActorScrapeManager.CreateInstance();
             RenameTaskManager = RenameTaskManager.CreateInstance();
+            SubtitleTaskManager = Jvedio.Core.Tasks.SubtitleTaskManager.CreateInstance();
 
             // 触发类型初始化：订阅刮削/截图事件，累计阈值后后台静默重建图片索引
             ImageIndexManager.Init();
@@ -204,6 +206,13 @@ namespace Jvedio
             try {
                 DownloadManager.Exiting = true;
                 DownloadManager.SaveTasksToFile();
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+
+            // 观看时长：退出时冲刷未落库的增量（在 ConfigManager.SaveAll 之后、日志收尾之前）
+            try {
+                Jvedio.Core.Tasks.WatchTimeTracker.FlushOnExit();
             } catch (Exception ex) {
                 Logger.Error(ex);
             }

@@ -15,6 +15,8 @@ namespace Jvedio.Core.DataBase.Tables
                 "ALTER TABLE metadata ADD COLUMN TitleCN TEXT DEFAULT '';",
                 "ALTER TABLE actor_info ADD COLUMN ShoeSize VARCHAR(100);",
                 "ALTER TABLE actor_info ADD COLUMN ActorNameEN VARCHAR(500);",
+                // 累计观看时长（秒）：WatchTimeTracker 播放时增量落库，统计页汇总展示
+                "ALTER TABLE metadata ADD COLUMN PlayDuration INT DEFAULT 0;",
                 // 标记排序（-1=未排序，排在已排序标记之后；拖拽排序后全部编号 0..N）
                 "ALTER TABLE common_tagstamp ADD COLUMN SortOrder INT DEFAULT -1;",
                 // 视频真实时长（秒，0=未知；来源 MediaInfo，分段视频取各段之和），区别于刮削的影片时长 Duration

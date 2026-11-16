@@ -307,13 +307,12 @@ namespace Jvedio.Core.Tasks
 
         /// <summary>
         /// 下载并保存演员头像到本地头像目录（GetImagePath 约定的文件名）。
-        /// 已有本地头像的演员直接跳过（不覆盖 Gfriends/MDCx 等来源的图）；失败仅记日志不影响任务
+        /// 已有本地头像的演员直接跳过（不覆盖 Gfriends/MDCx 等来源的图）；失败仅记日志不影响任务。
+        /// 开启 Gfriends 时优先按演员名从 Gfriends 头像库取图，取不到再回退站点头像 URL
         /// </summary>
         private static async Task<bool> SaveActorImageAsync(ActorInfo actorInfo, string imageUrl, RequestHeader header)
         {
             try {
-                if (string.IsNullOrEmpty(imageUrl) || !imageUrl.StartsWith("http"))
-                    return false;
                 string targetPath = Path.GetFullPath(actorInfo.GetImagePath());
                 if (File.Exists(targetPath))
                     return false;
@@ -322,6 +321,20 @@ namespace Jvedio.Core.Tasks
                     return false;
                 if (!Directory.Exists(dir))
                     Directory.CreateDirectory(dir);
+
+                // Gfriends 头像库优先（量大质高）；查无此人/失败再走站点头像
+                if (Gfriends.GfriendsAvatar.Enabled) {
+                    byte[] gfriendsBytes = await Gfriends.GfriendsAvatar.TryGetAvatarBytesAsync(actorInfo.ActorName, actorInfo.ActorNameEN);
+                    if (gfriendsBytes != null && gfriendsBytes.Length > 0) {
+                        File.WriteAllBytes(targetPath, gfriendsBytes);
+                        App.Logger.Info($"演员头像已保存（Gfriends）：{actorInfo.ActorName} → {targetPath}");
+                        return true;
+                    }
+                    App.Logger.Info($"Gfriends 无头像，回退站点头像：{actorInfo.ActorName}");
+                }
+
+                if (string.IsNullOrEmpty(imageUrl) || !imageUrl.StartsWith("http"))
+                    return false;
 
                 using (HttpClient http = new HttpClient()) {
                     http.Timeout = TimeSpan.FromSeconds(30);

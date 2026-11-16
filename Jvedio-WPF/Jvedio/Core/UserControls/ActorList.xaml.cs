@@ -456,13 +456,13 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                          "join metadata " +
                          "on metadata_to_actor.DataID=metadata.DataID " +
                          $"WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType={0} " +
-                         $"{(search ? $"and actor_info.ActorName like '%{searchText}%' " : string.Empty)} " +
+                         $"{(search ? SearchCondition(searchText) : string.Empty)} " +
                          "GROUP BY actor_info.ActorID " +
                          "UNION " +
                          "select actor_info.ActorID  " +
                          "FROM actor_info WHERE NOT EXISTS " +
                          "(SELECT 1 from metadata_to_actor where metadata_to_actor.ActorID=actor_info.ActorID ) " +
-                         $"{(search ? $"and actor_info.ActorName like '%{searchText}%' " : string.Empty)} " +
+                         $"{(search ? SearchCondition(searchText) : string.Empty)} " +
                          "GROUP BY actor_info.ActorID)";
 
 
@@ -475,17 +475,25 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                 $"join metadata_to_actor on metadata_to_actor.ActorID=actor_info.ActorID " +
                 $"join metadata on metadata_to_actor.DataID=metadata.DataID " +
                 $"WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType={0} " +
-                $"{(search ? $"and actor_info.ActorName like '%{searchText}%' " : string.Empty)} " +
+                $"{(search ? SearchCondition(searchText) : string.Empty)} " +
                 $"GROUP BY actor_info.ActorID " +
                 "UNION " +
                 // 显示只有演员名，没有数量的演员
                 $"{unionSelect} FROM actor_info " +
                 "WHERE NOT EXISTS(SELECT 1 from metadata_to_actor where metadata_to_actor.ActorID=actor_info.ActorID )" +
-                $"{(search ? $"and actor_info.ActorName like '%{searchText}%' " : string.Empty)}  GROUP BY actor_info.ActorID " +
+                $"{(search ? SearchCondition(searchText) : string.Empty)}  GROUP BY actor_info.ActorID " +
                 wrapper.ToOrder() + ActorToLimit();
 
             onPageChange(TotalCount);
             Render(sql);
+        }
+
+        /// <summary>
+        /// 搜索条件：日文名或英文名（罗马字）模糊匹配，任一命中即算
+        /// </summary>
+        private static string SearchCondition(string searchText)
+        {
+            return $"and (actor_info.ActorName like '%{searchText}%' or actor_info.ActorNameEN like '%{searchText}%') ";
         }
 
         public void onPageChange(long total)
@@ -752,12 +760,12 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                         $"join metadata_to_actor on metadata_to_actor.ActorID=actor_info.ActorID " +
                         $"join metadata on metadata_to_actor.DataID=metadata.DataID " +
                         $"WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType={0} " +
-                        $"{(search ? $"and actor_info.ActorName like '%{searchText}%' " : string.Empty)} " +
+                        $"{(search ? SearchCondition(searchText) : string.Empty)} " +
                         $"GROUP BY actor_info.ActorID " +
                         "UNION " +
                         $"{unionSelect} FROM actor_info " +
                         "WHERE NOT EXISTS(SELECT 1 from metadata_to_actor where metadata_to_actor.ActorID=actor_info.ActorID )" +
-                        $"{(search ? $"and actor_info.ActorName like '%{searchText}%' " : string.Empty)}  GROUP BY actor_info.ActorID";
+                        $"{(search ? SearchCondition(searchText) : string.Empty)}  GROUP BY actor_info.ActorID";
                     // 仅本页：整查询包一层，按当前页演员 ID 过滤（列结构与整库导出一致）
                     if (!string.IsNullOrEmpty(outerFilter))
                         sql = $"SELECT * FROM ({sql}){outerFilter}";
@@ -805,6 +813,40 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                 }
 
                 Select();
+            }
+        }
+
+        /// <summary>
+        /// 右键「合并到另一位」：把重复演员并入一个目标（影片关联迁移、空缺资料/评分/头像取自被合并者）。
+        /// 选择语义与「删除」一致：编辑模式下合并已勾选的全部，否则仅右键的这一位
+        /// </summary>
+        private void MergeActors(object sender, RoutedEventArgs e)
+        {
+            MenuItem mnu = sender as MenuItem;
+            ContextMenu contextMenu = mnu?.Parent as ContextMenu;
+            if (contextMenu == null || !long.TryParse(contextMenu.Tag?.ToString(), out long actorID) || actorID <= 0)
+                return;
+
+            List<ActorInfo> sources = new List<ActorInfo>();
+            if (ConfigManager.VideoConfig.ActorEditMode) {
+                foreach (ActorInfo selected in SelectedActors) {
+                    if (selected != null && selected.ActorID > 0 && !sources.Any(arg => arg.ActorID == selected.ActorID))
+                        sources.Add(selected);
+                }
+            }
+            ActorInfo current = CurrentList?.Where(arg => arg != null && arg.ActorID == actorID).FirstOrDefault();
+            if (current == null)
+                current = ActorInfo.GetById(actorID);
+            if (current == null)
+                return;
+            if (!sources.Any(arg => arg.ActorID == actorID))
+                sources.Add(current);
+
+            Window_MergeActor dialog = new Window_MergeActor(sources);
+            if (dialog.ShowDialog() == true) {
+                SelectedActors.Clear();
+                Select();
+                onStatistic?.Invoke();
             }
         }
 

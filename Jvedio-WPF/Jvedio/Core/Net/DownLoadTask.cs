@@ -405,24 +405,38 @@ namespace Jvedio.Core.Net
                         if (downloadActorImage) {
                             string saveFileName = actorInfo.GetImagePath(video.Path, Path.GetExtension(url), false);
                             if (!File.Exists(saveFileName)) {
-                                byte[] fileByte = await downLoader.DownloadImage(url, header, (error) => {
-                                    if (!string.IsNullOrEmpty(error))
-                                        Logger.Error($"{url} => {error}");
-                                });
-                                // 头像图床多有风控（403），延迟重试一次
-                                if (fileByte == null || fileByte.Length == 0) {
-                                    Logger.Warning($"演员头像下载失败，正在重试... {url}");
-                                    await Task.Delay(1000);
-                                    fileByte = await downLoader.DownloadImage(url, header, (error) => {
-                                        if (!string.IsNullOrEmpty(error))
-                                            Logger.Error($"重试: {url} => {error}");
-                                    });
+                                // Gfriends 头像库优先（量大质高），查无此人/下载失败再走站点头像
+                                bool savedFromGfriends = false;
+                                if (Jvedio.Core.Gfriends.GfriendsAvatar.Enabled) {
+                                    byte[] gfriendsBytes = await Jvedio.Core.Gfriends.GfriendsAvatar
+                                        .TryGetAvatarBytesAsync(actorName, actorInfo.ActorNameEN);
+                                    if (gfriendsBytes != null && gfriendsBytes.Length > 0) {
+                                        FileHelper.ByteArrayToFile(gfriendsBytes, saveFileName);
+                                        StatusText = $"{i + 1}/{actorCount} 成功同步演员头像(Gfriends): {actorName}";
+                                        Logger.Info($"演员头像已保存（Gfriends）：{actorName}");
+                                        savedFromGfriends = true;
+                                    }
                                 }
-                                if (fileByte != null && fileByte.Length > 0) {
-                                    FileHelper.ByteArrayToFile(fileByte, saveFileName);
-                                    StatusText = $"{i + 1}/{actorCount} 成功同步演员头像: {actorName}";
-                                } else
-                                    Logger.Error($"{i + 1}/{actorCount} sync actor（{actorName}）image failed, file byte is empty");
+                                if (!savedFromGfriends) {
+                                    byte[] fileByte = await downLoader.DownloadImage(url, header, (error) => {
+                                        if (!string.IsNullOrEmpty(error))
+                                            Logger.Error($"{url} => {error}");
+                                    });
+                                    // 头像图床多有风控（403），延迟重试一次
+                                    if (fileByte == null || fileByte.Length == 0) {
+                                        Logger.Warning($"演员头像下载失败，正在重试... {url}");
+                                        await Task.Delay(1000);
+                                        fileByte = await downLoader.DownloadImage(url, header, (error) => {
+                                            if (!string.IsNullOrEmpty(error))
+                                                Logger.Error($"重试: {url} => {error}");
+                                        });
+                                    }
+                                    if (fileByte != null && fileByte.Length > 0) {
+                                        FileHelper.ByteArrayToFile(fileByte, saveFileName);
+                                        StatusText = $"{i + 1}/{actorCount} 成功同步演员头像: {actorName}";
+                                    } else
+                                        Logger.Error($"{i + 1}/{actorCount} sync actor（{actorName}）image failed, file byte is empty");
+                                }
                             } else {
                                 Logger.Info($"{LangManager.GetValueByKey("SkipDownloadImage")} {saveFileName}");
                             }
@@ -599,6 +613,7 @@ namespace Jvedio.Core.Net
             Task.Run(async () => {
                 Progress = 0;
                 TimeWatch.Start();
+                bool scrapedVideo = false; // 本次刮削成功拿到信息（自动下载字幕的触发条件）
                 if (DataType == DataType.Video) {
                     Video video = videoMapper.SelectVideoByID(DataID);
                     if (video == null) {
@@ -693,6 +708,7 @@ namespace Jvedio.Core.Net
                         }
                     }
                     Status = TaskStatus.RanToCompletion;
+                    scrapedVideo = dict != null && dict.Count > 0;
                 }
                 StatusText = "7. 同步所有内容完成";
                 Running = false;
@@ -700,6 +716,16 @@ namespace Jvedio.Core.Net
                 TimeWatch.Stop();
                 ElapsedMilliseconds = TimeWatch.ElapsedMilliseconds;
                 Logger.Info($"{LangManager.GetValueByKey("TotalCost")} {DateHelper.ToReadableTime(ElapsedMilliseconds)}");
+
+                // 刮削完成后自动下载字幕（设置开启时；独立队列串行执行，不阻塞本任务收尾）。
+                // 仅对刮削成功（拿到了信息）的视频触发；已有字幕的会在入队前跳过
+                if (scrapedVideo && ConfigManager.Settings?.SubtitleAutoDownload == true && DataID > 0) {
+                    try {
+                        Jvedio.Core.Tasks.SubtitleTaskManager.EnqueueAuto(videoMapper.SelectVideoByID(DataID));
+                    } catch (Exception subEx) {
+                        Logger.Error($"自动下载字幕入队失败：{subEx.Message}");
+                    }
+                }
 
                 // 任务完成后暂停 3s 随机
                 await Task.Delay(new Random().Next(0, 3000));

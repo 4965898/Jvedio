@@ -459,6 +459,35 @@ taskList.onRestart += App.DownloadManager.Restart;
 
                     break;
 
+                case TaskType.Subtitle:
+                    taskList.TaskStatusList = App.SubtitleTaskManager.CurrentTasks;
+                    // 任务显示按入队序号从旧到新固定排序（与演员任务同款，状态变化不重排）
+                    System.ComponentModel.ICollectionView subtitleTaskView =
+                        System.Windows.Data.CollectionViewSource.GetDefaultView(App.SubtitleTaskManager.CurrentTasks);
+                    subtitleTaskView.SortDescriptions.Clear();
+                    subtitleTaskView.SortDescriptions.Add(new System.ComponentModel.SortDescription(
+                        nameof(Jvedio.Core.Tasks.SubtitleTask.EnqueueSeq), System.ComponentModel.ListSortDirection.Ascending));
+                    taskList.onRemoveAll += () => App.SubtitleTaskManager.RemoveTask(TaskStatus.Canceled | TaskStatus.RanToCompletion);
+                    taskList.onRemoveCancel += () => App.SubtitleTaskManager.RemoveTask(TaskStatus.Canceled);
+                    taskList.onRemoveComplete += () => App.SubtitleTaskManager.RemoveTask(TaskStatus.RanToCompletion);
+                    taskList.onCancel += App.SubtitleTaskManager.CancelTask;
+                    taskList.onCancelAll += App.SubtitleTaskManager.CancelAll;
+                    taskList.onRestart += App.SubtitleTaskManager.Restart;
+                    taskList.onRestartAll += App.SubtitleTaskManager.RestartAllFailed;
+                    taskList.onShowDetail += (tList, id) => {
+                        string logs = App.SubtitleTaskManager.GetTaskLogs(id);
+                        tList.SetLogs(logs);
+                        tList.ShowLog = true;
+                    };
+
+                    App.SubtitleTaskManager.onRunning += () => {
+                        TaskList list = GetTaskListByType(type);
+                        if (list != null)
+                            list.AllTaskProgress = App.SubtitleTaskManager.Progress;
+                    };
+
+                    break;
+
                 case TaskType.Rename:
                     taskList.TaskStatusList = App.RenameTaskManager.CurrentTasks;
                     taskList.onRemoveAll += () => App.RenameTaskManager.RemoveTask(TaskStatus.Canceled | TaskStatus.RanToCompletion);

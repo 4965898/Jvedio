@@ -928,6 +928,13 @@
                         Path="M304 336A208 208 0 1 0 720 336A208 208 0 1 0 304 336ZM512 640C694.6 640 853.3 741 853.3 856V960H170.7V856C170.7 741 329.4 640 512 640Z"
                         Style="{StaticResource NormalPathMsg}"
                         ToolTip="{DynamicResource ActorScrapeTask}" />
+                    <!--  字幕下载任务（对话气泡图标），点击打开字幕任务页；MsgCount 与下载图标同款显示进行中数  -->
+                    <super:PathMsg
+                        MouseLeftButtonUp="ShowSubtitlePopup"
+                        MsgCount="{Binding RunningCount, Source={x:Static local:App.SubtitleTaskManager}, Mode=OneWay}"
+                        Path="M512 64c247.4 0 448 150.5 448 336S759.4 736 512 736c-37.3 0-73.4-3.4-107.4-10-48.8 32.5-125.7 61.6-212.6 71.5 28.6-24.7 54-58.6 60.5-95.1C144.7 654.5 64 534.7 64 400c0-185.5 200.6-336 448-336z"
+                        Style="{StaticResource NormalPathMsg}"
+                        ToolTip="{DynamicResource SubtitleTask}" />
                     <!--  资料体检中心：与任务图标同为 30x30，位于翻译任务左侧  -->
                     <super:PathMsg
                         MouseLeftButtonUp="ShowLibraryHealth"

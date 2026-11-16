@@ -281,6 +281,14 @@
     <Compile Include="Core\Exceptions\CrawlerNotSupportException.cs" />
     <Compile Include="Core\Exceptions\SqlException.cs" />
     <Compile Include="Core\Export\ExportHelper.cs" />
+    <Compile Include="Core\Gfriends\GfriendsAvatar.cs" />
+    <Compile Include="Core\Utils\FolderPickerHelper.cs" />
+    <Compile Include="Core\Tasks\WatchTimeTracker.cs" />
+    <Compile Include="Core\Subtitle\SrtNormalizer.cs" />
+    <Compile Include="Core\Subtitle\SubtitleCatProvider.cs" />
+    <Compile Include="Core\Tasks\SubtitleTask.cs" />
+    <Compile Include="Core\Tasks\SubtitleTaskManager.cs" />
+    <Compile Include="Core\Merge\ActorMergeHelper.cs" />
     <Compile Include="Core\Exceptions\NFOParseException.cs" />
     <Compile Include="Core\Exceptions\DllLoadFailedException.cs" />
     <Compile Include="Core\Exceptions\DirCreateFailedException.cs" />
@@ -495,6 +503,9 @@
     <Compile Include="Windows\Dialog\Window_SearchAsso.xaml.cs">
       <DependentUpon>Window_SearchAsso.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Windows\Dialog\Window_MergeActor.xaml.cs">
+      <DependentUpon>Window_MergeActor.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Windows\Window_DataBase.xaml.cs">
       <DependentUpon>Window_DataBase.xaml</DependentUpon>
     </Compile>
@@ -613,6 +624,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="Windows\Dialog\Window_SearchAsso.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Windows\Dialog\Window_MergeActor.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

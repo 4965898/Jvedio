@@ -114,6 +114,52 @@ SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
             }
         }
 
+        /// <summary>
+        /// 无本地头像时优先从 Gfriends 头像库取图（默认开；已有头像不覆盖，取不到再回退站点头像）
+        /// </summary>
+        public bool _GfriendsAvatar = true;
+        public bool GfriendsAvatar {
+            get { return _GfriendsAvatar; }
+            set {
+                _GfriendsAvatar = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 刮削完成后自动从 SubtitleCat 按番号下载中文字幕（默认关；已有字幕不覆盖）
+        /// </summary>
+        public bool _SubtitleAutoDownload = false;
+        public bool SubtitleAutoDownload {
+            get { return _SubtitleAutoDownload; }
+            set {
+                _SubtitleAutoDownload = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>
+        /// 字幕保存位置：0=影片所在目录（与视频同名 .srt）；1=指定文件夹（番号.语言.srt，同番号共享）
+        /// 必须是 int：ComboBox SelectedValue 与选项 Value(int) 类型一致才能双向选中
+        /// </summary>
+        public int _SubtitleSaveMode = 0;
+        public int SubtitleSaveMode {
+            get { return _SubtitleSaveMode; }
+            set {
+                _SubtitleSaveMode = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>指定文件夹路径（SubtitleSaveMode=1 时使用；留空回退用户数据目录 subtitles）</summary>
+        public string SubtitleSaveFolder { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 字幕语言偏好（逗号分隔的语言码，按顺序优先）：默认简体+繁体。
+        /// 可选如 zh-CN、zh-TW、en、ja、ko、es、th、vi、id、ru 等（SubtitleCat 按后缀提供）
+        /// </summary>
+        public string SubtitleLanguages { get; set; } = "zh-CN,zh-TW";
+
         public bool IgnoreCertVal { get; set; }
 
         public bool AutoHandleHeader { get; set; }

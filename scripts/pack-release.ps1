@@ -98,8 +98,8 @@ try {
     Copy-Item -LiteralPath $minnanoavDll -Destination (Join-Path $crawlerDest 'minnanoav\MinnanoavCrawler.dll') -Force
     Copy-Item -LiteralPath $javdatabaseDll -Destination (Join-Path $crawlerDest 'javdatabase\JavdatabaseCrawler.dll') -Force
 
-    # 修复五兜底：db 与新插件目录各自的依赖解析链不含根目录 Newtonsoft，逐目录补拷
-    foreach ($pluginDir in @('db', 'avmoo', 'javmenu', 'minnanoav', 'javdatabase')) {
+    # 修复五兜底：各插件目录的依赖解析链不含根目录 Newtonsoft，逐目录补拷
+    foreach ($pluginDir in @('bus', 'db', 'avmoo', 'javmenu', 'minnanoav', 'javdatabase')) {
         Copy-Item -LiteralPath (Join-Path $references 'Newtonsoft.Json.dll') `
             -Destination (Join-Path $crawlerDest "$pluginDir\Newtonsoft.Json.dll") -Force
     }
@@ -119,6 +119,7 @@ try {
         'plugins\crawlers\javmenu\main.json', 'plugins\crawlers\javmenu\JavmenuCrawler.dll',
         'plugins\crawlers\minnanoav\main.json', 'plugins\crawlers\minnanoav\MinnanoavCrawler.dll',
         'plugins\crawlers\javdatabase\main.json', 'plugins\crawlers\javdatabase\JavdatabaseCrawler.dll',
+        'plugins\crawlers\bus\Newtonsoft.Json.dll',
         'plugins\crawlers\javdatabase\Newtonsoft.Json.dll',
         'plugins\crawlers\db\Newtonsoft.Json.dll'
     )

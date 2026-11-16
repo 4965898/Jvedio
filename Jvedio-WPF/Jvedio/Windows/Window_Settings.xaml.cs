@@ -1007,6 +1007,15 @@ namespace Jvedio
             ConfigManager.Settings.ActorAutoEnrich = vieModel.ActorAutoEnrich;
             ConfigManager.Settings.ActorOverwriteScraped = vieModel.ActorOverwriteScraped;
             ConfigManager.Settings.ActorScrapeSaveImage = vieModel.ActorScrapeSaveImage;
+            ConfigManager.Settings.GfriendsAvatar = vieModel.GfriendsAvatar;
+            ConfigManager.Settings.SubtitleAutoDownload = vieModel.SubtitleAutoDownload;
+            if (vieModel.SubtitleSaveMode < 0 || vieModel.SubtitleSaveMode > 1)
+                vieModel.SubtitleSaveMode = 0;
+            ConfigManager.Settings.SubtitleSaveMode = vieModel.SubtitleSaveMode;
+            ConfigManager.Settings.SubtitleSaveFolder = vieModel.SubtitleSaveFolder ?? string.Empty;
+            // 语言偏好：空值回退默认简繁双语
+            ConfigManager.Settings.SubtitleLanguages =
+                string.IsNullOrWhiteSpace(vieModel.SubtitleLanguages) ? "zh-CN,zh-TW" : vieModel.SubtitleLanguages.Trim();
             ConfigManager.ScanConfig.CopyNFOOverwriteImage = vieModel.CopyNFOOverwriteImage;
             ConfigManager.ScanConfig.CopyNFOPicture = vieModel.CopyNFOPicture;
             ConfigManager.ScanConfig.CopyNFOActorPicture = vieModel.CopyNFOActorPicture;
@@ -1389,11 +1398,12 @@ namespace Jvedio
         {
             if (ConfigManager.Main == null)
                 return;
-            System.Windows.Forms.FolderBrowserDialog dlg = new System.Windows.Forms.FolderBrowserDialog();
-            dlg.Description = LangManager.GetValueByKey("SelectOutputFolder");
-            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+            string outputDir = Jvedio.Core.Utils.FolderPickerHelper.PickFolder(
+                null,
+                LangManager.GetValueByKey("SelectOutputFolder"),
+                new System.Windows.Interop.WindowInteropHelper(this).Handle);
+            if (string.IsNullOrEmpty(outputDir))
                 return;
-            string outputDir = dlg.SelectedPath;
             string select = new SelectWrapper<Video>().Select(VideoMapper.SelectFields).ToSelect(false);
             string sql = select + VideoMapper.SQL_BASE +
                 $" WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType=0";
@@ -1463,10 +1473,23 @@ namespace Jvedio
 
         private void SelectBackupDirectory(object sender, RoutedEventArgs e)
         {
-            using (var dialog = new System.Windows.Forms.FolderBrowserDialog()) {
-                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                    BackupDirectoryBox.Text = dialog.SelectedPath;
-            }
+            string selected = Jvedio.Core.Utils.FolderPickerHelper.PickFolder(
+                BackupDirectoryBox.Text?.Trim(),
+                SuperControls.Style.LangManager.GetValueByKey("BackupDirectoryLabel"),
+                new System.Windows.Interop.WindowInteropHelper(this).Handle);
+            if (!string.IsNullOrEmpty(selected))
+                BackupDirectoryBox.Text = selected;
+        }
+
+        /// <summary>字幕指定文件夹选择（现代文件夹对话框，与资源管理器同款可粘贴路径/新建文件夹）</summary>
+        private void SelectSubtitleFolder(object sender, RoutedEventArgs e)
+        {
+            string selected = Jvedio.Core.Utils.FolderPickerHelper.PickFolder(
+                SubtitleFolderBox.Text?.Trim(),
+                SuperControls.Style.LangManager.GetValueByKey("SubtitleSaveFolderLabel"),
+                new System.Windows.Interop.WindowInteropHelper(this).Handle);
+            if (!string.IsNullOrEmpty(selected))
+                SubtitleFolderBox.Text = selected;
         }
 
         private async void TestWebDavConnection(object sender, RoutedEventArgs e)
@@ -1545,10 +1568,12 @@ namespace Jvedio
 
         private async void RestoreBackupFolder(object sender, RoutedEventArgs e)
         {
-            using (var dialog = new System.Windows.Forms.FolderBrowserDialog()) {
-                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                    await StageBackupRestore(dialog.SelectedPath);
-            }
+            string selected = Jvedio.Core.Utils.FolderPickerHelper.PickFolder(
+                null,
+                null,
+                new System.Windows.Interop.WindowInteropHelper(this).Handle);
+            if (!string.IsNullOrEmpty(selected))
+                await StageBackupRestore(selected);
         }
 
         private async void RestoreRemoteBackup(object sender, RoutedEventArgs e)
@@ -1805,6 +1830,11 @@ namespace Jvedio
                 vieModel.ActorAutoEnrich = true;
                 vieModel.ActorOverwriteScraped = false;
                 vieModel.ActorScrapeSaveImage = true;
+                vieModel.GfriendsAvatar = true;
+                vieModel.SubtitleAutoDownload = false;
+                vieModel.SubtitleSaveMode = 0;
+                vieModel.SubtitleSaveFolder = string.Empty;
+                vieModel.SubtitleLanguages = "zh-CN,zh-TW";
 
                 ConfigManager.ScanConfig.ScanNfo = false;
                 ConfigManager.ScanConfig.Save();

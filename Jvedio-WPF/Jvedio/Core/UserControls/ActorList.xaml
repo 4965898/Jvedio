@@ -86,6 +86,7 @@
                         <MenuItem Click="DownLoadAllActors" Header="{DynamicResource SyncInfoLibrary}" />
                         <MenuItem Click="OpenActorImagePath" Header="{DynamicResource OpenPath}" />
                         <MenuItem Click="DeleteActors" Header="{DynamicResource Delete}" />
+                        <MenuItem Click="MergeActors" Header="{DynamicResource MergeActor}" />
                         <Separator />
                         <MenuItem Click="ConvertActorNameENSelected" Header="{DynamicResource ConvertActorNameENSelected}" />
                         <MenuItem Click="ConvertActorNameENPage" Header="{DynamicResource ConvertActorNameENPage}" />
@@ -332,6 +333,7 @@
                         <MenuItem Click="DownLoadAllActors" Header="{DynamicResource SyncInfoLibrary}" />
                         <MenuItem Click="OpenActorImagePath" Header="{DynamicResource OpenPath}" />
                         <MenuItem Click="DeleteActors" Header="{DynamicResource Delete}" />
+                        <MenuItem Click="MergeActors" Header="{DynamicResource MergeActor}" />
                         <Separator />
                         <MenuItem Click="ConvertActorNameENSelected" Header="{DynamicResource ConvertActorNameENSelected}" />
                         <MenuItem Click="ConvertActorNameENPage" Header="{DynamicResource ConvertActorNameENPage}" />

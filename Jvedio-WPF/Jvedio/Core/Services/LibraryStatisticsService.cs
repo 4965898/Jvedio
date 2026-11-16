@@ -51,13 +51,13 @@ namespace Jvedio.Core.Library
             long total = 0, favorites = 0, watched = 0, playCount = 0, sizeTotal = 0, durationTotal = 0,
                 durationKnown = 0, sizeKnown = 0, playable = 0, subtitles = 0, translated = 0,
                 titleKnown = 0, genreKnown = 0, studioKnown = 0, seriesKnown = 0, directorKnown = 0,
-                scraped = 0, imported30 = 0, unknownYear = 0;
+                scraped = 0, imported30 = 0, unknownYear = 0, watchTimeTotal = 0;
             double gradeTotal = 0;
             using (var connection = Open(true))
             using (var transaction = connection.BeginTransaction(IsolationLevel.Serializable, true)) {
                 string sql = "select m.Size,m.ViewCount,m.Grade,m.Path,m.PathExist,m.SubtitleExist,m.Title,m.TitleCN," +
                     "m.Genre,m.Country,m.ReleaseDate,m.FirstScanDate,m.CreateDate," +
-                    "v.Duration,v.FileDuration,v.VideoType,v.Studio,v.Series,v.Director,v.WebType,v.WebUrl " +
+                    "v.Duration,v.FileDuration,v.VideoType,v.Studio,v.Series,v.Director,v.WebType,v.WebUrl,m.PlayDuration " +
                     "from metadata m left join metadata_video v on v.MVID=" +
                     "(select max(MVID) from metadata_video where DataID=m.DataID) where " + scope;
                 using (var command = MakeCommand(connection, transaction, sql, "@db", dbId ?? 0))
@@ -102,6 +102,7 @@ namespace Jvedio.Core.Library
                         if (AddValues(series, Text(reader[17]))) seriesKnown++;
                         if (AddValues(directors, Text(reader[18]))) directorKnown++;
                         if (!string.IsNullOrWhiteSpace(Text(reader[19])) || !string.IsNullOrWhiteSpace(Text(reader[20]))) scraped++;
+                        watchTimeTotal += Math.Max(0, Number(reader[21]));
                     }
                 }
                 long actorCount = Scalar(connection, transaction,
@@ -120,6 +121,7 @@ namespace Jvedio.Core.Library
                 result.Metrics = new Dictionary<string, double> {
                     ["Videos"] = total, ["Favorites"] = favorites, ["Size"] = sizeTotal, ["Duration"] = durationTotal,
                     ["Watched"] = watched, ["Unwatched"] = total - watched, ["PlayCount"] = playCount,
+                    ["WatchTime"] = watchTimeTotal,
                     ["Playable"] = playable, ["Subtitles"] = subtitles, ["Translated"] = translated,
                     ["Actors"] = actorCount, ["Labels"] = labelCount, ["Labeled"] = labeled,
                     ["Imported30"] = imported30, ["AvgGrade"] = favorites == 0 ? 0 : gradeTotal / favorites,

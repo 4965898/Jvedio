@@ -519,6 +519,12 @@ private int _SyncConcurrency = (int)ConfigManager.Settings.SyncConcurrency;
         /// <summary>定时增量扫描间隔候选项（0=关闭），供 ComboBox 绑定</summary>
         public List<ScheduledScanOption> ScheduledScanOptions { get; } = BuildScheduledScanOptions();
 
+        /// <summary>字幕保存位置候选项（0=影片位置；1=指定文件夹），供 ComboBox 绑定</summary>
+        public List<ScheduledScanOption> SubtitleSaveModeOptions { get; } = new List<ScheduledScanOption> {
+            new ScheduledScanOption { Value = 0, Label = SuperControls.Style.LangManager.GetValueByKey("SubtitleSaveModeVideo") },
+            new ScheduledScanOption { Value = 1, Label = SuperControls.Style.LangManager.GetValueByKey("SubtitleSaveModeFolder") },
+        };
+
         private static List<ScheduledScanOption> BuildScheduledScanOptions()
         {
             int[] values = new int[] { 0, 30, 60, 120, 180, 360, 720, 1440 };
@@ -564,6 +570,72 @@ private int _SyncConcurrency = (int)ConfigManager.Settings.SyncConcurrency;
                 RaisePropertyChanged();
             }
         }
+
+        private bool _GfriendsAvatar = ConfigManager.Settings.GfriendsAvatar;
+
+        public bool GfriendsAvatar {
+            get { return _GfriendsAvatar; }
+
+            set {
+                _GfriendsAvatar = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        private bool _SubtitleAutoDownload = ConfigManager.Settings.SubtitleAutoDownload;
+
+        public bool SubtitleAutoDownload {
+            get { return _SubtitleAutoDownload; }
+
+            set {
+                _SubtitleAutoDownload = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        private int _SubtitleSaveMode = ConfigManager.Settings.SubtitleSaveMode;
+
+        public int SubtitleSaveMode {
+            get { return _SubtitleSaveMode; }
+
+            set {
+                _SubtitleSaveMode = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        private string _SubtitleSaveFolder = ConfigManager.Settings.SubtitleSaveFolder;
+
+        public string SubtitleSaveFolder {
+            get { return _SubtitleSaveFolder; }
+
+            set {
+                _SubtitleSaveFolder = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        private string _SubtitleLanguages = ConfigManager.Settings.SubtitleLanguages;
+
+        public string SubtitleLanguages {
+            get { return _SubtitleLanguages; }
+
+            set {
+                _SubtitleLanguages = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        /// <summary>字幕语言偏好候选项（可编辑 ComboBox，直接填语言码也行）</summary>
+        public List<string> SubtitleLanguageOptions { get; } = new List<string> {
+            "zh-CN",
+            "zh-CN,zh-TW",
+            "zh-CN,zh-TW,en",
+            "zh-CN,zh-TW,ja",
+            "zh-CN,zh-TW,en,ja",
+            "en",
+            "ja",
+        };
 
         #endregion
 

@@ -423,7 +423,9 @@ namespace Jvedio.Entity
         {
             if (File.Exists(filepath)) {
                 bool success = false;
-                if (!string.IsNullOrEmpty(ConfigManager.Settings.VideoPlayerPath) && File.Exists(ConfigManager.Settings.VideoPlayerPath)) {
+                bool knownPlayer = !string.IsNullOrEmpty(ConfigManager.Settings.VideoPlayerPath) &&
+                    File.Exists(ConfigManager.Settings.VideoPlayerPath);
+                if (knownPlayer) {
                     success = FileHelper.TryOpenFile(ConfigManager.Settings.VideoPlayerPath, filepath);
                 } else {
                     // 使用默认播放器
@@ -432,6 +434,17 @@ namespace Jvedio.Entity
 
                 if (success && dataID > 0) {
                     MapperManager.metaDataMapper.UpdateFieldById("ViewDate", DateHelper.Now(), dataID);
+                    // 播放次数自增：此前全项目无自增点，统计页「已观看/未观看/播放次数」一直恒为 0
+                    try {
+                        MapperManager.metaDataMapper.ExecuteNonQuery(
+                            $"update metadata set ViewCount = ifnull(ViewCount,0) + 1 where DataID={dataID}");
+                    } catch (Exception ex) {
+                        Logger.Error($"播放次数自增失败：{ex.Message}");
+                    }
+                    // 观看时长会话：外部播放器无法拿到进程句柄，由 WatchTimeTracker 按进程名轮询累计；
+                    // 未配置播放器路径（系统默认打开）时无法识别进程，不统计
+                    Jvedio.Core.Tasks.WatchTimeTracker.StartSession(dataID,
+                        knownPlayer ? ConfigManager.Settings.VideoPlayerPath : null);
                     onPlayVideo?.Invoke();
                 }
             } else {

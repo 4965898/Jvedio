@@ -158,10 +158,10 @@ namespace Jvedio.Windows
             var panel = new WrapPanel { Margin = new Thickness(0, 6, 0, 14) };
             foreach (string metric in additional
                 ? new[] { "AvgGrade", "AvgSize", "AvgDuration", "Playable", "Subtitles", "Translated", "Actors", "Labels" }
-                : new[] { "Videos", "Favorites", "Watched", "Unwatched", "Size", "Duration", "PlayCount", "Imported30" }) {
+                : new[] { "Videos", "Favorites", "Watched", "Unwatched", "WatchTime", "PlayCount", "Size", "Duration", "Imported30" }) {
                 double value = data.Metrics[metric];
                 string text = metric == "Size" || metric == "AvgSize" ? (value / 1073741824d).ToString("N2") + " GB"
-                    : metric == "Duration" ? (value / 3600d).ToString("N1") + " h"
+                    : metric == "Duration" || metric == "WatchTime" ? (value / 3600d).ToString("N1") + " h"
                     : metric == "AvgDuration" ? (value / 60d).ToString("N1") + " min"
                     : metric == "AvgGrade" ? (data.Metrics["Favorites"] == 0 ? "—" : value.ToString("F2") + " / 5")
                     : value.ToString("N0");

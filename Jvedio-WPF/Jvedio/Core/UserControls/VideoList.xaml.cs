@@ -240,11 +240,12 @@ namespace Jvedio.Core.UserControls
                 MessageCard.Info(LangManager.GetValueByKey("ExportEmpty"));
                 return;
             }
-            System.Windows.Forms.FolderBrowserDialog dlg = new System.Windows.Forms.FolderBrowserDialog();
-            dlg.Description = LangManager.GetValueByKey("SelectOutputFolder");
-            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+            string outputDir = Jvedio.Core.Utils.FolderPickerHelper.PickFolder(
+                null,
+                LangManager.GetValueByKey("SelectOutputFolder"),
+                new System.Windows.Interop.WindowInteropHelper(Window.GetWindow(this)).Handle);
+            if (string.IsNullOrEmpty(outputDir))
                 return;
-            string outputDir = dlg.SelectedPath;
             string select = new SelectWrapper<Video>().Select(VideoMapper.SelectFields).ToSelect(false);
             string ids = string.Join(",", vieModel.SelectedVideo.Select(v => v.DataID));
             string sql = select + VideoMapper.SQL_BASE + $" WHERE metadata.DataID IN ({ids})";
@@ -266,11 +267,12 @@ namespace Jvedio.Core.UserControls
         /// </summary>
         public async void ExportAllVideoDataNfo(object sender, RoutedEventArgs e)
         {
-            System.Windows.Forms.FolderBrowserDialog dlg = new System.Windows.Forms.FolderBrowserDialog();
-            dlg.Description = LangManager.GetValueByKey("SelectOutputFolder");
-            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+            string outputDir = Jvedio.Core.Utils.FolderPickerHelper.PickFolder(
+                null,
+                LangManager.GetValueByKey("SelectOutputFolder"),
+                new System.Windows.Interop.WindowInteropHelper(Window.GetWindow(this)).Handle);
+            if (string.IsNullOrEmpty(outputDir))
                 return;
-            string outputDir = dlg.SelectedPath;
             string select = new SelectWrapper<Video>().Select(VideoMapper.SelectFields).ToSelect(false);
             string sql = select + VideoMapper.SQL_BASE +
                 $" WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType=0";
@@ -767,6 +769,30 @@ namespace Jvedio.Core.UserControls
         /// 选中影片重命名（右键-拓展功能）：一部影片一个任务入队，进度/取消/失败重启在任务页查看。
         /// 原实现在 UI 线程同步循环，批量时卡界面（维护日志 3.52 收编任务页）。
         /// </summary>
+        /// <summary>
+        /// 右键「下载字幕」（顶级菜单项，在线观看之下）：按番号从 SubtitleCat 按偏好语言查找字幕。
+        /// 选择语义与其他菜单一致：多选模式=勾选的全部，否则仅右键这一部。
+        /// 保存位置由设置决定（影片目录/指定文件夹）；已有字幕跳过不覆盖；
+        /// 进度在右下角任务页（状态栏对话气泡图标）。
+        /// 顶级菜单项 depth=0（Parent 直接是 ContextMenu；曾放「拓展功能」子菜单内为 1）
+        /// </summary>
+        public void DownloadSubtitle(object sender, RoutedEventArgs e)
+        {
+            HandleMenuSelected(sender);
+            ObservableCollection<Video> videos = GetVideosByMenu(sender as MenuItem, 0);
+            if (videos == null)
+                return;
+            List<Video> targets = vieModel.SelectedVideo.Where(arg => arg != null && arg.DataID > 0).ToList();
+            if (targets.Count == 0)
+                return;
+            int added = Jvedio.Core.Tasks.SubtitleTaskManager.EnqueueManual(targets);
+            if (added > 0)
+                MessageNotify.Success(string.Format(
+                    SuperControls.Style.LangManager.GetValueByKey("SubtitleEnqueued"), added));
+            else
+                MessageNotify.Info(SuperControls.Style.LangManager.GetValueByKey("SubtitleAlreadyQueued"));
+        }
+
         public void RenameFile(object sender, RoutedEventArgs e)
         {
             if (ConfigManager.RenameConfig.FormatString.IndexOf("{") < 0) {
