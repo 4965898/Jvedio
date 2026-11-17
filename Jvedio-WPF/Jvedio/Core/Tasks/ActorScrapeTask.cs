@@ -31,6 +31,12 @@ namespace Jvedio.Core.Tasks
         private static long _SeqCounter = 0;
         public long EnqueueSeq { get; private set; }
 
+        /// <summary>
+        /// 单个演员资料任务完成且数据有变化后的全局通知（参数=ActorID）：
+        /// 供演员详情弹窗等 UI 即时刷新，无需重开页面；从后台线程触发，订阅方自行调度 UI 线程
+        /// </summary>
+        public static event Action<long> ActorDataChanged;
+
         public ActorScrapeTask(ActorInfo actorInfo) : base()
         {
             EnqueueSeq = System.Threading.Interlocked.Increment(ref _SeqCounter);
@@ -204,6 +210,7 @@ namespace Jvedio.Core.Tasks
                             : $"{actorInfo.ActorName} 资料已补齐";
                         Progress = 100;
                         App.Logger.Info($"演员资料已补齐：{actorInfo.ActorName}（{StatusText}）");
+                        NotifyActorDataChanged(ActorID);
                     } else {
                         // 站点有页面但没补到任何字段：同样标记已处理，避免反复请求
                         MarkAttempted(actorInfo);
@@ -221,6 +228,16 @@ namespace Jvedio.Core.Tasks
                 }
                 OnCompleted(null);
             });
+        }
+
+        /// <summary>广播资料变更通知；订阅方异常不阻断任务流程</summary>
+        private static void NotifyActorDataChanged(long actorID)
+        {
+            try {
+                ActorDataChanged?.Invoke(actorID);
+            } catch (Exception ex) {
+                App.Logger.Error($"演员资料变更通知失败：{ex.Message}");
+            }
         }
 
         /// <summary>探测结果缓存（App 生命周期一次）：插件 DLL 路径 → 是否提供 GetActorInfo</summary>

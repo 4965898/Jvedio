@@ -157,6 +157,16 @@ namespace Jvedio
             DownloadManager.Exiting = true;
             DownloadManager.SaveTasksToFile();
             DownloadManager.CancelAll();
+            // 演员资料补齐任务同样保存快照（Exiting=true 保证 CancelAll 不清快照）
+            ActorScrapeManager.Exiting = true;
+            ActorScrapeManager.SaveTasksToFile();
+            ActorScrapeManager.CancelAll();
+            // 字幕下载任务同样保存快照
+            SubtitleTaskManager.Exiting = true;
+            SubtitleTaskManager.SaveTasksToFile();
+            SubtitleTaskManager.CancelAll();
+            // 统计窗口为独立窗口（无 Owner），主窗关闭时一并关闭保持退出语义
+            StatisticsWindow?.Close();
             ScreenShotManager.CancelAll();
             ScanManager.CancelAll();
         }
@@ -787,9 +797,18 @@ namespace Jvedio
             new Windows.Window_LibraryHealth(ConfigManager.Main.CurrentDBId) { Owner = this }.ShowDialog();
         }
 
+        /// <summary>统计窗口（独立非 Owner：owned window 会永久浮在主窗之上导致无法切换；单例复用）</summary>
+        private static Windows.Window_Statistics StatisticsWindow;
+
         private void ShowStatistics(object sender, MouseButtonEventArgs e)
         {
-            new Windows.Window_Statistics(ConfigManager.Main.CurrentDBId) { Owner = this }.Show();
+            if (StatisticsWindow != null) {
+                StatisticsWindow.Activate();
+                return;
+            }
+            StatisticsWindow = new Windows.Window_Statistics(ConfigManager.Main.CurrentDBId, vieModel.OnStatisticClicked);
+            StatisticsWindow.Closed += (s, e) => StatisticsWindow = null;
+            StatisticsWindow.Show();
         }
 
         private void ShowBrowserClipper(object sender, RoutedEventArgs e)

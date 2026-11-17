@@ -1,15 +1,20 @@
 using Jvedio.Core.Crawler;
+using Jvedio.Core.Media;
 using Jvedio.Core.Utils;
 using Jvedio.Entity;
 using SuperControls.Style;
 using SuperUtils.IO;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using static Jvedio.MapperManager;
 
 namespace Jvedio.Core.UserControls
@@ -205,36 +210,58 @@ namespace Jvedio.Core.UserControls
             MessageNotify.Success($"英文名：{en}");
         }
 
-        // todo 演员信息下载
+        /// <summary>手动下载头像进行中标记（防重复点击并发下载）</summary>
+        private bool _DownloadingAvatar;
+
+        /// <summary>
+        /// 手动从 Gfriends 头像库下载当前演员头像：按演员名（英文名兜底）取图并保存到本地头像目录。
+        /// 与自动刮削「已有头像不覆盖」不同，显式点击视为刷新，成功后覆盖本地头像并即时上屏
+        /// </summary>
         private void BeginDownLoadActress(object sender, MouseButtonEventArgs e)
         {
-            MessageNotify.Info("开发中");
-            // List<Actress> actresses = new List<Actress>();
-            // actresses.Add(vieModel.Actress);
-            // DownLoadActress downLoadActress = new DownLoadActress(actresses);
-            // downLoadActress.BeginDownLoad();
-            // downLoadActress.InfoUpdate += (s, ev) =>
-            // {
-            //    ActressUpdateEventArgs actressUpdateEventArgs = ev as ActressUpdateEventArgs;
-            //    try
-            //    {
-            //        Dispatcher.Invoke((Action)delegate ()
-            //        {
-            //            vieModel.Actress = null;
-            //            vieModel.Actress = actressUpdateEventArgs.Actress;
-            //            downLoadActress.State = DownLoadState.Completed;
-            //        });
-            //    }
-            //    catch (TaskCanceledException ex) { Logger.LogE(ex); }
-
-            // };
-
-            // downLoadActress.MessageCallBack += (s, ev) =>
-            // {
-            //    MessageCallBackEventArgs actressUpdateEventArgs = ev as MessageCallBackEventArgs;
-            //    msgCard.Info(actressUpdateEventArgs.Message);
-
-            // };
+            if (CurrentActorInfo == null || string.IsNullOrEmpty(CurrentActorInfo.ActorName) || _DownloadingAvatar)
+                return;
+            if (!Gfriends.GfriendsAvatar.Enabled) {
+                MessageNotify.Warning("未启用 Gfriends 头像库：请在「选项 → 同步信息」中勾选");
+                return;
+            }
+            ActorInfo actorInfo = CurrentActorInfo;
+            long actorID = actorInfo.ActorID;
+            string actorName = actorInfo.ActorName;
+            string actorNameEN = actorInfo.ActorNameEN;
+            _DownloadingAvatar = true;
+            MessageNotify.Info($"正在从 Gfriends 头像库获取头像：{actorName}");
+            Task.Run(async () => {
+                try {
+                    byte[] bytes = await Gfriends.GfriendsAvatar.TryGetAvatarBytesAsync(actorName, actorNameEN);
+                    if (bytes == null || bytes.Length == 0) {
+                        Dispatcher.BeginInvoke(new Action(() => MessageNotify.Warning($"Gfriends 头像库未收录：{actorName}")));
+                        return;
+                    }
+                    // GetImagePath：已有头像返回其现有文件名（原地覆盖），没有则落到约定命名
+                    string targetPath = Path.GetFullPath(actorInfo.GetImagePath());
+                    string dir = Path.GetDirectoryName(targetPath);
+                    if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                        Directory.CreateDirectory(dir);
+                    File.WriteAllBytes(targetPath, bytes);
+                    ImageCache.Remove(targetPath);
+                    App.Logger.Info($"手动下载演员头像（Gfriends）：{actorName} → {targetPath}");
+                    Dispatcher.Invoke((Action)delegate () {
+                        // 期间用户已切换演员则只落盘，不刷新当前展示
+                        if (CurrentActorInfo != null && CurrentActorInfo.ActorID == actorID) {
+                            string imagePath = CurrentActorInfo.GetImagePath();
+                            BitmapImage image = ImageCache.Get(imagePath);
+                            CurrentActorInfo.SmallImage = image ?? MetaData.DefaultActorImage;
+                        }
+                        MessageNotify.Success($"头像已保存：{actorName}");
+                    });
+                } catch (Exception ex) {
+                    App.Logger.Error($"手动下载演员头像失败 {actorName}：{ex.Message}");
+                    Dispatcher.BeginInvoke(new Action(() => MessageNotify.Error($"头像下载失败：{ex.Message}")));
+                } finally {
+                    _DownloadingAvatar = false;
+                }
+            });
         }
         private void EditActress(object sender, MouseButtonEventArgs e)
         {
@@ -244,9 +271,21 @@ namespace Jvedio.Core.UserControls
             }
         }
 
-        private void LoadActorOtherMovie(object sender, MouseButtonEventArgs e)
+        /// <summary>
+        /// 手动补齐当前演员资料（同演员列表右键「同步信息」）：插队入队串行执行，
+        /// 进度见右下角任务页；完成后经 ActorScrapeTask.ActorDataChanged 联动刷新弹窗字段
+        /// </summary>
+        private void SyncActorInfo(object sender, MouseButtonEventArgs e)
         {
-            MessageNotify.Info("开发中");
+            if (CurrentActorInfo == null || CurrentActorInfo.ActorID <= 0 || string.IsNullOrEmpty(CurrentActorInfo.ActorName))
+                return;
+            int result = Jvedio.Core.Tasks.ActorScrapeManager.EnqueueManual(new List<ActorInfo>() { CurrentActorInfo });
+            if (result < 0)
+                MessageNotify.Warning("尚未启用演员资料源：请在「选项 → 同步信息」中启用 JAVDatabase(推荐)或 MinnanoAV 后重试");
+            else if (result == 0)
+                MessageNotify.Info("该演员已在补齐队列中");
+            else
+                MessageNotify.Success($"已加入演员资料补齐队列：{CurrentActorInfo.ActorName}");
         }
 
         private void ActorRate_ValueChanged(object sender, EventArgs e)

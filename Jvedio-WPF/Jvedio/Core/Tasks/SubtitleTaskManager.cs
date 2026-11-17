@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using SuperControls.Style;
 using SuperUtils.Framework.Tasks;
 using System;
@@ -11,6 +12,19 @@ using static Jvedio.MapperManager;
 
 namespace Jvedio.Core.Tasks
 {
+    /// <summary>
+    /// 字幕下载任务的持久化记录（JSON，仅存恢复所需的字段）
+    /// </summary>
+    public class SubtitleTaskRecord
+    {
+        public long DataID { get; set; }
+
+        public string Vid { get; set; }
+
+        public int Status { get; set; }
+
+        public string CreateTime { get; set; }
+    }
     /// <summary>
     /// 字幕下载任务管理器：串行执行 + 间隔限速（公共站点礼貌），任务页可看进度/取消/重启。
     /// 重启语义：基类 AbstractTask.Restart 对非 Canceled 状态只重置为 WaitingToRun 且不重新执行
@@ -218,5 +232,210 @@ namespace Jvedio.Core.Tasks
                 RestartAllRunning = false;
             }
         }
+        #region "任务持久化（崩溃/退出后恢复未完成的字幕下载任务，与刮削/演员任务同模式）"
+
+        /// <summary>是否为退出流程（退出时仍保存快照，但取消操作不删除快照）</summary>
+        public bool Exiting { get; set; }
+
+        private readonly object _PersistLock = new object();
+
+        private readonly Dictionary<long, SubtitleTaskRecord> _PendingRecords = new Dictionary<long, SubtitleTaskRecord>();
+
+        private static string PersistPath => Path.Combine(Jvedio.Core.Global.PathManager.CurrentUserFolder, "subtitle_tasks.json");
+
+        public new void AddTask(AbstractTask task)
+        {
+            if (CurrentTasks.Contains(task))
+                return;
+
+            task.onCompleted += OnTaskPersistCompleted;
+            if (task is SubtitleTask subtitleTask) {
+                lock (_PersistLock) {
+                    _PendingRecords[subtitleTask.DataID] = ToRecord(subtitleTask);
+                }
+            }
+            SaveTasksToFile();
+            try {
+                base.AddTask(task);
+            } catch {
+                task.onCompleted -= OnTaskPersistCompleted;
+                if (task is SubtitleTask failedTask) {
+                    lock (_PersistLock) {
+                        _PendingRecords.Remove(failedTask.DataID);
+                    }
+                    SaveTasksToFile();
+                }
+                throw;
+            }
+        }
+
+        public new void AddTaskFront(AbstractTask task)
+        {
+            if (CurrentTasks.Contains(task))
+                return;
+
+            task.onCompleted += OnTaskPersistCompleted;
+            if (task is SubtitleTask subtitleTask) {
+                lock (_PersistLock) {
+                    _PendingRecords[subtitleTask.DataID] = ToRecord(subtitleTask);
+                }
+            }
+            SaveTasksToFile();
+            try {
+                base.AddTaskFront(task);
+            } catch {
+                task.onCompleted -= OnTaskPersistCompleted;
+                if (task is SubtitleTask failedTask) {
+                    lock (_PersistLock) {
+                        _PendingRecords.Remove(failedTask.DataID);
+                    }
+                    SaveTasksToFile();
+                }
+                throw;
+            }
+        }
+
+        private void OnTaskPersistCompleted(object sender, EventArgs e)
+        {
+            if (sender is SubtitleTask subtitleTask) {
+                lock (_PersistLock) {
+                    _PendingRecords.Remove(subtitleTask.DataID);
+                }
+                SaveTasksToFile();
+            }
+        }
+
+        public new void RemoveTask(System.Threading.Tasks.TaskStatus status)
+        {
+            List<AbstractTask> removed = new List<AbstractTask>();
+            if (status == (System.Threading.Tasks.TaskStatus.Canceled | System.Threading.Tasks.TaskStatus.RanToCompletion)) {
+                removed.AddRange(CurrentTasks);
+            } else {
+                removed.AddRange(CurrentTasks.Where(t => t.Status == status));
+            }
+            base.RemoveTask(status);
+            lock (_PersistLock) {
+                foreach (AbstractTask task in removed) {
+                    if (task is SubtitleTask subtitleTask)
+                        _PendingRecords.Remove(subtitleTask.DataID);
+                }
+            }
+            SaveTasksToFile();
+        }
+
+        public new void CancelTask(string id)
+        {
+            base.CancelTask(id);
+            if (Exiting)
+                return;
+            AbstractTask task = CurrentTasks.FirstOrDefault(arg => arg.ID.Equals(id));
+            if (task is SubtitleTask subtitleTask) {
+                lock (_PersistLock) {
+                    _PendingRecords.Remove(subtitleTask.DataID);
+                }
+                SaveTasksToFile();
+            }
+        }
+
+        public new void CancelAll()
+        {
+            base.CancelAll();
+            if (Exiting)
+                return;
+            lock (_PersistLock) {
+                _PendingRecords.Clear();
+            }
+            SaveTasksToFile();
+        }
+
+        private static SubtitleTaskRecord ToRecord(SubtitleTask task)
+        {
+            return new SubtitleTaskRecord {
+                DataID = task.DataID,
+                Vid = task.Title,
+                Status = (int)task.Status,
+                CreateTime = task.CreateTime,
+            };
+        }
+
+        /// <summary>
+        /// 把未完成任务快照写入本地文件（原子替换）。任何时机调用都安全，异常仅记日志。
+        /// </summary>
+        public void SaveTasksToFile()
+        {
+            try {
+                string json;
+                lock (_PersistLock) {
+                    json = JsonConvert.SerializeObject(_PendingRecords.Values.ToList());
+                }
+                string dir = Jvedio.Core.Global.PathManager.CurrentUserFolder;
+                if (!Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                string tmp = PersistPath + ".tmp";
+                File.WriteAllText(tmp, json);
+                if (File.Exists(PersistPath))
+                    File.Delete(PersistPath);
+                File.Move(tmp, PersistPath);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+        }
+
+        /// <summary>
+        /// 启动时从本地文件恢复未完成的字幕下载任务。
+        /// 按当前设置重建任务（语言/保存模式取当下配置），只进入任务列表（「上次未完成，可重启」），
+        /// 由用户点「重启全部失败」或单任务重启后继续；影片已删除/无番号的快照直接丢弃。
+        /// </summary>
+        /// <returns>恢复的任务数量</returns>
+        public int RestoreTasksFromFile()
+        {
+            List<SubtitleTaskRecord> records = new List<SubtitleTaskRecord>();
+            try {
+                if (File.Exists(PersistPath)) {
+                    string json = File.ReadAllText(PersistPath);
+                    records = JsonConvert.DeserializeObject<List<SubtitleTaskRecord>>(json) ?? new List<SubtitleTaskRecord>();
+                }
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                records = new List<SubtitleTaskRecord>();
+            }
+
+            int restored = 0;
+            foreach (SubtitleTaskRecord record in records) {
+                if (record == null || record.DataID <= 0)
+                    continue;
+                try {
+                    if (CurrentTasks.Any(t => t is SubtitleTask st && st.DataID == record.DataID))
+                        continue;
+                    // 影片已删除（或按当前设置不可下载：无番号/模式 0 无路径）则丢弃快照，避免僵尸任务
+                    Jvedio.Entity.Video video = videoMapper.SelectVideoByID(record.DataID);
+                    SubtitleTask task = video == null ? null : CreateTask(video);
+                    if (task == null) {
+                        Logger.Info($"video {record.DataID} no longer subtitle-eligible, drop snapshot");
+                        continue;
+                    }
+                    task.onCompleted += OnTaskPersistCompleted;
+
+                    // 只恢复到列表（保持「未完成」状态），不自动开始；用户点「重启全部失败」或单任务重启后继续
+                    task.Status = TaskStatus.Canceled;
+                    task.StatusText = LangManager.GetValueByKey("TaskInterrupted");
+                    CurrentTasks.Add(task);
+                    lock (_PersistLock) {
+                        _PendingRecords[record.DataID] = record;
+                    }
+                    restored++;
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                }
+            }
+            if (restored > 0) {
+                Logger.Info($"restore {restored} subtitle tasks (not started, waiting for user)");
+                SaveTasksToFile();
+            }
+            return restored;
+        }
+
+        #endregion
+
     }
 }

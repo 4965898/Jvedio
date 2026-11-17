@@ -3,6 +3,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using LangManager = SuperControls.Style.LangManager;
 
@@ -18,6 +19,10 @@ namespace Jvedio.Core.UserControls
             new SolidColorBrush(Color.FromRgb(245,170,65)), new SolidColorBrush(Color.FromRgb(155,115,240)),
             new SolidColorBrush(Color.FromRgb(235,100,125)), new SolidColorBrush(Color.FromRgb(60,190,205))
         };
+
+        /// <summary>点击某一条统计条目（按当前图表几何做命中测试）；订阅后条目区显示手型光标</summary>
+        public Action<StatisticItem> ItemClicked;
+
         public StatisticsChart(StatisticChart data, double total)
         {
             _Data = data; _Total = total;
@@ -99,6 +104,84 @@ namespace Jvedio.Core.UserControls
         }
         private static Point Polar(Point center, double radius, double angle) =>
             new Point(center.X + radius * Math.Cos(angle * Math.PI / 180), center.Y + radius * Math.Sin(angle * Math.PI / 180));
+
+        /// <summary>
+        /// 鼠标位置 → 条目下标；几何与 OnRender 的绘制布局保持一致（Bar=整行、Donut=图例行/圆环、Column/Line=整列），未命中返回 -1
+        /// </summary>
+        private int HitItem(Point p)
+        {
+            if (_Data == null || _Data.Items.Count == 0 || ActualWidth <= 0)
+                return -1;
+            switch (_Data.Kind) {
+                case "Bar":
+                case "Coverage": {
+                    double labels = Math.Min(155, ActualWidth * .34);
+                    double width = Math.Max(20, ActualWidth - labels - 100);
+                    int row = (int)((p.Y - 3) / 28);
+                    if (row < 0 || row >= _Data.Items.Count)
+                        return -1;
+                    double y = row * 28 + 3;
+                    return p.X >= 0 && p.X <= labels + width + 100 && p.Y >= y && p.Y <= y + 22 ? row : -1;
+                }
+                case "Donut": {
+                    double radius = Math.Min(77, ActualWidth * .18);
+                    double thickness = radius * .32;
+                    var center = new Point(radius + 14, 112);
+                    double x = center.X + radius + thickness / 2 + 22;
+                    if (p.X >= x - 10) { // 图例行（每项两行文本，占高 49）
+                        for (int i = 0; i < _Data.Items.Count; i++)
+                            if (p.Y >= 55 + i * 49 - 4 && p.Y <= 55 + i * 49 + 38)
+                                return i;
+                        return -1;
+                    }
+                    double dx = p.X - center.X, dy = p.Y - center.Y;
+                    double dist = Math.Sqrt(dx * dx + dy * dy);
+                    double sum = _Data.Items.Sum(item => item.Count);
+                    if (sum <= 0 || dist < radius - thickness / 2 || dist > radius + thickness / 2)
+                        return -1;
+                    double degree = (Math.Atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360; // 绘制从 -90 起顺时针
+                    double acc = 0;
+                    for (int i = 0; i < _Data.Items.Count; i++) {
+                        acc += _Data.Items[i].Count / sum * 360;
+                        if (degree < acc)
+                            return i;
+                    }
+                    return -1;
+                }
+                default: { // Column / Line
+                    double left = 48;
+                    double width = Math.Max(30, ActualWidth - left - 15);
+                    double step = width / _Data.Items.Count;
+                    if (p.X < left || p.Y < 0 || p.Y > 230)
+                        return -1;
+                    int index = (int)((p.X - left) / step);
+                    return index >= 0 && index < _Data.Items.Count ? index : -1;
+                }
+            }
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            if (ItemClicked == null)
+                return;
+            Cursor = HitItem(e.GetPosition(this)) >= 0 ? Cursors.Hand : Cursors.Arrow;
+        }
+
+        protected override void OnMouseLeave(MouseEventArgs e)
+        {
+            base.OnMouseLeave(e);
+            Cursor = Cursors.Arrow;
+        }
+
+        protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+        {
+            base.OnMouseLeftButtonUp(e);
+            int index = ItemClicked == null ? -1 : HitItem(e.GetPosition(this));
+            if (index >= 0)
+                ItemClicked?.Invoke(_Data.Items[index]);
+        }
+
         private void DrawCartesian(DrawingContext dc, bool line)
         {
             double left = 48, top = 16, width = Math.Max(30, ActualWidth - left - 15), height = 175;

@@ -174,6 +174,26 @@ namespace Jvedio.Core.UserControls
             }
         }
 
+        /// <summary>
+        /// 外部注入的演员筛选条件（actor_info 列名前缀的原生 SQL，如 actor_info.Height between 160 and 169），
+        /// 由统计窗口点击演员信息分布条目跳转时设置；对「有影片的演员/无影片的演员」两个查询臂同时生效
+        /// </summary>
+        private string _ExtraFilter = string.Empty;
+
+        /// <summary>设置演员筛选条件（传空串清除）；列表已加载时立即刷新，否则等 Loaded→Select 生效</summary>
+        public void SetActorFilter(string condition)
+        {
+            _ExtraFilter = condition ?? string.Empty;
+            if (IsLoaded)
+                Select();
+        }
+
+        /// <summary>把外部筛选条件拼进查询（两个查询臂的 WHERE 之后都紧跟 and (...)，调用点保证 WHERE 已存在）</summary>
+        private string FilterClause()
+        {
+            return string.IsNullOrEmpty(_ExtraFilter) ? string.Empty : $"and ({_ExtraFilter}) ";
+        }
+
         private int _PageSize = 40;
 
         public int PageSize {
@@ -456,13 +476,13 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                          "join metadata " +
                          "on metadata_to_actor.DataID=metadata.DataID " +
                          $"WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType={0} " +
-                         $"{(search ? SearchCondition(searchText) : string.Empty)} " +
+                         $"{(search ? SearchCondition(searchText) : string.Empty)}{FilterClause()}" +
                          "GROUP BY actor_info.ActorID " +
                          "UNION " +
                          "select actor_info.ActorID  " +
                          "FROM actor_info WHERE NOT EXISTS " +
                          "(SELECT 1 from metadata_to_actor where metadata_to_actor.ActorID=actor_info.ActorID ) " +
-                         $"{(search ? SearchCondition(searchText) : string.Empty)} " +
+                         $"{(search ? SearchCondition(searchText) : string.Empty)}{FilterClause()}" +
                          "GROUP BY actor_info.ActorID)";
 
 
@@ -475,13 +495,13 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                 $"join metadata_to_actor on metadata_to_actor.ActorID=actor_info.ActorID " +
                 $"join metadata on metadata_to_actor.DataID=metadata.DataID " +
                 $"WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType={0} " +
-                $"{(search ? SearchCondition(searchText) : string.Empty)} " +
+                $"{(search ? SearchCondition(searchText) : string.Empty)}{FilterClause()}" +
                 $"GROUP BY actor_info.ActorID " +
                 "UNION " +
                 // 显示只有演员名，没有数量的演员
                 $"{unionSelect} FROM actor_info " +
                 "WHERE NOT EXISTS(SELECT 1 from metadata_to_actor where metadata_to_actor.ActorID=actor_info.ActorID )" +
-                $"{(search ? SearchCondition(searchText) : string.Empty)}  GROUP BY actor_info.ActorID " +
+                $"{(search ? SearchCondition(searchText) : string.Empty)}{FilterClause()} GROUP BY actor_info.ActorID " +
                 wrapper.ToOrder() + ActorToLimit();
 
             onPageChange(TotalCount);
@@ -537,10 +557,17 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
 
             CurrentCount = Actors.Count;
 
-            RenderActor();
+            RenderActorAsync();
         }
 
-        public async void RenderActor()
+        /// <summary>UI 批量更新大小（与影片库 RenderAsync 同策略：避免逐条 BeginInvoke 的调度开销）</summary>
+        private const int UI_UPDATE_BATCH_SIZE = 12;
+
+        /// <summary>
+        /// 渲染演员页（与影片库 RenderAsync 同架构）：图片解码/磁盘 IO 全在后台线程，
+        /// UI 集合按批更新——替代旧版「UI 线程逐条 SetImage + 逐条 BeginInvoke」的卡顿实现
+        /// </summary>
+        public Task RenderActorAsync()
         {
             if (CurrentList == null) {
                 CurrentList = new ObservableCollection<ActorInfo>();
@@ -550,34 +577,89 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                 };
             }
 
-            for (int i = 0; i < Actors.Count; i++) {
+            Rendering = true;
+            RenderProgress = 0;
+            List<ActorInfo> actors = Actors;
+            CancellationToken token = RenderCT;
+            return Task.Run(async () => {
                 try {
-                    RenderCT.ThrowIfCancellationRequested();
-                } catch (OperationCanceledException) {
-                    RenderCTS?.Dispose();
-                    break;
+                    int from = 0;
+                    for (int i = 0; i < actors.Count; i++) {
+                        if (token.IsCancellationRequested)
+                            break;
+                        ActorInfo actorInfo = actors[i];
+                        if (actorInfo == null)
+                            continue;
+                        // 耗时操作（图片解码、磁盘读取）全部在后台线程执行
+                        ActorInfo.SetImage(ref actorInfo);
+                        RenderProgress = (int)(100 * (i + 1) / (float)actors.Count);
+                        if (i % UI_UPDATE_BATCH_SIZE == UI_UPDATE_BATCH_SIZE - 1) {
+                            if (token.IsCancellationRequested)
+                                break;
+                            int to = i;
+                            await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background,
+                                new Action(() => ApplyRenderBatch(actors, from, to)));
+                            from = i + 1;
+                        }
+                    }
+
+                    // 收尾：渲染期间又有新请求则放弃，避免旧结果覆盖新页面
+                    if (!token.IsCancellationRequested) {
+                        int from2 = from;
+                        await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background,
+                            new Action(() => {
+                                ApplyRenderBatch(actors, from2, actors.Count - 1);
+                                // 清除多余的项（含结果为空时清空整页）
+                                for (int j = CurrentList.Count - 1; j >= actors.Count; j--)
+                                    CurrentList.RemoveAt(j);
+                            }));
+                    }
+                } catch (Exception ex) {
+                    App.Logger.Error(ex);
+                } finally {
+                    try {
+                        await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => {
+                            try {
+                                if (RenderCT.IsCancellationRequested)
+                                    RefreshActorRenderToken();
+                            } finally {
+                                Rendering = false;
+                                PageChangedCompleted?.Invoke(this, null);
+                            }
+                        }));
+                    } catch (Exception ex) {
+                        App.Logger.Error(ex);
+                    }
                 }
+            });
+        }
 
-                Rendering = true;
-                ActorInfo actorInfo = Actors[i];
-                ActorInfo.SetImage(ref actorInfo);
-                // 编辑模式勾选状态在翻页/重渲染后保持(与 SelectedActors 同步)
-                actorInfo.IsSelected = SelectedActors.Any(a => a.ActorID == actorInfo.ActorID);
-                await App.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new LoadActorDelegate(LoadActor), actorInfo, i);
-                RenderProgress = (int)(100 * (i + 1) / (float)Actors.Count);
+        /// <summary>
+        /// UI 线程批量更新集合（替换/新增）：同 ActorID 沿用旧对象反射拷贝属性（保留卡片引用，
+        /// 与旧 LoadActor 语义一致），不同则整对象替换
+        /// </summary>
+        private void ApplyRenderBatch(List<ActorInfo> actors, int from, int to)
+        {
+            if (actors == null || CurrentList == null)
+                return;
+            for (int i = from; i <= to && i < actors.Count; i++) {
+                ActorInfo actor = actors[i];
+                if (actor == null)
+                    continue;
+                // 编辑模式勾选状态在翻页/重渲染后保持（UI 线程读 SelectedActors，避免跨线程竞态）
+                actor.IsSelected = SelectedActors.Any(a => a.ActorID == actor.ActorID);
+                if (CurrentList.Count < PageSize && i >= CurrentList.Count) {
+                    CurrentList.Add(actor);
+                } else if (i < CurrentList.Count) {
+                    if (CurrentList[i].ActorID == actor.ActorID) {
+                        // 不知为啥，如果 2 个对象相等，则不会触发 notify
+                        ActorInfo temp = CurrentList[i];
+                        RefreshData(ref temp, actor);
+                    } else {
+                        CurrentList[i] = actor;
+                    }
+                }
             }
-
-            // 清除
-            for (int i = CurrentList.Count - 1; i > Actors.Count - 1; i--) {
-                CurrentList.RemoveAt(i);
-            }
-
-            if (RenderCT.IsCancellationRequested)
-                RefreshActorRenderToken();
-            Rendering = false;
-
-            // if (pageQueue.Count > 0) pageQueue.Dequeue();
-            PageChangedCompleted?.Invoke(this, null);
         }
 
         private void LoadActor(ActorInfo actor, int idx)

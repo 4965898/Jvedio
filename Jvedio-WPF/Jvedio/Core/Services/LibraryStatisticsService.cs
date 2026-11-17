@@ -13,6 +13,15 @@ namespace Jvedio.Core.Library
         public string Label { get; set; }
         public long Count { get; set; }
         public bool Localized { get; set; }
+
+        /// <summary>点击跳转类型：影片维度=LabelType 枚举名（Genre/Studio/Series/Director/Country/LabelName）、Tag=标记、Actor=按 RefId 跳演员、ActorXxx=演员信息分布；空=不可跳转</summary>
+        public string FilterType { get; set; }
+
+        /// <summary>演员信息分布的跳转 SQL 条件（actor_info 列名前缀，注入演员列表查询）</summary>
+        public string FilterSql { get; set; }
+
+        /// <summary>跳转引用 ID（Actor 类型=ActorID）</summary>
+        public long RefId { get; set; }
     }
 
     public sealed class StatisticChart
@@ -118,6 +127,30 @@ namespace Jvedio.Core.Library
                     (dbId.HasValue ? " and c.DBId=@db" : "") +
                     " union select m.DBId,l.LabelName from metadata_to_label l join metadata m on m.DataID=l.DataID where " + scope +
                     " and trim(ifnull(l.LabelName,''))<>'')", dbId);
+
+                // 演员信息统计：范围内影片出现过的演员（与 StatByActor 同一连接与范围），逐项分桶
+                long[] actorAges = new long[8], actorHeights = new long[6], actorWeights = new long[6], actorShoes = new long[7];
+                var birthplaces = new Dictionary<string, long>(StringComparer.Ordinal);
+                long unknownBirthplace = 0;
+                using (var command = MakeCommand(connection, transaction,
+                    "select actor_info.Age,actor_info.Height,actor_info.Weight,actor_info.BirthPlace,actor_info.ShoeSize " +
+                    "from actor_info join metadata_to_actor on metadata_to_actor.ActorID=actor_info.ActorID " +
+                    "join metadata m on m.DataID=metadata_to_actor.DataID where " + scope + " group by actor_info.ActorID", "@db", dbId ?? 0))
+                using (var reader = command.ExecuteReader()) {
+                    while (reader.Read()) {
+                        long age = Number(reader[0]);
+                        actorAges[age <= 0 ? 0 : age <= 20 ? 1 : age <= 25 ? 2 : age <= 30 ? 3 : age <= 35 ? 4 : age <= 40 ? 5 : age <= 50 ? 6 : 7]++;
+                        long height = Number(reader[1]);
+                        actorHeights[height <= 0 ? 0 : height < 150 ? 1 : height < 160 ? 2 : height < 170 ? 3 : height < 180 ? 4 : 5]++;
+                        long weight = Number(reader[2]);
+                        actorWeights[weight <= 0 ? 0 : weight < 40 ? 1 : weight < 50 ? 2 : weight < 60 ? 3 : weight < 70 ? 4 : 5]++;
+                        string birthplace = Text(reader[3]).Trim();
+                        if (birthplace.Length == 0) unknownBirthplace++; else Increment(birthplaces, birthplace);
+                        double.TryParse(Text(reader[4]), NumberStyles.Any, CultureInfo.InvariantCulture, out double shoe);
+                        actorShoes[shoe <= 0 ? 0 : shoe <= 34 ? 1 : shoe <= 36 ? 2 : shoe <= 38 ? 3 : shoe <= 40 ? 4 : shoe <= 42 ? 5 : 6]++;
+                    }
+                }
+
                 result.Metrics = new Dictionary<string, double> {
                     ["Videos"] = total, ["Favorites"] = favorites, ["Size"] = sizeTotal, ["Duration"] = durationTotal,
                     ["Watched"] = watched, ["Unwatched"] = total - watched, ["PlayCount"] = playCount,
@@ -159,21 +192,60 @@ namespace Jvedio.Core.Library
                     "StatUnknown", "StatSize1", "StatSize3", "StatSize5", "StatSize10", "StatSize20", "StatSizeMore"));
                 AddChart(result, "StatDurationDistribution", "Column", "StatFiles", Buckets(durations,
                     "StatUnknown", "StatDuration30", "StatDuration60", "StatDuration120", "StatDuration180", "StatDuration240", "StatDurationMore"));
-                AddChart(result, "StatByGenre", "Bar", "StatPreferences", Top(genres, 15));
-                AddChart(result, "StatByStudio", "Bar", "StatPreferences", Top(studios, 10));
-                AddChart(result, "StatBySeries", "Bar", "StatPreferences", Top(series, 10));
-                AddChart(result, "StatByDirector", "Bar", "StatPreferences", Top(directors, 10));
-                AddChart(result, "StatByCountry", "Bar", "StatPreferences", Top(countries, 10));
-                AddChart(result, "StatByActor", "Bar", "StatPreferences", QueryBars(connection, transaction,
-                    "select ifnull(nullif(a.ActorName,''),'#'||l.ActorID),count(distinct l.DataID) Cnt " +
+                var genreItems = Top(genres, 15);
+                Attach(genreItems, "Genre");
+                AddChart(result, "StatByGenre", "Bar", "StatPreferences", genreItems);
+                var studioItems = Top(studios, 10);
+                Attach(studioItems, "Studio");
+                AddChart(result, "StatByStudio", "Bar", "StatPreferences", studioItems);
+                var seriesItems = Top(series, 10);
+                Attach(seriesItems, "Series");
+                AddChart(result, "StatBySeries", "Bar", "StatPreferences", seriesItems);
+                var directorItems = Top(directors, 10);
+                Attach(directorItems, "Director");
+                AddChart(result, "StatByDirector", "Bar", "StatPreferences", directorItems);
+                var countryItems = Top(countries, 10);
+                Attach(countryItems, "Country");
+                AddChart(result, "StatByCountry", "Bar", "StatPreferences", countryItems);
+                var actorItems = new List<StatisticItem>();
+                using (var command = MakeCommand(connection, transaction,
+                    "select a.ActorID,ifnull(nullif(a.ActorName,''),'#'||l.ActorID),count(distinct l.DataID) Cnt " +
                     "from metadata_to_actor l join metadata m on m.DataID=l.DataID left join actor_info a on a.ActorID=l.ActorID " +
-                    "where " + scope + " group by l.ActorID order by Cnt desc limit 10", dbId));
-                AddChart(result, "StatByLabels", "Bar", "StatPreferences", QueryBars(connection, transaction,
+                    "where " + scope + " group by l.ActorID order by Cnt desc limit 10", "@db", dbId ?? 0))
+                using (var reader = command.ExecuteReader()) {
+                    while (reader.Read()) {
+                        var item = Item(Text(reader[1]), Number(reader[2]));
+                        item.FilterType = "Actor";
+                        item.RefId = Number(reader[0]);
+                        actorItems.Add(item);
+                    }
+                }
+                AddChart(result, "StatByActor", "Bar", "StatPreferences", actorItems);
+                var labelItems = QueryBars(connection, transaction,
                     "select l.LabelName,count(distinct l.DataID) Cnt from metadata_to_label l join metadata m on m.DataID=l.DataID " +
-                    "where " + scope + " and trim(ifnull(l.LabelName,''))<>'' group by l.LabelName order by Cnt desc limit 15", dbId));
-                AddChart(result, "StatByMarkers", "Bar", "StatPreferences", QueryBars(connection, transaction,
+                    "where " + scope + " and trim(ifnull(l.LabelName,''))<>'' group by l.LabelName order by Cnt desc limit 15", dbId);
+                Attach(labelItems, "LabelName");
+                AddChart(result, "StatByLabels", "Bar", "StatPreferences", labelItems);
+                var markerItems = QueryBars(connection, transaction,
                     "select t.TagName,count(distinct l.DataID) Cnt from metadata_to_tagstamp l join metadata m on m.DataID=l.DataID " +
-                    "join common_tagstamp t on t.TagID=l.TagID where " + scope + " group by l.TagID order by Cnt desc limit 15", dbId));
+                    "join common_tagstamp t on t.TagID=l.TagID where " + scope + " group by l.TagID order by Cnt desc limit 15", dbId);
+                Attach(markerItems, "Tag");
+                AddChart(result, "StatByMarkers", "Bar", "StatPreferences", markerItems);
+
+                // 演员信息分布（点击条目 → 打开按桶筛选的演员列表；空数据归「未知」）
+                AddChart(result, "StatActorAge", "Bar", "StatGroupActors", ActorBuckets(actorAges, "ActorAge", AgeLabels, AgeSql));
+                AddChart(result, "StatActorHeight", "Bar", "StatGroupActors", ActorBuckets(actorHeights, "ActorHeight", HeightLabels, HeightSql));
+                AddChart(result, "StatActorWeight", "Bar", "StatGroupActors", ActorBuckets(actorWeights, "ActorWeight", WeightLabels, WeightSql));
+                AddChart(result, "StatActorShoeSize", "Bar", "StatGroupActors", ActorBuckets(actorShoes, "ActorShoeSize", ShoeLabels, ShoeSql));
+                var birthItems = Top(birthplaces, 10);
+                Attach(birthItems, "ActorBirthplace");
+                foreach (var item in birthItems)
+                    item.FilterSql = "actor_info.BirthPlace='" + item.Label.Replace("'", "''") + "'";
+                var unknownPlace = Item("StatUnknown", unknownBirthplace, true);
+                unknownPlace.FilterType = "ActorBirthplace";
+                unknownPlace.FilterSql = "ifnull(actor_info.BirthPlace,'')=''";
+                birthItems.Add(unknownPlace);
+                AddChart(result, "StatActorBirthplace", "Bar", "StatGroupActors", birthItems);
                 transaction.Commit();
             }
             return result;
@@ -196,6 +268,62 @@ namespace Jvedio.Core.Library
 
         private static List<StatisticItem> Buckets(long[] counts, params string[] labels) =>
             counts.Select((count, i) => Item(labels[i], count, true)).ToList();
+
+        /// <summary>演员信息分布分桶标签（首项=未知，走 StatUnknown 语言键；其余为语言无关的数值区间）</summary>
+        private static readonly string[] AgeLabels = { "StatUnknown", "≤20", "21~25", "26~30", "31~35", "36~40", "41~50", ">50" };
+        private static readonly string[] HeightLabels = { "StatUnknown", "<150", "150~159", "160~169", "170~179", "≥180" };
+        private static readonly string[] WeightLabels = { "StatUnknown", "<40", "40~49", "50~59", "60~69", "≥70" };
+        private static readonly string[] ShoeLabels = { "StatUnknown", "≤34", "35~36", "37~38", "39~40", "41~42", "≥43" };
+
+        /// <summary>与分桶一一对应的演员列表筛选 SQL（actor_info 列名前缀；数值语义与内存分桶一致：0/非数字=未知）</summary>
+        private static readonly string[] AgeSql = {
+            "ifnull(actor_info.Age,0)<=0",
+            "actor_info.Age>0 and actor_info.Age<=20",
+            "actor_info.Age between 21 and 25", "actor_info.Age between 26 and 30",
+            "actor_info.Age between 31 and 35", "actor_info.Age between 36 and 40",
+            "actor_info.Age between 41 and 50", "actor_info.Age>=51",
+        };
+        private static readonly string[] HeightSql = {
+            "ifnull(actor_info.Height,0)<=0",
+            "actor_info.Height>0 and actor_info.Height<150",
+            "actor_info.Height between 150 and 159", "actor_info.Height between 160 and 169",
+            "actor_info.Height between 170 and 179", "actor_info.Height>=180",
+        };
+        private static readonly string[] WeightSql = {
+            "ifnull(actor_info.Weight,0)<=0",
+            "actor_info.Weight>0 and actor_info.Weight<40",
+            "actor_info.Weight between 40 and 49", "actor_info.Weight between 50 and 59",
+            "actor_info.Weight between 60 and 69", "actor_info.Weight>=70",
+        };
+        private static readonly string[] ShoeSql = {
+            "ifnull(actor_info.ShoeSize,'')='' or cast(ifnull(actor_info.ShoeSize,'0') as real)<=0",
+            "cast(actor_info.ShoeSize as real)>0 and cast(actor_info.ShoeSize as real)<=34",
+            "cast(actor_info.ShoeSize as real)>34 and cast(actor_info.ShoeSize as real)<=36",
+            "cast(actor_info.ShoeSize as real)>36 and cast(actor_info.ShoeSize as real)<=38",
+            "cast(actor_info.ShoeSize as real)>38 and cast(actor_info.ShoeSize as real)<=40",
+            "cast(actor_info.ShoeSize as real)>40 and cast(actor_info.ShoeSize as real)<=42",
+            "cast(actor_info.ShoeSize as real)>=43",
+        };
+
+        /// <summary>把计数数组组装为可跳转的分桶条目：未知桶走语言键，其余区间标签按原文显示</summary>
+        private static List<StatisticItem> ActorBuckets(long[] counts, string filterType, string[] labels, string[] sql)
+        {
+            var list = new List<StatisticItem>();
+            for (int i = 0; i < counts.Length; i++) {
+                var item = Item(labels[i], counts[i], labels[i] == "StatUnknown");
+                item.FilterType = filterType;
+                item.FilterSql = sql[i];
+                list.Add(item);
+            }
+            return list;
+        }
+
+        /// <summary>为统计条目批量标注点击跳转类型</summary>
+        private static void Attach(List<StatisticItem> items, string filterType)
+        {
+            foreach (var item in items) item.FilterType = filterType;
+        }
+
         private static List<StatisticItem> Partition(long total, long yes, string yesKey, string noKey) =>
             new List<StatisticItem> { Item(yesKey, yes, true), Item(noKey, total - yes, true) };
         private static List<StatisticItem> Top(Dictionary<string, long> counts, int take) =>

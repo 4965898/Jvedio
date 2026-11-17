@@ -158,6 +158,24 @@ namespace Jvedio
                 Logger.Error(ex);
             }
 
+            // 恢复上次会话未完成的演员资料补齐任务（同样只恢复到任务列表，不自动开始）
+            try {
+                int restoredActors = App.ActorScrapeManager.RestoreTasksFromFile();
+                if (restoredActors > 0)
+                    Logger.Info($"restored {restoredActors} actor scrape tasks from last session");
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+
+            // 恢复上次会话未完成的字幕下载任务（同样只恢复到任务列表，不自动开始）
+            try {
+                int restoredSubtitles = App.SubtitleTaskManager.RestoreTasksFromFile();
+                if (restoredSubtitles > 0)
+                    Logger.Info($"restored {restoredSubtitles} subtitle tasks from last session");
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+
             await MoveOldFiles();
             InitAppData();
             await MovePlugins();

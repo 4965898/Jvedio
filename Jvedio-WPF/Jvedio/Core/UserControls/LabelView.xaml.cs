@@ -205,6 +205,7 @@ namespace Jvedio.Core.UserControls
         Genre,
         Studio,
         Series,
-        Director
+        Director,
+        Country
     }
 }

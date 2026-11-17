@@ -119,6 +119,8 @@
     <sys:String x:Key="ActorScrapeSaveImageTip">チェックすると、女優プロフィール補完・「情報同期」時に資料ソースから女優のポートレート画像をダウンロードしてローカルの画像フォルダに保存します（既にローカル画像がある女優はスキップし、Gfriends などの画像を上書きしません）。オフの場合はテキスト情報のみ補完します</sys:String>
     <sys:String x:Key="GfriendsAvatar">ポートレート：ローカル画像がない場合は Gfriends を優先</sys:String>
     <sys:String x:Key="GfriendsAvatarTip">チェックすると、動画スクレイピング・女優プロフィール補完時にポートレートを Gfriends アバターライブラリ（女優名でインデックス、収録数が多く高品質）から優先的に取得します。既にローカル画像がある女優は上書きせず、Gfriends に該当がない・ダウンロード失敗の場合はスクレイピング元サイトの画像にフォールバックします。インデックス（約 6MB）は初回使用時にダウンロードして 7 日間キャッシュします</sys:String>
+    <sys:String x:Key="DownloadActorAvatar">Gfriends アバターライブラリからポートレートを取得・更新（既存の画像は上書きされます）</sys:String>
+    <sys:String x:Key="SyncActorInfo">この女優の情報を同期：空欄（身長/スリーサイズ/生年月日など）を割り込みで補完し、完了後に自動更新します</sys:String>
     <sys:String x:Key="SubtitleAutoDownload">字幕：スクレイピング後に中国語字幕を自動ダウンロード</sys:String>
     <sys:String x:Key="SubtitleAutoDownloadTip">チェックすると、動画のスクレイピング完了時に番号で SubtitleCat から簡体字/繁体字中国語字幕を検索し（簡体字優先）、正規化して保存します。既に字幕がある動画は上書きしません。右クリック「拡張機能 → 中国語字幕をダウンロード」から手動実行もできます</sys:String>
     <sys:String x:Key="SubtitleSaveModeLabel">字幕の保存先：</sys:String>
@@ -440,6 +442,13 @@
     <sys:String x:Key="StatDurationMore">240 分以上</sys:String>
     <sys:String x:Key="StatByDirector">監督 Top 10</sys:String>
     <sys:String x:Key="StatByCountry">国・地域 Top 10</sys:String>
+    <sys:String x:Key="StatGroupActors">女優情報</sys:String>
+    <sys:String x:Key="StatActorAge">女優の年齢分布</sys:String>
+    <sys:String x:Key="StatActorHeight">女優の身長分布</sys:String>
+    <sys:String x:Key="StatActorWeight">女優の体重分布</sys:String>
+    <sys:String x:Key="StatActorBirthplace">女優の出身地 Top 10</sys:String>
+    <sys:String x:Key="StatActorShoeSize">女優の靴サイズ分布</sys:String>
+    <sys:String x:Key="StatClickHint">ヒント：グラフの項目をクリックすると、対応する絞り込み結果に直接移動します</sys:String>
     <sys:String x:Key="StatByLabels">タグ Top 15</sys:String>
     <sys:String x:Key="StatByMarkers">マーク Top 15</sys:String>
     <sys:String x:Key="StatSection">区分</sys:String>

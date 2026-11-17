@@ -1,9 +1,11 @@
 using Jvedio.Core.Plugins.Crawler;
 using Jvedio.Entity;
+using Newtonsoft.Json;
 using SuperUtils.Framework.ORM.Wrapper;
 using SuperUtils.Framework.Tasks;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using static Jvedio.App;
@@ -11,6 +13,20 @@ using static Jvedio.MapperManager;
 
 namespace Jvedio.Core.Tasks
 {
+    /// <summary>
+    /// 演员资料补齐任务的持久化记录（JSON，仅存恢复所需的字段）
+    /// </summary>
+    public class ActorScrapeTaskRecord
+    {
+        public long ActorID { get; set; }
+
+        public string ActorName { get; set; }
+
+        public int Status { get; set; }
+
+        public string CreateTime { get; set; }
+    }
+
     /// <summary>
     /// 演员资料补齐任务管理器：串行执行（防限流），每 10 个长歇 15 秒防风控。
     /// 参照 TranslateTaskManager 的队列模式；任务按 ActorID 去重。
@@ -268,6 +284,214 @@ namespace Jvedio.Core.Tasks
             }
             return added;
         }
+
+        #region "任务持久化（崩溃/退出后恢复未完成的演员补齐任务，与刮削任务同模式）"
+
+        /// <summary>是否为退出流程（退出时仍保存快照，但取消操作不删除快照）</summary>
+        public bool Exiting { get; set; }
+
+        private readonly object _PersistLock = new object();
+
+        private readonly Dictionary<long, ActorScrapeTaskRecord> _PendingRecords = new Dictionary<long, ActorScrapeTaskRecord>();
+
+        private static string PersistPath => Path.Combine(Jvedio.Core.Global.PathManager.CurrentUserFolder, "actor_scrape_tasks.json");
+
+        public new void AddTask(AbstractTask task)
+        {
+            if (CurrentTasks.Contains(task))
+                return;
+
+            task.onCompleted += OnTaskPersistCompleted;
+            if (task is ActorScrapeTask actorTask) {
+                lock (_PersistLock) {
+                    _PendingRecords[actorTask.ActorID] = ToRecord(actorTask);
+                }
+            }
+            SaveTasksToFile();
+            try {
+                base.AddTask(task);
+            } catch {
+                task.onCompleted -= OnTaskPersistCompleted;
+                if (task is ActorScrapeTask failedTask) {
+                    lock (_PersistLock) {
+                        _PendingRecords.Remove(failedTask.ActorID);
+                    }
+                    SaveTasksToFile();
+                }
+                throw;
+            }
+        }
+
+        public new void AddTaskFront(AbstractTask task)
+        {
+            if (CurrentTasks.Contains(task))
+                return;
+
+            task.onCompleted += OnTaskPersistCompleted;
+            if (task is ActorScrapeTask actorTask) {
+                lock (_PersistLock) {
+                    _PendingRecords[actorTask.ActorID] = ToRecord(actorTask);
+                }
+            }
+            SaveTasksToFile();
+            try {
+                base.AddTaskFront(task);
+            } catch {
+                task.onCompleted -= OnTaskPersistCompleted;
+                if (task is ActorScrapeTask failedTask) {
+                    lock (_PersistLock) {
+                        _PendingRecords.Remove(failedTask.ActorID);
+                    }
+                    SaveTasksToFile();
+                }
+                throw;
+            }
+        }
+
+        private void OnTaskPersistCompleted(object sender, EventArgs e)
+        {
+            if (sender is ActorScrapeTask actorTask) {
+                lock (_PersistLock) {
+                    _PendingRecords.Remove(actorTask.ActorID);
+                }
+                SaveTasksToFile();
+            }
+        }
+
+        public new void RemoveTask(System.Threading.Tasks.TaskStatus status)
+        {
+            List<AbstractTask> removed = new List<AbstractTask>();
+            if (status == (System.Threading.Tasks.TaskStatus.Canceled | System.Threading.Tasks.TaskStatus.RanToCompletion)) {
+                removed.AddRange(CurrentTasks);
+            } else {
+                removed.AddRange(CurrentTasks.Where(t => t.Status == status));
+            }
+            base.RemoveTask(status);
+            lock (_PersistLock) {
+                foreach (AbstractTask task in removed) {
+                    if (task is ActorScrapeTask actorTask)
+                        _PendingRecords.Remove(actorTask.ActorID);
+                }
+            }
+            SaveTasksToFile();
+        }
+
+        public new void CancelTask(string id)
+        {
+            base.CancelTask(id);
+            if (Exiting)
+                return;
+            AbstractTask task = CurrentTasks.FirstOrDefault(arg => arg.ID.Equals(id));
+            if (task is ActorScrapeTask actorTask) {
+                lock (_PersistLock) {
+                    _PendingRecords.Remove(actorTask.ActorID);
+                }
+                SaveTasksToFile();
+            }
+        }
+
+        public new void CancelAll()
+        {
+            base.CancelAll();
+            if (Exiting)
+                return;
+            lock (_PersistLock) {
+                _PendingRecords.Clear();
+            }
+            SaveTasksToFile();
+        }
+
+        private static ActorScrapeTaskRecord ToRecord(ActorScrapeTask task)
+        {
+            return new ActorScrapeTaskRecord {
+                ActorID = task.ActorID,
+                ActorName = task.Title,
+                Status = (int)task.Status,
+                CreateTime = task.CreateTime,
+            };
+        }
+
+        /// <summary>
+        /// 把未完成任务快照写入本地文件（原子替换）。任何时机调用都安全，异常仅记日志。
+        /// </summary>
+        public void SaveTasksToFile()
+        {
+            try {
+                string json;
+                lock (_PersistLock) {
+                    json = JsonConvert.SerializeObject(_PendingRecords.Values.ToList());
+                }
+                string dir = Jvedio.Core.Global.PathManager.CurrentUserFolder;
+                if (!Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                string tmp = PersistPath + ".tmp";
+                File.WriteAllText(tmp, json);
+                if (File.Exists(PersistPath))
+                    File.Delete(PersistPath);
+                File.Move(tmp, PersistPath);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+        }
+
+        /// <summary>
+        /// 启动时从本地文件恢复未完成的演员补齐任务。
+        /// 所有恢复的任务只进入任务列表（状态显示为「上次未完成，可重启」），
+        /// 是否继续由用户决定：点「重启全部失败」或单个任务「重启」后才会开始。
+        /// 演员已被删除的快照直接丢弃（避免僵尸任务）。
+        /// </summary>
+        /// <returns>恢复的任务数量</returns>
+        public int RestoreTasksFromFile()
+        {
+            List<ActorScrapeTaskRecord> records = new List<ActorScrapeTaskRecord>();
+            try {
+                if (File.Exists(PersistPath)) {
+                    string json = File.ReadAllText(PersistPath);
+                    records = JsonConvert.DeserializeObject<List<ActorScrapeTaskRecord>>(json) ?? new List<ActorScrapeTaskRecord>();
+                }
+            } catch (Exception ex) {
+                Logger.Error(ex);
+                records = new List<ActorScrapeTaskRecord>();
+            }
+
+            int restored = 0;
+            foreach (ActorScrapeTaskRecord record in records) {
+                if (record == null || record.ActorID <= 0)
+                    continue;
+                try {
+                    if (CurrentTasks.Any(t => t is ActorScrapeTask at && at.ActorID == record.ActorID))
+                        continue;
+
+                    // 演员已被删除则丢弃快照（避免「不存在 ActorID」的僵尸任务）
+                    ActorInfo actor = actorMapper.SelectOne(new SelectWrapper<ActorInfo>().Eq("ActorID", record.ActorID));
+                    if (actor == null) {
+                        Logger.Info($"actor {record.ActorID} no longer exists, drop snapshot");
+                        continue;
+                    }
+
+                    ActorScrapeTask task = new ActorScrapeTask(actor) { CreateTime = record.CreateTime };
+                    task.onCompleted += OnTaskPersistCompleted;
+
+                    // 只恢复到列表（保持「未完成」状态），不自动开始；用户点「重启全部失败」或单任务重启后继续
+                    task.Status = System.Threading.Tasks.TaskStatus.Canceled;
+                    task.StatusText = SuperControls.Style.LangManager.GetValueByKey("TaskInterrupted");
+                    CurrentTasks.Add(task);
+                    lock (_PersistLock) {
+                        _PendingRecords[record.ActorID] = record;
+                    }
+                    restored++;
+                } catch (Exception ex) {
+                    Logger.Error(ex);
+                }
+            }
+            if (restored > 0) {
+                Logger.Info($"restore {restored} actor scrape tasks (not started, waiting for user)");
+                SaveTasksToFile();
+            }
+            return restored;
+        }
+
+        #endregion
 
         // 支持任意一个演员资料源(JAVDatabase 优先,MinnanoAV 兜底)
         private static bool HasEnabledActorSource()

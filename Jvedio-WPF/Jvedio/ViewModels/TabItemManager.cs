@@ -56,6 +56,7 @@ namespace Jvedio.ViewModels
                     foreach (VideoList list in GetAllVideoList()) list.Refresh();
                 }));
             };
+            Jvedio.Core.Tasks.ActorScrapeTask.ActorDataChanged += OnActorDataChanged;
         }
 
         public static TabItemManager CreateInstance(VieModel_Main vieModel, SimplePanel tabPanel)
@@ -153,6 +154,33 @@ namespace Jvedio.ViewModels
                 }
             }
         }
+
+        /// <summary>
+        /// 演员资料补齐任务完成且数据有变化：刷新正显示该演员详情弹窗的影片页
+        /// （与 OnActorGradeChange 同模式；事件从任务后台线程触发，需调度 UI 线程）
+        /// </summary>
+        private void OnActorDataChanged(long actorID)
+        {
+            App.Current.Dispatcher.BeginInvoke(new Action(() => {
+                if (vieModel == null || App.Current.Dispatcher.HasShutdownStarted)
+                    return;
+                ActorInfo actorInfo = ActorInfo.GetById(actorID);
+                if (actorInfo == null)
+                    return;
+                List<VideoList> videoLists = GetAllVideoList();
+                if (videoLists == null)
+                    return;
+                foreach (VideoList video in videoLists) {
+                    if (!video.IsShowActor())
+                        continue;
+                    if (video.GetCurrentActor() is ActorInfo info && info.ActorID == actorID) {
+                        video.SetActor(actorInfo);
+                        break;
+                    }
+                }
+            }));
+        }
+
         public void OnGradeChange(long dataID, float grade)
         {
             List<VideoList> videoLists = GetAllVideoList();
@@ -247,6 +275,12 @@ namespace Jvedio.ViewModels
 
                     actorList.onShowSameActor += vieModel.ShowSameActor;
                     actorList.onGradeChange += OnActorGradeChange;
+
+                    // 统计窗口点击演员信息分布条目跳转：筛选条件是 tabData[0]（GeoActor 只带一个参数，
+                    // 与 GeoVideo 的 [wrapper, actorInfo] 两元素布局不同——照抄 Length>1 会导致筛选静默丢失）
+                    if (tabData != null && tabData.Length > 0 && tabData[0] is string extraFilter &&
+                        !string.IsNullOrWhiteSpace(extraFilter))
+                        actorList.SetActorFilter(extraFilter);
 
                     TabPanel.Children.Add(actorList);
                     break;

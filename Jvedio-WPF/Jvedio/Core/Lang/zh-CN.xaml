@@ -119,6 +119,8 @@
     <sys:String x:Key="ActorScrapeSaveImageTip">勾选后，演员资料补齐/同步信息时会从资料源下载演员头像保存到本地头像目录（已有头像的演员不覆盖，避免冲掉 Gfriends 等来源的图）；不勾选则只补文字资料</sys:String>
     <sys:String x:Key="GfriendsAvatar">头像：无本地头像时优先用 Gfriends 头像库</sys:String>
     <sys:String x:Key="GfriendsAvatarTip">勾选后，影片刮削/演员资料补齐需要下载头像时优先从 Gfriends 头像库（按演员名索引、量大质高）取图；已有本地头像的演员不覆盖，Gfriends 查无此人或下载失败时回退到刮削源站点的头像。索引首次使用需下载约 6MB 并缓存 7 天</sys:String>
+    <sys:String x:Key="DownloadActorAvatar">从 Gfriends 头像库下载/更新演员头像（已有头像将被覆盖）</sys:String>
+    <sys:String x:Key="SyncActorInfo">同步该演员资料：插队补齐空缺字段（身高/三围/生日等），完成后自动刷新</sys:String>
     <sys:String x:Key="SubtitleAutoDownload">字幕：刮削完成后自动从中文字幕站下载</sys:String>
     <sys:String x:Key="SubtitleAutoDownloadTip">勾选后，影片刮削完成时自动按番号从 SubtitleCat 查找简体/繁体中文字幕（简体优先），下载后规范化保存。已有字幕的影片不覆盖。也可在影片右键「拓展功能 → 下载字幕」手动触发</sys:String>
     <sys:String x:Key="SubtitleSaveModeLabel">字幕保存位置：</sys:String>
@@ -440,6 +442,13 @@
     <sys:String x:Key="StatDurationMore">240 分钟以上</sys:String>
     <sys:String x:Key="StatByDirector">导演 Top 10</sys:String>
     <sys:String x:Key="StatByCountry">国家 / 地区 Top 10</sys:String>
+    <sys:String x:Key="StatGroupActors">演员信息</sys:String>
+    <sys:String x:Key="StatActorAge">演员年龄分布</sys:String>
+    <sys:String x:Key="StatActorHeight">演员身高分布</sys:String>
+    <sys:String x:Key="StatActorWeight">演员体重分布</sys:String>
+    <sys:String x:Key="StatActorBirthplace">演员家乡 Top 10</sys:String>
+    <sys:String x:Key="StatActorShoeSize">演员鞋码分布</sys:String>
+    <sys:String x:Key="StatClickHint">提示：点击图表条目可直接跳转到对应筛选结果</sys:String>
     <sys:String x:Key="StatByLabels">标签 Top 15</sys:String>
     <sys:String x:Key="StatByMarkers">标记 Top 15</sys:String>
     <sys:String x:Key="StatSection">分类</sys:String>

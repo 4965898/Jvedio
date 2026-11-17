@@ -1,4 +1,5 @@
 ﻿using Jvedio.Core.Enums;
+using Jvedio.Core.Library;
 using Jvedio.Core.Server;
 using Jvedio.Core.UserControls;
 using Jvedio.Entity;
@@ -520,6 +521,7 @@ namespace Jvedio.ViewModel
                 case LabelType.Series:
                 case LabelType.Studio:
                 case LabelType.Director:
+                case LabelType.Country:
                     tabName = LangManager.GetValueByKey(typeName);
                     ExtraWrapper.Like(typeName, label);
                     break;
@@ -528,6 +530,37 @@ namespace Jvedio.ViewModel
             }
 
             TabItemManager.Add(TabType.GeoVideo, $"{tabName}: {label}", ExtraWrapper);
+        }
+
+        /// <summary>
+        /// 统计窗口点击图表条目跳转：影片维度（类别/片商/系列/导演/国家/标签/标记）建过滤影片 tab，
+        /// 演员条目建该演员的影片 tab（带详情弹窗），演员信息分布建按桶筛选的演员列表 tab
+        /// </summary>
+        public void OnStatisticClicked(StatisticChart chart, StatisticItem item)
+        {
+            if (item == null || string.IsNullOrEmpty(item.FilterType))
+                return;
+            if (item.FilterType == "Actor") {
+                if (item.RefId > 0)
+                    ShowSameActor(item.RefId);
+                return;
+            }
+            if (item.FilterType.StartsWith("Actor")) { // 演员信息分布：按桶条件筛选演员列表
+                if (string.IsNullOrEmpty(item.FilterSql))
+                    return;
+                string label = item.Localized ? LangManager.GetValueByKey(item.Label) : item.Label;
+                TabItemManager.Add(TabType.GeoActor, $"{LangManager.GetValueByKey("Actors")}: {label}", item.FilterSql);
+                return;
+            }
+            if (item.FilterType == "Tag") { // 标记：TagName 在 common_tagstamp，需补联表
+                SelectWrapper<Video> wrapper = new SelectWrapper<Video>();
+                wrapper.Eq("TagName", item.Label);
+                wrapper.ExtraSql = VideoMapper.SQL_JOIN_TAGSTAMP + " JOIN common_tagstamp on common_tagstamp.TagID=metadata_to_tagstamp.TagID ";
+                TabItemManager.Add(TabType.GeoVideo, $"{LangManager.GetValueByKey("TagStamp")}: {item.Label}", wrapper);
+                return;
+            }
+            if (Enum.TryParse(item.FilterType, out LabelType type))
+                onLabelClick(item.Label, type);
         }
 
         public void ShowSameActor(long actorID)

@@ -32,9 +32,11 @@ namespace Jvedio.Windows
         private LibraryStatistics _Snapshot;
         private string _SnapshotScope;
         private int _Version;
+        private readonly Action<StatisticChart, StatisticItem> _OnItemClicked;
 
-        public Window_Statistics(long dbId)
+        public Window_Statistics(long dbId, Action<StatisticChart, StatisticItem> onItemClicked = null)
         {
+            _OnItemClicked = onItemClicked;
             Title = L("Statistics");
             Width = 1130; Height = 790; MinWidth = 700; MinHeight = 460;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -104,7 +106,8 @@ namespace Jvedio.Windows
                 Build(snapshot);
                 _Status.Text = string.Format(L("StatUpdated"), snapshot.CollectedAt.ToString("HH:mm:ss"), snapshot.Metrics["Videos"].ToString("N0"));
             } catch (Exception ex) {
-                App.Logger.Error(ex);
+                // ex.ToString() 含堆栈：状态栏只显示 Message，但日志必须能定位抛出点
+                App.Logger.Error($"统计快照收集/渲染失败：{ex}");
                 if (version == _Version) { _Snapshot = null; _Tabs.Items.Clear(); _Status.Text = ex.Message; }
             }
             finally {
@@ -118,7 +121,7 @@ namespace Jvedio.Windows
         {
             int selected = Math.Max(0, _Tabs.SelectedIndex);
             _Tabs.Items.Clear(); _Grids.Clear();
-            foreach (string group in new[] { "StatOverview", "StatHistory", "StatFiles", "StatPreferences" }) {
+            foreach (string group in new[] { "StatOverview", "StatHistory", "StatFiles", "StatPreferences", "StatGroupActors" }) {
                 var panel = new StackPanel { Margin = new Thickness(8) };
                 if (group == "StatOverview") {
                     panel.Children.Add(Summary(data));
@@ -130,6 +133,11 @@ namespace Jvedio.Windows
                         data.Metrics["DurationKnown"].ToString("N0"), data.Metrics["Videos"].ToString("N0")),
                         Margin = new Thickness(0, 8, 0, 14), TextWrapping = TextWrapping.Wrap, Opacity = .8 });
                 }
+                if (group == "StatPreferences" || group == "StatGroupActors") {
+                    panel.Children.Add(new TextBlock { Text = L("StatClickHint"),
+                        Margin = new Thickness(0, 8, 0, 14), TextWrapping = TextWrapping.Wrap, Opacity = .8,
+                        Foreground = new SolidColorBrush(Color.FromRgb(64, 158, 255)) });
+                }
                 var grid = new UniformGrid { Columns = ActualWidth >= 980 ? 2 : 1 };
                 _Grids.Add(grid);
                 foreach (StatisticChart chart in data.Charts.Where(chart => chart.GroupKey == group)) {
@@ -137,7 +145,10 @@ namespace Jvedio.Windows
                     var title = new TextBlock { Text = L(chart.TitleKey), FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 10) };
                     title.SetResourceReference(TextBlock.FontSizeProperty, "GlobalFontSize16");
                     card.Children.Add(title);
-                    card.Children.Add(new StatisticsChart(chart, data.Metrics["Videos"]));
+                    var chartControl = new StatisticsChart(chart, data.Metrics["Videos"]);
+                    if (_OnItemClicked != null && chart.Items.Any(item => !string.IsNullOrEmpty(item.FilterType)))
+                        chartControl.ItemClicked += item => _OnItemClicked(chart, item);
+                    card.Children.Add(chartControl);
                     grid.Children.Add(new Border { Child = card, Margin = new Thickness(0, 0, 12, 12),
                         CornerRadius = new CornerRadius(6), Background = new SolidColorBrush(Color.FromArgb(16,128,128,128)) });
                 }

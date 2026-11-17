@@ -191,8 +191,46 @@ namespace Jvedio
             // 非UI线程未捕获异常处理事件
             AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(Window_ErrorMsg.CurrentDomain_UnhandledException);
 
+            // 堆栈诊断：全局异常补记完整堆栈与内部异常（Window_ErrorMsg 只记 Message，无法定位抛出点）
+            this.DispatcherUnhandledException += new DispatcherUnhandledExceptionEventHandler(DispatcherExceptionStackLogger);
+            TaskScheduler.UnobservedTaskException += TaskExceptionStackLogger;
+            AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(DomainExceptionStackLogger);
+
 #endif
             base.OnStartup(e);
+        }
+
+        private static void DispatcherExceptionStackLogger(object sender, DispatcherUnhandledExceptionEventArgs e)
+        {
+            Logger.Error($"[UI线程异常堆栈] {e.Exception.GetType().Name}: {e.Exception.Message}{FormatStack(e.Exception)}");
+        }
+
+        private static void TaskExceptionStackLogger(object sender, UnobservedTaskExceptionEventArgs e)
+        {
+            Exception baseException = e.Exception.GetBaseException();
+            Logger.Error($"[后台任务未观测异常堆栈] {baseException.GetType().Name}: {baseException.Message}{FormatStack(e.Exception)}");
+        }
+
+        private static void DomainExceptionStackLogger(object sender, UnhandledExceptionEventArgs e)
+        {
+            if (e.ExceptionObject is Exception exception)
+                Logger.Error($"[域未处理异常堆栈] {exception.GetType().Name}: {exception.Message}{FormatStack(exception)}");
+        }
+
+        private static string FormatStack(Exception exception)
+        {
+            try {
+                string stack = string.Empty;
+                Exception current = exception;
+                while (current != null) {
+                    if (!string.IsNullOrEmpty(current.StackTrace))
+                        stack += $"\r\n  at [{current.GetType().Name}] {current.StackTrace}";
+                    current = current.InnerException;
+                }
+                return string.IsNullOrEmpty(stack) ? "\r\n  (无堆栈)" : stack;
+            } catch {
+                return "\r\n  (堆栈格式化失败)";
+            }
         }
 
 
@@ -206,6 +244,22 @@ namespace Jvedio
             try {
                 DownloadManager.Exiting = true;
                 DownloadManager.SaveTasksToFile();
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+
+            // 兜底：退出时保存未完成的演员资料补齐任务（重启后恢复为「上次未完成，可重启」）
+            try {
+                ActorScrapeManager.Exiting = true;
+                ActorScrapeManager.SaveTasksToFile();
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
+
+            // 兜底：退出时保存未完成的字幕下载任务（重启后恢复为「上次未完成，可重启」）
+            try {
+                SubtitleTaskManager.Exiting = true;
+                SubtitleTaskManager.SaveTasksToFile();
             } catch (Exception ex) {
                 Logger.Error(ex);
             }

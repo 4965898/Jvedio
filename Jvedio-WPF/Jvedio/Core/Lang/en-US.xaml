@@ -120,6 +120,8 @@
     <sys:String x:Key="ActorScrapeSaveImageTip">When checked, actor profile enrichment / "Sync info" also downloads the actress portrait from the source and saves it to the local actress image folder (actors that already have a local image are skipped, so images from Gfriends etc. are never overwritten); when unchecked, only text data is filled</sys:String>
     <sys:String x:Key="GfriendsAvatar">Avatar: prefer Gfriends library when no local image</sys:String>
     <sys:String x:Key="GfriendsAvatarTip">When checked, video scraping / actor profile enrichment fetches portraits from the Gfriends avatar library (indexed by actor name, large and high quality) first; actors that already have a local image are never overwritten, and it falls back to the scraper site portrait when Gfriends has no match or download fails. The index (about 6MB) is downloaded on first use and cached for 7 days</sys:String>
+    <sys:String x:Key="DownloadActorAvatar">Download / refresh the actor avatar from the Gfriends library (an existing avatar will be overwritten)</sys:String>
+    <sys:String x:Key="SyncActorInfo">Sync this actor's info: fills missing fields (height, measurements, birthday, etc.) first in the queue; the panel refreshes automatically when done</sys:String>
     <sys:String x:Key="SubtitleAutoDownload">Subtitles: auto-download from subtitle site after scraping</sys:String>
     <sys:String x:Key="SubtitleAutoDownloadTip">When checked, after a video finishes scraping, the app searches SubtitleCat by its ID for simplified/traditional Chinese subtitles (simplified preferred), normalizes and saves the download. Videos that already have a subtitle are never overwritten. You can also trigger it manually via right-click "Advanced → Download Chinese subtitle"</sys:String>
     <sys:String x:Key="SubtitleSaveModeLabel">Subtitle save location:</sys:String>
@@ -441,6 +443,13 @@
     <sys:String x:Key="StatDurationMore">240 min or more</sys:String>
     <sys:String x:Key="StatByDirector">Directors Top 10</sys:String>
     <sys:String x:Key="StatByCountry">Countries / regions Top 10</sys:String>
+    <sys:String x:Key="StatGroupActors">Actor Info</sys:String>
+    <sys:String x:Key="StatActorAge">Actor age distribution</sys:String>
+    <sys:String x:Key="StatActorHeight">Actor height distribution</sys:String>
+    <sys:String x:Key="StatActorWeight">Actor weight distribution</sys:String>
+    <sys:String x:Key="StatActorBirthplace">Actor birthplaces Top 10</sys:String>
+    <sys:String x:Key="StatActorShoeSize">Actor shoe size distribution</sys:String>
+    <sys:String x:Key="StatClickHint">Tip: click a chart entry to jump straight to its filtered results</sys:String>
     <sys:String x:Key="StatByLabels">Labels Top 15</sys:String>
     <sys:String x:Key="StatByMarkers">Markers Top 15</sys:String>
     <sys:String x:Key="StatSection">Section</sys:String>
