@@ -459,4 +459,10 @@
     <sys:String x:Key="HeaderHintDb">JavDB usually requires login: sign in with your browser, then copy the request headers as described above and paste them on the left (must include cookie). A "login required" failure means the cookie has expired; copy it again.</sys:String>
     <sys:String x:Key="HeaderHintBus">JavBus usually needs no headers; when scraping fails with a Cloudflare challenge or 403, pasting the browser's request headers (user-agent, cookie) usually helps.</sys:String>
     <sys:String x:Key="HeaderHintOther">This source usually needs no headers; if scraping fails, try pasting the browser's request headers (user-agent, cookie).</sys:String>
+    <sys:String x:Key="Actress_BirthDecade">Birth Decade</sys:String>
+    <sys:String x:Key="ActorFilterReset">Reset</sys:String>
+    <sys:String x:Key="ActorFilterHobbyTip">Hobby keyword contains-match: separate keywords with spaces; actors matching any keyword are kept</sys:String>
+    <sys:String x:Key="Actress_Avatar">Avatar</sys:String>
+    <sys:String x:Key="HasAvatar">Has avatar</sys:String>
+    <sys:String x:Key="NoAvatar">No avatar</sys:String>
 </ResourceDictionary>

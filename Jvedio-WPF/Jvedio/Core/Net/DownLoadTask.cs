@@ -301,14 +301,33 @@ namespace Jvedio.Core.Net
             return false;
         }
 
+        /// <summary>
+        /// 按名查演员（并发刮削链路专用直连 SQL）：SelectWrapper&lt;T&gt;.whereConditions 是按泛型类型
+        /// 的静态字典（SuperUtils 预编译），并发任务的 Eq 条件交叉污染会查错/查空——
+        /// common_url_code 实测多片共用同一 RemoteValue 即此机制；实体级 CRUD 不走该字典，不受影响
+        /// </summary>
+        private ActorInfo GetActorByName(string actorName)
+        {
+            try {
+                string sql = "select * from actor_info where ActorName='" + actorName.Replace("'", "''") + "'";
+                List<Dictionary<string, object>> rows = actorMapper.Select(sql);
+                if (rows == null || rows.Count == 0)
+                    return null;
+                List<ActorInfo> list = actorMapper.ToEntity<ActorInfo>(rows, typeof(ActorInfo).GetProperties(), false);
+                return list != null && list.Count > 0 ? list[0] : null;
+            } catch (Exception ex) {
+                Logger.Error($"按名查演员失败 {actorName}：{ex.Message}");
+                return null;
+            }
+        }
+
         public void SaveActorNames(object names, Video video, object enNames = null)
         {
             if (names is List<string> actorNames && actorNames.Count > 0) {
                 int actorCount = actorNames.Count;
                 for (int i = 0; i < actorCount; i++) {
                     string actorName = actorNames[i];
-                    ActorInfo actorInfo =
-                        actorMapper.SelectOne(new SelectWrapper<ActorInfo>().Eq("ActorName", actorName));
+                    ActorInfo actorInfo = GetActorByName(actorName);
                     if (actorInfo == null || actorInfo.ActorID <= 0) {
                         actorInfo = new ActorInfo();
                         actorInfo.ActorName = actorName;
@@ -385,7 +404,7 @@ namespace Jvedio.Core.Net
                         string actorName = actorNames[i];
                         string url = ActressImageUrl[i];
                         Logger.Info($"{actorName}: {url}");
-                        ActorInfo actorInfo = actorMapper.SelectOne(new SelectWrapper<ActorInfo>().Eq("ActorName", actorName));
+                        ActorInfo actorInfo = GetActorByName(actorName);
                         if (actorInfo == null || actorInfo.ActorID <= 0) {
                             actorInfo = new ActorInfo();
                             actorInfo.ActorName = actorName;

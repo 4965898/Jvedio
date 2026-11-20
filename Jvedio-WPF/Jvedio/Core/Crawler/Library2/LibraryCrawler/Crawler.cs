@@ -198,6 +198,11 @@ namespace Jvedio.Crawler
             Header = header;
             Header.Headers["Cache-Control"] = "no-cache";
             DataInfo = dict;
+            // 同一插件多个源行共用同一 invoker 实例：上一行的 Info 残留会让本行
+            // 未守卫的 Info.Add（WebUrl/WebType/Logs）抛「已添加了具有相同键的项」——
+            // 每次调用换成全新字典，Logs 清空避免混入上一行日志
+            Info = new Dictionary<string, object>();
+            Logs.Clear();
             ParseDataInfo();
             Logs.Add(string.Format("crawler recv vid: {0}", dict["VID"]));
             if (string.IsNullOrEmpty(DataCode))

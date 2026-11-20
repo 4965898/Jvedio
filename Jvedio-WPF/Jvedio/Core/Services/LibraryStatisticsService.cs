@@ -269,41 +269,42 @@ namespace Jvedio.Core.Library
         private static List<StatisticItem> Buckets(long[] counts, params string[] labels) =>
             counts.Select((count, i) => Item(labels[i], count, true)).ToList();
 
-        /// <summary>演员信息分布分桶标签（首项=未知，走 StatUnknown 语言键；其余为语言无关的数值区间）</summary>
-        private static readonly string[] AgeLabels = { "StatUnknown", "≤20", "21~25", "26~30", "31~35", "36~40", "41~50", ">50" };
-        private static readonly string[] HeightLabels = { "StatUnknown", "<150", "150~159", "160~169", "170~179", "≥180" };
-        private static readonly string[] WeightLabels = { "StatUnknown", "<40", "40~49", "50~59", "60~69", "≥70" };
-        private static readonly string[] ShoeLabels = { "StatUnknown", "≤34", "35~36", "37~38", "39~40", "41~42", "≥43" };
+    /// <summary>演员信息分布分桶标签（首项=未知，走 StatUnknown 语言键；其余为语言无关的数值区间）。
+    /// public 供演员筛选器复用，保证筛选档位与统计图分桶一致</summary>
+    public static readonly string[] AgeLabels = { "StatUnknown", "≤20", "21~25", "26~30", "31~35", "36~40", "41~50", ">50" };
+    public static readonly string[] HeightLabels = { "StatUnknown", "<150", "150~159", "160~169", "170~179", "≥180" };
+    public static readonly string[] WeightLabels = { "StatUnknown", "<40", "40~49", "50~59", "60~69", "≥70" };
+    public static readonly string[] ShoeLabels = { "StatUnknown", "≤34", "35~36", "37~38", "39~40", "41~42", "≥43" };
 
-        /// <summary>与分桶一一对应的演员列表筛选 SQL（actor_info 列名前缀；数值语义与内存分桶一致：0/非数字=未知）</summary>
-        private static readonly string[] AgeSql = {
-            "ifnull(actor_info.Age,0)<=0",
-            "actor_info.Age>0 and actor_info.Age<=20",
-            "actor_info.Age between 21 and 25", "actor_info.Age between 26 and 30",
-            "actor_info.Age between 31 and 35", "actor_info.Age between 36 and 40",
-            "actor_info.Age between 41 and 50", "actor_info.Age>=51",
-        };
-        private static readonly string[] HeightSql = {
-            "ifnull(actor_info.Height,0)<=0",
-            "actor_info.Height>0 and actor_info.Height<150",
-            "actor_info.Height between 150 and 159", "actor_info.Height between 160 and 169",
-            "actor_info.Height between 170 and 179", "actor_info.Height>=180",
-        };
-        private static readonly string[] WeightSql = {
-            "ifnull(actor_info.Weight,0)<=0",
-            "actor_info.Weight>0 and actor_info.Weight<40",
-            "actor_info.Weight between 40 and 49", "actor_info.Weight between 50 and 59",
-            "actor_info.Weight between 60 and 69", "actor_info.Weight>=70",
-        };
-        private static readonly string[] ShoeSql = {
-            "ifnull(actor_info.ShoeSize,'')='' or cast(ifnull(actor_info.ShoeSize,'0') as real)<=0",
-            "cast(actor_info.ShoeSize as real)>0 and cast(actor_info.ShoeSize as real)<=34",
-            "cast(actor_info.ShoeSize as real)>34 and cast(actor_info.ShoeSize as real)<=36",
-            "cast(actor_info.ShoeSize as real)>36 and cast(actor_info.ShoeSize as real)<=38",
-            "cast(actor_info.ShoeSize as real)>38 and cast(actor_info.ShoeSize as real)<=40",
-            "cast(actor_info.ShoeSize as real)>40 and cast(actor_info.ShoeSize as real)<=42",
-            "cast(actor_info.ShoeSize as real)>=43",
-        };
+    /// <summary>与分桶一一对应的演员列表筛选 SQL（actor_info 列名前缀；数值语义与内存分桶一致：0/非数字=未知）</summary>
+    public static readonly string[] AgeSql = {
+        "ifnull(actor_info.Age,0)<=0",
+        "actor_info.Age>0 and actor_info.Age<=20",
+        "actor_info.Age between 21 and 25", "actor_info.Age between 26 and 30",
+        "actor_info.Age between 31 and 35", "actor_info.Age between 36 and 40",
+        "actor_info.Age between 41 and 50", "actor_info.Age>=51",
+    };
+    public static readonly string[] HeightSql = {
+        "ifnull(actor_info.Height,0)<=0",
+        "actor_info.Height>0 and actor_info.Height<150",
+        "actor_info.Height between 150 and 159", "actor_info.Height between 160 and 169",
+        "actor_info.Height between 170 and 179", "actor_info.Height>=180",
+    };
+    public static readonly string[] WeightSql = {
+        "ifnull(actor_info.Weight,0)<=0",
+        "actor_info.Weight>0 and actor_info.Weight<40",
+        "actor_info.Weight between 40 and 49", "actor_info.Weight between 50 and 59",
+        "actor_info.Weight between 60 and 69", "actor_info.Weight>=70",
+    };
+    public static readonly string[] ShoeSql = {
+        "ifnull(actor_info.ShoeSize,'')='' or cast(ifnull(actor_info.ShoeSize,'0') as real)<=0",
+        "cast(actor_info.ShoeSize as real)>0 and cast(actor_info.ShoeSize as real)<=34",
+        "cast(actor_info.ShoeSize as real)>34 and cast(actor_info.ShoeSize as real)<=36",
+        "cast(actor_info.ShoeSize as real)>36 and cast(actor_info.ShoeSize as real)<=38",
+        "cast(actor_info.ShoeSize as real)>38 and cast(actor_info.ShoeSize as real)<=40",
+        "cast(actor_info.ShoeSize as real)>40 and cast(actor_info.ShoeSize as real)<=42",
+        "cast(actor_info.ShoeSize as real)>=43",
+    };
 
         /// <summary>把计数数组组装为可跳转的分桶条目：未知桶走语言键，其余区间标签按原文显示</summary>
         private static List<StatisticItem> ActorBuckets(long[] counts, string filterType, string[] labels, string[] sql)

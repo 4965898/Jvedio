@@ -454,16 +454,17 @@ namespace Jvedio.Entity
             actorInfo.SmallImage = smallimage;
         }
 
-        public string GetImagePath(string dataPath = "", string ext = ".jpg", bool searchExt = true)
+        /// <summary>
+        /// 演员头像目录（Actresses，随图片路径模式）：
+        /// 图片路径为「相对影片」时也回退到软件数据目录的 Actresses（Gfriends 等平铺导出目录），
+        /// 保证演员列表页/详情页无需影片上下文也能显示头像；Actresses 目录不随图片路径模式变化。
+        /// 供筛选器等无 ActorID 上下文的场景扫描使用
+        /// </summary>
+        public static string GetActressDirectory()
         {
-            string result = string.Empty;
             PathType pathType = (PathType)ConfigManager.Settings.PicPathMode;
             string basePicPath = ConfigManager.Settings.PicPaths[pathType.ToString()].ToString();
-
-            // 独立演员头像目录（hitchao/Jvedio#445/#338/#270）：
-            // 图片路径为「相对影片」时也回退到软件数据目录的 Actresses（Gfriends 等平铺导出目录），
-            // 保证演员列表页/详情页无需影片上下文也能显示头像；Actresses 目录不随图片路径模式变化。
-            string actressDir = null;
+            string actressDir;
             if (pathType == PathType.RelativeToData) {
                 string appPath = ConfigManager.Settings.PicPaths[PathType.RelativeToApp.ToString()].ToString();
                 actressDir = System.IO.Path.Combine(PathManager.CurrentUserFolder, appPath, "Actresses");
@@ -474,6 +475,16 @@ namespace Jvedio.Entity
             }
             if (!Directory.Exists(actressDir))
                 FileHelper.TryCreateDir(actressDir);
+            return actressDir;
+        }
+
+        public string GetImagePath(string dataPath = "", string ext = ".jpg", bool searchExt = true)
+        {
+            string result = string.Empty;
+            PathType pathType = (PathType)ConfigManager.Settings.PicPathMode;
+
+            // 独立演员头像目录（hitchao/Jvedio#445/#338/#270）
+            string actressDir = GetActressDirectory();
 
             // 优先使用 1_name.jpg 的方式
             result = System.IO.Path.Combine(actressDir, $"{ActorID}_{ActorName}{ext}");
@@ -515,9 +526,15 @@ namespace Jvedio.Entity
 
         public static ActorInfo GetById(long actorID)
         {
-            SelectWrapper<ActorInfo> wrapper = new SelectWrapper<ActorInfo>();
-            wrapper.Eq("ActorID", actorID);
-            ActorInfo actorInfo = MapperManager.actorMapper.SelectById(wrapper);
+            // 直连 SQL：SelectWrapper<T>.whereConditions 是按泛型类型的静态字典，并发调用
+            //（演员任务/UI 刷新/刮削链）的 Eq(ActorID,…) 条件会交叉污染，可能拿到别的演员的数据
+            List<Dictionary<string, object>> rows = MapperManager.actorMapper.Select(
+                "select * from actor_info where ActorID=" + actorID);
+            ActorInfo actorInfo = null;
+            if (rows != null && rows.Count > 0) {
+                List<ActorInfo> list = MapperManager.actorMapper.ToEntity<ActorInfo>(rows, typeof(ActorInfo).GetProperties(), false);
+                actorInfo = list != null && list.Count > 0 ? list[0] : null;
+            }
             if (actorInfo == null)
                 return null;
             ActorInfo.SetImage(ref actorInfo);

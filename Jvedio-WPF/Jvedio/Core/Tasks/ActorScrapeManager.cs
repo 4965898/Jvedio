@@ -28,8 +28,8 @@ namespace Jvedio.Core.Tasks
     }
 
     /// <summary>
-    /// 演员资料补齐任务管理器：串行执行（防限流），每 10 个长歇 15 秒防风控。
-    /// 参照 TranslateTaskManager 的队列模式；任务按 ActorID 去重。
+    /// 演员资料补齐任务管理器：默认串行（防限流），并发数由设置「演员资料补齐并发数」控制（1~5），
+    /// 每 10 个长歇 15 秒防风控。参照 TranslateTaskManager 的队列模式；任务按 ActorID 去重。
     /// </summary>
     public class ActorScrapeManager : BaseManager
     {
@@ -42,7 +42,7 @@ namespace Jvedio.Core.Tasks
         /// </summary>
         private const int AUTO_BATCH_LIMIT = 200;
 
-        /// <summary>同时进行的任务数：演员资料站点对并发敏感，固定串行</summary>
+        /// <summary>同时进行的任务数默认值：演员资料站点对并发敏感，实际值由设置 ActorScrapeConcurrency 应用</summary>
         private const int TASK_COUNT = 1;
 
         /// <summary>每完成 LONG_TASK_COUNT 个任务长歇一次</summary>
@@ -87,7 +87,29 @@ namespace Jvedio.Core.Tasks
 
         public void Start()
         {
+            // 每次启动重读设置：设置页改并发数后下一次批量/手动补齐立即生效
+            try {
+                ApplyConcurrency((int)ConfigManager.Settings.ActorScrapeConcurrency);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
             Dispatcher.BeginWork();
+        }
+
+        /// <summary>
+        /// 应用「演员资料补齐并发数」设置（1~5，立即生效）：默认串行 1 防风控，
+        /// 并发越高越容易触发 JAVDatabase 的 Wordfence 404 限速——
+        /// 插件已有连续 404 止损与拦截页检测兜底，但限频期的失败仍不可避免
+        /// </summary>
+        public static void ApplyConcurrency(int concurrency)
+        {
+            int value = Math.Max(1, Math.Min(5, concurrency));
+            try {
+                Dispatcher?.UpdateTaskCount(value);
+                App.Logger.Info($"actor scrape concurrency applied: {value}");
+            } catch (Exception ex) {
+                App.Logger.Error(ex);
+            }
         }
 
         public override void AddToDispatcher(AbstractTask task)

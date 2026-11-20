@@ -139,6 +139,12 @@ namespace Jvedio
             } catch (Exception ex) {
                 Logger.Error(ex);
             }
+            // 同步应用「演员资料补齐并发数」（1~5，默认串行防风控）
+            try {
+                Jvedio.Core.Tasks.ActorScrapeManager.ApplyConcurrency((int)Settings.ActorScrapeConcurrency);
+            } catch (Exception ex) {
+                Logger.Error(ex);
+            }
             onLoaded?.Invoke();
             Loaded = true;
         }

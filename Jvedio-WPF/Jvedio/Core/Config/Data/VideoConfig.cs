@@ -35,6 +35,7 @@ namespace Jvedio.Core.Config.Data
             ActorSortDescending = true;
             ShowFilter = true;
             ActorShowCount = true;
+            ActorShowFilter = false;
             BlurBackground = true;
 
         }
@@ -62,6 +63,16 @@ namespace Jvedio.Core.Config.Data
 
 
         #region "Actor"
+
+        /// <summary>演员界面筛选器侧栏显隐（与影片界面 ShowFilter 同款开关）</summary>
+        private bool _ActorShowFilter;
+        public bool ActorShowFilter {
+            get { return _ActorShowFilter; }
+            set {
+                _ActorShowFilter = value;
+                RaisePropertyChanged();
+            }
+        }
 
         private bool _ActorShowCount;
         public bool ActorShowCount {

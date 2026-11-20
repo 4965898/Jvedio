@@ -1,0 +1,335 @@
+<UserControl
+    x:Class="Jvedio.Core.UserControls.ActorFilter"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:super="https://github.com/SuperStudio/SuperControls"
+    x:Name="actorFilter"
+    MinWidth="300"
+    d:DesignHeight="900"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <Style
+            x:Key="InfoRadioButton"
+            BasedOn="{StaticResource FlatRoundRadioButton}"
+            TargetType="RadioButton">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="5" />
+        </Style>
+        <Style
+            x:Key="FilterToggleButton"
+            BasedOn="{StaticResource FlatToggleButton}"
+            TargetType="ToggleButton">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="5,2" />
+            <Setter Property="Padding" Value="5,3" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style x:Key="LinePanelStyle" TargetType="DockPanel">
+            <Setter Property="LastChildFill" Value="True" />
+            <Setter Property="Margin" Value="5,2" />
+        </Style>
+        <Style
+            x:Key="InfoTextBlock"
+            BasedOn="{StaticResource BaseTextBlock}"
+            TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="5" />
+            <Setter Property="TextAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+        </Style>
+        <Style x:Key="HobbyTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Margin" Value="5,2" />
+            <Setter Property="Padding" Value="3,2" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
+    <super:SimplePanel>
+        <Border
+            Margin="5"
+            BorderBrush="{DynamicResource Window.Title.Background}"
+            BorderThickness="1"
+            CornerRadius="3"
+            Effect="{StaticResource ShadowDropShadowEffect}" />
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="auto" />
+            </Grid.RowDefinitions>
+            <Border
+                Grid.Row="0"
+                Margin="5"
+                Background="{DynamicResource Window.Side.Background}"
+                CornerRadius="3 3 0 0" />
+            <super:SimplePanel Grid.Row="0" Margin="5">
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    FontSize="{DynamicResource GlobalFontSize12}"
+                    Style="{StaticResource BaseTextBlock}"
+                    Text="{DynamicResource Filter}" />
+                <super:HoverPath
+                    Margin="5,0"
+                    VerticalAlignment="Center"
+                    Click="HideGrid"
+                    Style="{StaticResource CloseExHoverPath}" />
+            </super:SimplePanel>
+
+            <ScrollViewer
+                Grid.Row="1"
+                Width="290"
+                Margin="5,0"
+                Style="{StaticResource FlatScrollViewer}"
+                VerticalScrollBarVisibility="auto">
+                <StackPanel Name="filterStackPanel" Orientation="Vertical">
+
+                    <!--  基础属性：性别/作品数量/评分/数值档位（与统计图分桶一致）  -->
+                    <super:TogglePanel
+                        Height="auto"
+                        Margin="1,0"
+                        Padding="0,4"
+                        FontSize="{DynamicResource GlobalFontSize}"
+                        Header="{DynamicResource ActorInfo}"
+                        IsExpanded="True"
+                        IsSelected="False"
+                        LineWidth="0"
+                        Style="{StaticResource BaseTogglePanel}">
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource Gender}" />
+                            </StackPanel>
+                            <WrapPanel Name="genderWrapPanel" Orientation="Horizontal">
+                                <RadioButton
+                                    Click="SetGender"
+                                    Content="{DynamicResource All}"
+                                    GroupName="GenderRadioButton"
+                                    IsChecked="True"
+                                    Style="{StaticResource InfoRadioButton}" />
+                                <RadioButton
+                                    Click="SetGender"
+                                    Content="{DynamicResource Girl}"
+                                    GroupName="GenderRadioButton"
+                                    Style="{StaticResource InfoRadioButton}" />
+                                <RadioButton
+                                    Click="SetGender"
+                                    Content="{DynamicResource Boy}"
+                                    GroupName="GenderRadioButton"
+                                    Style="{StaticResource InfoRadioButton}" />
+                                <RadioButton
+                                    Click="SetGender"
+                                    Content="{DynamicResource StatUnknown}"
+                                    GroupName="GenderRadioButton"
+                                    Style="{StaticResource InfoRadioButton}" />
+                            </WrapPanel>
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource Actress_Avatar}" />
+                            </StackPanel>
+                            <WrapPanel Name="avatarWrapPanel" Orientation="Horizontal">
+                                <RadioButton
+                                    Click="SetAvatar"
+                                    Content="{DynamicResource All}"
+                                    GroupName="AvatarRadioButton"
+                                    IsChecked="True"
+                                    Style="{StaticResource InfoRadioButton}" />
+                                <RadioButton
+                                    Click="SetAvatar"
+                                    Content="{DynamicResource HasAvatar}"
+                                    GroupName="AvatarRadioButton"
+                                    Style="{StaticResource InfoRadioButton}" />
+                                <RadioButton
+                                    Click="SetAvatar"
+                                    Content="{DynamicResource NoAvatar}"
+                                    GroupName="AvatarRadioButton"
+                                    Style="{StaticResource InfoRadioButton}" />
+                            </WrapPanel>
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource WorkCount}" />
+                            </StackPanel>
+                            <WrapPanel Name="countWrapPanel" Orientation="Horizontal" />
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource Rating}" />
+                            </StackPanel>
+                            <super:DoubleSlider
+                                x:Name="rateSlider"
+                                Margin="10,0"
+                                BarCornerRadius="2"
+                                BarHeight="8"
+                                Integer="True"
+                                MaxValue="5"
+                                Maximum="5"
+                                MinValue="0"
+                                Minimum="0"
+                                SliderDiameter="15" />
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource Actress_Age}" />
+                            </StackPanel>
+                            <WrapPanel Name="ageWrapPanel" Orientation="Horizontal" />
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource Actress_BirthDecade}" />
+                            </StackPanel>
+                            <WrapPanel Name="decadeWrapPanel" Orientation="Horizontal" />
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource BloodType}" />
+                            </StackPanel>
+                            <WrapPanel Name="bloodWrapPanel" Orientation="Horizontal" />
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource Height}" />
+                            </StackPanel>
+                            <WrapPanel Name="heightWrapPanel" Orientation="Horizontal" />
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource Weight}" />
+                            </StackPanel>
+                            <WrapPanel Name="weightWrapPanel" Orientation="Horizontal" />
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource Actress_Chest}" />
+                            </StackPanel>
+                            <WrapPanel Name="chestWrapPanel" Orientation="Horizontal" />
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource Actress_Waist}" />
+                            </StackPanel>
+                            <WrapPanel Name="waistWrapPanel" Orientation="Horizontal" />
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource Actress_Hipline}" />
+                            </StackPanel>
+                            <WrapPanel Name="hiplineWrapPanel" Orientation="Horizontal" />
+                        </DockPanel>
+
+                        <DockPanel Style="{StaticResource LinePanelStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource InfoTextBlock}" Text="{DynamicResource Actress_ShoeSize}" />
+                            </StackPanel>
+                            <WrapPanel Name="shoeWrapPanel" Orientation="Horizontal" />
+                        </DockPanel>
+
+                    </super:TogglePanel>
+
+                    <!--  罩杯（惰性加载 DISTINCT）  -->
+                    <super:TogglePanel
+                        Height="auto"
+                        Margin="1,0"
+                        Padding="0,4"
+                        Expand="Cup_Expand"
+                        FontSize="{DynamicResource GlobalFontSize}"
+                        Header="{DynamicResource Actress_Cup}"
+                        IsExpanded="False"
+                        IsSelected="False"
+                        LineWidth="0"
+                        Style="{StaticResource BaseTogglePanel}">
+                        <WrapPanel Name="cupWrapPanel" Orientation="Horizontal" />
+                    </super:TogglePanel>
+
+                    <!--  国家（惰性加载 DISTINCT）  -->
+                    <super:TogglePanel
+                        Height="auto"
+                        Margin="1,0"
+                        Padding="0,4"
+                        Expand="Country_Expand"
+                        FontSize="{DynamicResource GlobalFontSize}"
+                        Header="{DynamicResource Country}"
+                        IsExpanded="False"
+                        IsSelected="False"
+                        LineWidth="0"
+                        Style="{StaticResource BaseTogglePanel}">
+                        <WrapPanel Name="countryWrapPanel" Orientation="Horizontal" />
+                    </super:TogglePanel>
+
+                    <!--  民族（惰性加载 DISTINCT）  -->
+                    <super:TogglePanel
+                        Height="auto"
+                        Margin="1,0"
+                        Padding="0,4"
+                        Expand="Nation_Expand"
+                        FontSize="{DynamicResource GlobalFontSize}"
+                        Header="{DynamicResource Nationality}"
+                        IsExpanded="False"
+                        IsSelected="False"
+                        LineWidth="0"
+                        Style="{StaticResource BaseTogglePanel}">
+                        <WrapPanel Name="nationWrapPanel" Orientation="Horizontal" />
+                    </super:TogglePanel>
+
+                    <!--  爱好：关键词包含匹配（空格分隔多词 OR）  -->
+                    <super:TogglePanel
+                        Height="auto"
+                        Margin="1,0"
+                        Padding="0,4"
+                        FontSize="{DynamicResource GlobalFontSize}"
+                        Header="{DynamicResource Actress_Hobby}"
+                        IsExpanded="False"
+                        IsSelected="False"
+                        LineWidth="0"
+                        Style="{StaticResource BaseTogglePanel}">
+                        <TextBox
+                            Name="hobbyBox"
+                            Margin="5,2"
+                            Padding="3,2"
+                            FontSize="12"
+                            KeyDown="HobbyBox_KeyDown"
+                            Style="{StaticResource HobbyTextBoxStyle}"
+                            ToolTip="{DynamicResource ActorFilterHobbyTip}"
+                            VerticalContentAlignment="Center" />
+                    </super:TogglePanel>
+
+                </StackPanel>
+            </ScrollViewer>
+
+            <Grid
+                Grid.Row="2"
+                Margin="5"
+                Background="{DynamicResource Window.Side.Background}">
+                <StackPanel Orientation="Horizontal">
+                    <Button
+                        MinWidth="100"
+                        Click="ApplyButton_Click"
+                        Content="{DynamicResource Apply}"
+                        Style="{StaticResource ButtonPrimary}" />
+                    <Button
+                        MinWidth="100"
+                        Margin="8,0,0,0"
+                        Click="ResetButton_Click"
+                        Content="{DynamicResource ActorFilterReset}"
+                        Style="{StaticResource ButtonPrimary}" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </super:SimplePanel>
+</UserControl>

@@ -9,6 +9,9 @@ namespace Jvedio.Core.WindowConfig
 
         public const int DEFAULT_SYNC_CONCURRENCY = 2;
 
+        /// <summary>演员资料补齐并发数默认值：串行防风控（JAVDatabase 站点对 404 频率敏感）</summary>
+        public const int DEFAULT_ACTOR_SCRAPED_CONCURRENCY = 1;
+
         /// <summary>
         /// 刮削等操作使影片新增图片后，累计多少条触发一次后台静默重建图片索引；0 表示关闭
         /// </summary>
@@ -44,7 +47,8 @@ namespace Jvedio.Core.WindowConfig
 
             DelInfoAfterDelFile = true;
 
-SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
+            SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
+            ActorScrapeConcurrency = DEFAULT_ACTOR_SCRAPED_CONCURRENCY;
             AutoRebuildImageIndexCount = DEFAULT_AUTO_REBUILD_IMAGE_INDEX_COUNT;
         }
 
@@ -195,6 +199,12 @@ SyncConcurrency = DEFAULT_SYNC_CONCURRENCY;
         public string NFOSavePath { get; set; }
 
         public long SyncConcurrency { get; set; }
+
+        /// <summary>
+        /// 演员资料补齐并发数（1~5）：默认串行 1 防风控；并发越高越容易触发
+        /// JAVDatabase 的 Wordfence 404 限速（插件已有止损与拦截检测兜底）
+        /// </summary>
+        public long ActorScrapeConcurrency { get; set; }
 
         /// <summary>
         /// 自动重建图片存在性索引的累计阈值（条数），0 表示关闭

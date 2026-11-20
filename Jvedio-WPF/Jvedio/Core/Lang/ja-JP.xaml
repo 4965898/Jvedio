@@ -458,4 +458,10 @@
     <sys:String x:Key="HeaderHintDb">JavDB は通常ログインが必要です。ブラウザーでログイン後、上記の方法でリクエストヘッダーをコピーして左に貼り付けてください（cookie を必ず含める）。「ログインが必要」の失敗表示は Cookie の期限切れを意味します。再コピーしてください。</sys:String>
     <sys:String x:Key="HeaderHintBus">JavBus は通常 Headers 不要です。Cloudflare の認証や 403 でブロックされた場合は、ブラウザーのリクエストヘッダー（user-agent、cookie）を貼り付けると解決することが多いです。</sys:String>
     <sys:String x:Key="HeaderHintOther">このソースは通常 Headers 不要です。取得に失敗する場合はブラウザーのリクエストヘッダー（user-agent、cookie）を試してください。</sys:String>
+    <sys:String x:Key="Actress_BirthDecade">生まれた年代</sys:String>
+    <sys:String x:Key="ActorFilterReset">リセット</sys:String>
+    <sys:String x:Key="ActorFilterHobbyTip">趣味キーワードの部分一致：キーワードは空白区切り、いずれか一致で表示</sys:String>
+    <sys:String x:Key="Actress_Avatar">アバター</sys:String>
+    <sys:String x:Key="HasAvatar">アバターあり</sys:String>
+    <sys:String x:Key="NoAvatar">アバターなし</sys:String>
 </ResourceDictionary>

@@ -84,6 +84,7 @@
                             Header="{DynamicResource SyncInfo}"
                              />
                         <MenuItem Click="DownLoadAllActors" Header="{DynamicResource SyncInfoLibrary}" />
+                        <MenuItem Click="DownloadActorAvatar" Header="{DynamicResource DownloadActorAvatar}" />
                         <MenuItem Click="OpenActorImagePath" Header="{DynamicResource OpenPath}" />
                         <MenuItem Click="DeleteActors" Header="{DynamicResource Delete}" />
                         <MenuItem Click="MergeActors" Header="{DynamicResource MergeActor}" />
@@ -331,6 +332,7 @@
                             Header="{DynamicResource SyncInfo}"
                              />
                         <MenuItem Click="DownLoadAllActors" Header="{DynamicResource SyncInfoLibrary}" />
+                        <MenuItem Click="DownloadActorAvatar" Header="{DynamicResource DownloadActorAvatar}" />
                         <MenuItem Click="OpenActorImagePath" Header="{DynamicResource OpenPath}" />
                         <MenuItem Click="DeleteActors" Header="{DynamicResource Delete}" />
                         <MenuItem Click="MergeActors" Header="{DynamicResource MergeActor}" />
@@ -588,6 +590,24 @@
                 Grid.Row="0"
                 Margin="10,5"
                 Orientation="Horizontal">
+                <ToggleButton
+                    Width="auto"
+                    Height="auto"
+                    Margin="0,0,10,0"
+                    Padding="5"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Background="Transparent"
+                    IsChecked="{Binding ActorShowFilter, Mode=TwoWay, Source={x:Static config:ConfigManager.VideoConfig}}"
+                    Style="{StaticResource FlatToggleButton}"
+                    ToolTip="{DynamicResource Filter}">
+                    <Viewbox
+                        Width="15"
+                        Height="auto"
+                        VerticalAlignment="Center">
+                        <Path Data="M452.923077 512v275.692308l118.153846-98.461539v-177.230769l177.230769-177.230769H275.692308l177.230769 177.230769zM0 512C0 229.218462 229.238154 0 512 0c282.781538 0 512 229.238154 512 512 0 282.781538-229.238154 512-512 512C229.218462 1024 0 794.761846 0 512z" Fill="{DynamicResource Window.Foreground}" />
+                    </Viewbox>
+                </ToggleButton>
                 <Button
                     Margin="0,0,10,0"
                     HorizontalAlignment="Left"
@@ -702,8 +722,27 @@
 
             </StackPanel>
         </Grid>
-        <!--  演员展示  -->
+        <!--  演员展示（Column0=筛选器侧栏，Column1=列表，仿影片界面 VideoList 布局）  -->
         <Grid Grid.Row="2" Visibility="{Binding Nothing, ElementName=actorList, Converter={StaticResource BoolToOppositeVisibilityConverter}}">
+
+            <Grid.RowDefinitions>
+                <RowDefinition Height="auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!--  演员筛选器（跨进度条+内容两行，否则 auto 行被筛选器自然高度撑开、列表被顶下去且内部 ScrollViewer 拿不到有限高度无法滚动）  -->
+            <localControl:ActorFilter
+                x:Name="actorFilter"
+                Grid.Column="0"
+                Grid.RowSpan="2"
+                ApplyRequested="ActorFilter_ApplyRequested"
+                CloseRequested="ActorFilter_CloseRequested"
+                Visibility="{Binding ActorShowFilter, Mode=TwoWay, Source={x:Static config:ConfigManager.VideoConfig}, Converter={StaticResource BoolToVisibilityConverter}}" />
+
             <!--<Grid.ContextMenu>
                 <ContextMenu>
                     <MenuItem
@@ -714,12 +753,8 @@
                 </ContextMenu>
             </Grid.ContextMenu>-->
 
-            <Grid.RowDefinitions>
-                <RowDefinition Height="auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
             <ProgressBar
+                Grid.Column="1"
                 Width="auto"
                 Height="2"
                 Margin="10,2,10,0"
@@ -742,6 +777,7 @@
             <ScrollViewer
                 x:Name="scrollViewer"
                 Grid.Row="1"
+                Grid.Column="1"
                 CanContentScroll="True"
                 FocusVisualStyle="{x:Null}"
                 IsDeferredScrollingEnabled="False"
@@ -781,6 +817,7 @@
             <DataGrid
                 x:Name="tableData"
                 Grid.Row="1"
+                Grid.Column="1"
                 Margin="5"
                 HorizontalContentAlignment="Left"
                 d:ItemsSource="{d:SampleData}"

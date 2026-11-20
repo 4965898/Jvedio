@@ -89,7 +89,9 @@ namespace Jvedio.Crawler
             HtmlNodeCollection gridNodes = doc.DocumentNode.SelectNodes("//div[@class='item']");
             if (gridNodes != null) {
                 foreach (HtmlNode gridNode in gridNodes) {
-                    HtmlNode uidNode = gridNode.SelectSingleNode("//a/div[@class='video-title']/strong");
+                    // 逐条目内相对查找（原 "//a/..." 双斜杠从文档根取，永远只检查第一条结果，
+                    // 精确匹配不在首位时永远搜不到）
+                    HtmlNode uidNode = gridNode.SelectSingleNode(".//a/div[@class='video-title']/strong");
                     if (uidNode == null || !uidNode.InnerText.ToUpper().Equals(VID.ToUpper()))
                         continue;
                     HtmlAttribute obj = uidNode.ParentNode.ParentNode.Attributes["href"];
@@ -181,6 +183,12 @@ namespace Jvedio.Crawler
             Header = header;
             Header.Headers["Cache-Control"] = "no-cache";
             DataInfo = dict;
+            // 同一插件的多个源行共用同一 invoker 实例（VideoDownLoader.GetCrawlerServer 把
+            // invoker 赋给该插件全部 server 行）：上一行留下的 Info 残留（含无守卫的
+            // Info.Add("Logs")）会让本行抛「已添加了具有相同键的项」打死整个任务——
+            // 每次调用换成全新字典；Logs 清空避免上一行的日志混进本行
+            Info = new Dictionary<string, object>();
+            Logs.Clear();
             ParseDataInfo();
             Logs.Add(string.Format("crawler recv vid: {0}", dict["VID"]));
             if (CrawlerMode != 2) {
@@ -232,6 +240,13 @@ namespace Jvedio.Crawler
                     httpResult.Error = "開通VIP";
                 } else if (HtmlText.IndexOf("此內容需要登入才能查看或操作") > 0) {
                     httpResult.Error = "此內容需要登入才能查看或操作";
+                } else if (!string.IsNullOrEmpty(VID) && HtmlText.IndexOf(VID, StringComparison.OrdinalIgnoreCase) < 0) {
+                    // 详情页标题不含当前番号时不解析，防止把别的影片的字段（含演员）挂到本片上。
+                    // 两种可能：①缓存的 UrlCode 指向其他影片（历史并发污染/站点复用页码）；
+                    // ②站点限频弹跳（302 循环后落到的页面不是本片，与搜索路径的「检索太频繁」同源）
+                    if (!Info.ContainsKey("Error"))
+                        Info.Add("Error", $"详情页不是本影片（标题不含 {VID}）：可能是站点限频弹跳（稍后自动恢复）或页码缓存错误，已跳过解析以防脏数据");
+                    Logs.Add("页码校验失败: 页面标题不含当前番号 " + VID);
                 } else {
                     List<Dictionary<string, object>> magnets = ParseMagnet();
                     await Parse();

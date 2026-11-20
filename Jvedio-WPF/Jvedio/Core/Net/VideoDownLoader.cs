@@ -125,7 +125,17 @@ namespace Jvedio.Core.Net
                     }
                     server.AttachToDict(dataInfo);
                     // Header 传递代理配置进去
-                    object o = await server.Invoker.SetMethod("GetInfo").InvokeAsync(new object[] { Header, dataInfo });
+                    object o;
+                    try {
+                        o = await server.Invoker.SetMethod("GetInfo").InvokeAsync(new object[] { Header, dataInfo });
+                    } catch (Exception ex) {
+                        // 插件内部异常不能打死整个刮削任务：记失败原因换下一个源，
+                        // 完整堆栈（含插件内部帧）进主日志用于定位（如多行源复用实例的字典冲突）
+                        LogSafely(() => TaskLogger.Warning($"刮削器[{server.PluginID}]调用异常：{ex.Message}"));
+                        App.Logger.Error($"[{server.PluginID}] 刮削插件调用异常：{ex}");
+                        failures.Add($"{server.PluginID}：插件调用异常 {ex.Message}");
+                        continue;
+                    }
                     if (!(o is Dictionary<string, object> d)) {
                         LogSafely(() => TaskLogger.Warning($"刮削器[{server.PluginID}] invoker 失败"));
                         failures.Add($"{server.PluginID}：插件调用失败");
@@ -179,8 +189,39 @@ namespace Jvedio.Core.Net
             return lastFailure;
         }
 
+        /// <summary>一次性清理守卫（进程级）：并发污染页码缓存只清一次</summary>
+        private static bool _ContaminatedUrlCodeCleanupDone = false;
+
+        /// <summary>
+        /// 2026-11-19 并发批量刮削期间，SelectWrapper&lt;T&gt;.whereConditions 静态字典条件交叉污染，
+        /// 向 common_url_code 写入了指向其他影片的页码映射（实测 SSIS-338 拿到 SMBD-136 的页码、
+        /// SSIS-423/SONE-012 等多片共用同一页码）——一次性清掉当天的 video 页码缓存，
+        /// 下次刮削会重新搜索生成正确映射（缓存缺失只是多一次搜索，无风险）
+        /// </summary>
+        private void CleanupContaminatedUrlCodes()
+        {
+            if (_ContaminatedUrlCodeCleanupDone)
+                return;
+            _ContaminatedUrlCodeCleanupDone = true;
+            try {
+                List<Dictionary<string, object>> rows = MapperManager.urlCodeMapper.Select(
+                    "select count(*) as Count from common_url_code where ValueType='video' and UpdateDate >= '2026-11-19 00:00:00'");
+                long count = rows != null && rows.Count > 0 && rows[0].ContainsKey("Count")
+                    ? Convert.ToInt64(rows[0]["Count"]) : 0;
+                if (count > 0) {
+                    MapperManager.urlCodeMapper.ExecuteNonQuery(
+                        "delete from common_url_code where ValueType='video' and UpdateDate >= '2026-11-19 00:00:00'");
+                    App.Logger.Info($"已清理 {count} 条 2026-11-19 并发污染的页码缓存，下次刮削将重新搜索生成正确映射");
+                }
+            } catch (Exception ex) {
+                App.Logger.Error($"清理污染页码缓存失败：{ex.Message}");
+            }
+        }
+
         public Dictionary<PluginMetaData, List<CrawlerServer>> GetCrawlerServer(Dictionary<string, object> dataInfo)
         {
+            CleanupContaminatedUrlCodes();
+
             // 获取信息类型，并设置爬虫类型
             if (ConfigManager.ServerConfig.CrawlerServers == null ||
                 CrawlerManager.PluginMetaDatas == null ||
@@ -224,23 +265,24 @@ namespace Jvedio.Core.Net
                             webType = webTypeObject.ToString();
                         string urlCodeString = string.Empty;
 
-                        // 索引是 ValueType, WebType, LocalValue
-                        IWrapper<UrlCode> wrapper = new SelectWrapper<UrlCode>().Eq("ValueType", "video");
-                        if (!string.IsNullOrEmpty(webType))
-                            wrapper.Eq("WebType", webType);
-                        wrapper.Eq("LocalValue", CurrentVideo.VID);
+                        // 索引是 ValueType, WebType, LocalValue。
+                        // SelectWrapper<T>.whereConditions 是按泛型类型的静态字典（SuperUtils 预编译）：
+                        // 并发批量刮削时多个任务往同一字典写 Eq 条件 → 交叉污染 → 拿到别的影片的
+                        // RemoteValue（common_url_code 实测多片共用同一页码、抓错页面详情字段全丢），
+                        // 改直连 SQL 绕开；此前针对「集合已修改」的 3 次重试也随之不再需要
                         UrlCode urlCode = null;
-                        for (int attempt = 0; attempt < 3 && urlCode == null; attempt++) {
-                            try {
-                                urlCode = MapperManager.urlCodeMapper.SelectOne(wrapper);
-                            } catch (InvalidOperationException) when (attempt < 2) {
-                                // SelectWrapper 的 whereConditions 是静态字典：并发首查时
-                                // 「一个线程在枚举、另一个在写入」会瞬态抛出集合异常，重试即可恢复
+                        try {
+                            string urlCodeSql = "select * from common_url_code where ValueType='video'";
+                            if (!string.IsNullOrEmpty(webType))
+                                urlCodeSql += " and WebType='" + webType.Replace("'", "''") + "'";
+                            urlCodeSql += " and LocalValue='" + CurrentVideo.VID.Replace("'", "''") + "'";
+                            List<Dictionary<string, object>> urlCodeRows = MapperManager.urlCodeMapper.Select(urlCodeSql);
+                            if (urlCodeRows != null && urlCodeRows.Count > 0) {
+                                List<UrlCode> codes = MapperManager.urlCodeMapper.ToEntity<UrlCode>(urlCodeRows, typeof(UrlCode).GetProperties(), false);
+                                urlCode = codes != null && codes.Count > 0 ? codes[0] : null;
                             }
-                        }
-                        if (urlCode == null) {
-                            // 三次都失败（或确实抛错）：把真实的异常留给上层堆栈日志
-                            urlCode = MapperManager.urlCodeMapper.SelectOne(wrapper);
+                        } catch (Exception ex) {
+                            LogSafely(() => TaskLogger.Warning($"查询 UrlCode 失败：{ex.Message}"));
                         }
                         foreach (var item in crawlerServers) {
                             item.UrlCode = urlCode;

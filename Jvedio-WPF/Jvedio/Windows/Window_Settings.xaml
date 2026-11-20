@@ -660,6 +660,24 @@
                                     Content="{DynamicResource GfriendsAvatar}"
                                     IsChecked="{Binding GfriendsAvatar, Mode=TwoWay}"
                                     ToolTip="{DynamicResource GfriendsAvatarTip}" />
+                                <StackPanel Margin="5" Orientation="Horizontal" ToolTip="默认串行 1 防风控；并发越高越容易触发 JAVDatabase 的站点限速（404 过多），已有止损与拦截检测兜底，改后下一次补齐生效">
+                                    <TextBlock
+                                        MinWidth="150"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="演员资料补齐并发数"
+                                        TextAlignment="Left" />
+                                    <super:SearchBox
+                                        MinWidth="100"
+                                        Background="{DynamicResource Window.Title.Background}"
+                                        ShowClearButton="False"
+                                        Text="{Binding ActorScrapeConcurrency, Mode=TwoWay}"
+                                        TextAlignment="Center" />
+                                    <TextBlock
+                                        Margin="10,0,0,0"
+                                        Style="{StaticResource BaseTextBlock}"
+                                        Text="默认并发数：" />
+                                    <Label Content="{x:Static wconf:Settings.DEFAULT_ACTOR_SCRAPED_CONCURRENCY}" Style="{StaticResource InfoLabel}" />
+                                </StackPanel>
                                 <StackPanel Margin="0,5,0,0" Orientation="Vertical">
                                     <CheckBox
                                         Content="{DynamicResource SubtitleAutoDownload}"

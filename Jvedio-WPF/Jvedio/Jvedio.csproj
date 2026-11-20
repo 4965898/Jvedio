@@ -393,6 +393,9 @@
     <Compile Include="Core\UserControls\Filter.xaml.cs">
       <DependentUpon>Filter.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Core\UserControls\ActorFilter.xaml.cs">
+      <DependentUpon>ActorFilter.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Core\UserControls\ActorInfoView.xaml.cs">
       <DependentUpon>ActorInfoView.xaml</DependentUpon>
     </Compile>
@@ -600,6 +603,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="Core\UserControls\Filter.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Core\UserControls\ActorFilter.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

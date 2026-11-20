@@ -15,6 +15,10 @@ namespace Jvedio.Crawler
     /// JavDatabase 演员资料爬虫：按番号定位——GET /movies/{番号}/ → p.mb-1 区块中
     /// Idol(s)/Actress(es) 标签下的唯一演员链接 → /idols/{slug}/ 资料页解析
     /// （DOB/Height/Measurements(B-W-H)/Cup/JP 日文名/h1 罗马字名）。
+    /// 站点开启 Wordfence 限速（2026-11-19 实测：404 过多触发 "Exceeded the maximum number of
+    /// page not found errors per minute" → 临时 503 拦截，会自动恢复），故番号候选发行日期新→旧、
+    /// 连续 404 提前止损；检测到拦截页只中止当前演员（不做进程级冷却——实测限速短暂、批次内
+    /// 其他演员仍可正常爬取），全部失败后按名字站内搜索兜底（同样消歧）。
     /// 仅供「演员资料自动补齐」任务通过 GetActorInfo 调用；
     /// IsPluginAvailable 恒返回原因字符串，保证影片刮削链自动跳过本插件。
     /// </summary>
@@ -22,6 +26,9 @@ namespace Jvedio.Crawler
     {
         private const string DEFAULT_BASE_URL = "https://www.javdatabase.com";
         private const string CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+        /// <summary>连续 404 达到该数即止损换演员：站内大概率缺这批影片，继续只会给 Wordfence 攒 404 计数</summary>
+        private const int MAX_CONSECUTIVE_404 = 5;
 
         public static string GetWebType()
         {
@@ -52,35 +59,66 @@ namespace Jvedio.Crawler
             string baseUrl = GetStrVal(dataInfo, "Url", DEFAULT_BASE_URL).TrimEnd('/');
             if (string.IsNullOrEmpty(baseUrl))
                 baseUrl = DEFAULT_BASE_URL;
-            // 候选番号：Vids(全部关联影片,最多10个) 优先,退回单个 Vid;404 自动换下一个
+
+            // 候选番号：Vids(全部关联影片,发行日期新→旧) 优先,退回单个 Vid;清洗去重,404 自动换下一个
             List<string> candidates = new List<string>();
             if (dataInfo.ContainsKey("Vids") && dataInfo["Vids"] is System.Collections.IEnumerable list)
                 foreach (object item in list)
-                    if (item?.ToString()?.Trim() is string s && s != "" && !candidates.Contains(s))
-                        candidates.Add(s);
+                    if (item?.ToString()?.Trim() is string s && s != "") {
+                        string clean = NormalizeVid(s);
+                        if (clean != "" && !candidates.Contains(clean))
+                            candidates.Add(clean);
+                    }
             string single = GetStrVal(dataInfo, "Vid").Trim();
-            if (single != "" && !candidates.Contains(single))
-                candidates.Insert(0, single);
+            if (single != "") {
+                string cleanSingle = NormalizeVid(single);
+                if (cleanSingle != "" && !candidates.Contains(cleanSingle))
+                    candidates.Insert(0, cleanSingle);
+            }
             if (candidates.Count == 0) {
                 result["Error"] = "缺少关联影片番号（Vid）：该演员没有可定位的影片";
                 result["Logs"] = logs;
                 return result;
             }
 
-            // 1. 逐个番号尝试影片页 → 演员区块:唯一直接用,多人合演收集候选按名字消歧
+            // 1. 逐个番号尝试影片页 → 演员区块:唯一直接用,多人合演/无区块降级收集候选按名字消歧
             string actressUrl = "";
             List<string> ambiguous = new List<string>();
             string actorName = GetStrVal(dataInfo, "ActorName");
             string actorNameEN = GetStrVal(dataInfo, "ActorNameEN");
+            int tried = 0, notFound = 0, requestFailed = 0, noActressBlock = 0, consecutive404 = 0;
+            bool siteBlocked = false;
             foreach (string vid in candidates) {
                 string movieUrl = $"{baseUrl}/movies/{vid.ToLowerInvariant()}/";
                 logs.Add("movie: " + movieUrl);
                 var movie = await GetHtmlAsync(header, movieUrl);
+                tried++;
                 if (movie.statusCode != (int)HttpStatusCode.OK || string.IsNullOrEmpty(movie.sourceCode)) {
-                    logs.Add($"影片页失败({vid}): status={movie.statusCode}, error={movie.error ?? "(空响应)"}");
+                    string blockMsg = DetectSiteBlock(movie.statusCode, movie.sourceCode);
+                    if (blockMsg != null) {
+                        // Wordfence 临时拦截（404 过多触发，会自动恢复）：当前演员立即止损
+                        //（继续只会全线 503），不做进程级冷却——批次内其他演员随时可能恢复
+                        logs.Add(blockMsg);
+                        siteBlocked = true;
+                        break;
+                    }
+                    if (movie.statusCode == 404) {
+                        notFound++;
+                        consecutive404++;
+                        logs.Add($"影片页站内缺失({vid}): 404");
+                        if (consecutive404 >= MAX_CONSECUTIVE_404) {
+                            logs.Add($"连续 {MAX_CONSECUTIVE_404} 个番号 404，止损不再尝试剩余候选（避免触发站点 404 限速）");
+                            break;
+                        }
+                    } else {
+                        requestFailed++;
+                        consecutive404 = 0;
+                        logs.Add($"影片页失败({vid}): status={movie.statusCode}, error={movie.error ?? "(空响应)"}");
+                    }
                     await Task.Delay(400);
                     continue;
                 }
+                consecutive404 = 0;
                 List<string> links = FindActressLinks(movie.sourceCode, logs);
                 if (links.Count == 1) {
                     actressUrl = links[0];
@@ -92,6 +130,17 @@ namespace Jvedio.Crawler
                     foreach (string link in links)
                         if (!ambiguous.Contains(link) && ambiguous.Count < 3)
                             ambiguous.Add(link);
+                } else {
+                    // 200 但无演员区块：区块标签变体/改版场景，降级全页搜 idol 链接（仍按名字消歧防误配）
+                    noActressBlock++;
+                    List<string> pageLinks = FindIdolLinksOnPage(movie.sourceCode, baseUrl);
+                    if (pageLinks.Count > 0)
+                        logs.Add($"影片页({vid})无演员区块，降级全页搜索 idol 链接 {pageLinks.Count} 个按名字消歧");
+                    else
+                        logs.Add($"影片页({vid})无演员区块且全页无 idol 链接");
+                    foreach (string link in pageLinks)
+                        if (!ambiguous.Contains(link) && ambiguous.Count < 3)
+                            ambiguous.Add(link);
                 }
                 await Task.Delay(400);
             }
@@ -101,6 +150,12 @@ namespace Jvedio.Crawler
                     await Task.Delay(400);
                     logs.Add("disambiguate: " + candidate);
                     var page = await GetHtmlAsync(header, candidate);
+                    string blockMsg = DetectSiteBlock(page.statusCode, page.sourceCode);
+                    if (blockMsg != null) {
+                        logs.Add(blockMsg);
+                        siteBlocked = true;
+                        break;
+                    }
                     if (page.statusCode != (int)HttpStatusCode.OK || string.IsNullOrEmpty(page.sourceCode))
                         continue;
                     var names = ParseActressNames(page.sourceCode);
@@ -111,10 +166,23 @@ namespace Jvedio.Crawler
                     }
                 }
             }
+            if (actressUrl == "" && !siteBlocked) {
+                // 2. 全部番号失败 → 按名字站内搜索兜底（结果页收集 /idols/ 候选,同样精确消歧防误配）
+                Tuple<string, bool> searchResult = await TrySearchActressUrl(header, baseUrl, actorName, actorNameEN, logs);
+                actressUrl = searchResult.Item1;
+                siteBlocked = searchResult.Item2;
+            }
             if (string.IsNullOrEmpty(actressUrl)) {
-                result["Error"] = ambiguous.Count > 0
-                    ? $"多人合演候选中无名字匹配者（{actorName}）：该演员在站内可能无资料页"
-                    : $"尝试了 {candidates.Count} 个关联番号均未找到演员链接（番号站内缺失或无演员区块）";
+                if (siteBlocked) {
+                    result["Error"] = "javdatabase 站点临时限速（Wordfence：404 过多触发，通常几分钟内自动恢复）：本演员已中止本次尝试，同批其他演员可能仍可正常爬取；若频繁出现请降低批量频率或更换代理出口";
+                } else {
+                    string summary = $"尝试了 {tried} 个关联番号未找到演员链接：站内缺失(404)={notFound}、请求失败={requestFailed}、无演员区块={noActressBlock}";
+                    if (requestFailed > 0)
+                        summary += "（请求失败可能被拦截，请在源配置检查 Cookie/代理）";
+                    if (ambiguous.Count > 0)
+                        summary = $"多人合演候选中无名字匹配者（{actorName}）。" + summary;
+                    result["Error"] = summary;
+                }
                 result["Logs"] = logs;
                 return result;
             }
@@ -132,6 +200,102 @@ namespace Jvedio.Crawler
             ParseActress(actress.sourceCode, actressUrl, result, logs);
             result["Logs"] = logs;
             return result;
+        }
+
+        /// <summary>Wordfence 临时拦截检测：503 + 封禁页特征文本（拦截会自动恢复，只中止当前演员不做进程冷却）</summary>
+        private static string DetectSiteBlock(int statusCode, string sourceCode)
+        {
+            if (statusCode == (int)HttpStatusCode.ServiceUnavailable && !string.IsNullOrEmpty(sourceCode) &&
+                sourceCode.IndexOf("access to this site has been limited", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "站点触发 Wordfence 临时限速（HTTP 503，多为 404 过多累积触发）：中止当前演员，稍后自动恢复";
+            return null;
+        }
+
+        /// <summary>番号清洗（与宿主 NormalizeVid 同语义）：NFKC、连字符统一、空白/下划线转连字符、去多分片后缀、FC2 归一</summary>
+        private static string NormalizeVid(string raw)
+        {
+            try {
+                string code = (raw ?? "").Normalize(System.Text.NormalizationForm.FormKC).Trim().ToUpperInvariant();
+                if (code == "")
+                    return "";
+                code = Regex.Replace(code, "[‐‑‒–—−]", "-");
+                code = Regex.Replace(code, "[\\s_]+", "-");
+                code = Regex.Replace(code, "-{2,}", "-").Trim('-');
+                code = Regex.Replace(code, "(?i)-?(?:CD|C|PART|DISC)\\d+$", "");
+                Match fc2 = Regex.Match(code, "^FC2-?(?:PPV-?)?(\\d{5,10})$");
+                if (fc2.Success)
+                    return "FC2-PPV-" + fc2.Groups[1].Value;
+                return code;
+            } catch {
+                return (raw ?? "").Trim();
+            }
+        }
+
+        /// <summary>影片页无演员区块时的降级：全文档搜 /idols/ 链接（排除目录页/带查询串），去重后 ≤3 个供名字消歧</summary>
+        private static List<string> FindIdolLinksOnPage(string html, string baseUrl)
+        {
+            try {
+                HtmlDocument doc = new HtmlDocument();
+                doc.LoadHtml(html);
+                List<string> links = (doc.DocumentNode.SelectNodes("//a[contains(@href,'/idols/')]") ?? new HtmlNodeCollection(doc.DocumentNode))
+                    .Select(a => a.GetAttributeValue("href", "").Trim())
+                    .Where(h => !string.IsNullOrEmpty(h) && !h.EndsWith("/idols/", StringComparison.OrdinalIgnoreCase) && !h.Contains("?"))
+                    .Select(h => h.StartsWith("http") ? h : baseUrl + (h.StartsWith("/") ? "" : "/") + h)
+                    .Distinct().Take(3).ToList();
+                return links;
+            } catch {
+                return new List<string>();
+            }
+        }
+
+        /// <summary>
+        /// 按名字站内搜索兜底（全部关联番号都失败时）：GET /?s={名字}（WordPress/ElasticPress 搜索），
+        /// 从结果页收集 /idols/ 候选（≤3）逐个抓页精确消歧；日文名优先、罗马字兜底，
+        /// 返回 (演员页 url 或空, 搜索期间是否被站点临时拦截)；搜索词无效时静默返回空
+        /// </summary>
+        private static async Task<Tuple<string, bool>> TrySearchActressUrl(RequestHeader header, string baseUrl, string actorName, string actorNameEN, List<string> logs)
+        {
+            bool searchBlocked = false;
+            foreach (string name in new[] { actorName, actorNameEN }) {
+                if (string.IsNullOrWhiteSpace(name))
+                    continue;
+                await Task.Delay(500);
+                string searchUrl = $"{baseUrl}/?s={Uri.EscapeDataString(name.Trim())}";
+                logs.Add("search: " + searchUrl);
+                var page = await GetHtmlAsync(header, searchUrl);
+                string blockMsg = DetectSiteBlock(page.statusCode, page.sourceCode);
+                if (blockMsg != null) {
+                    logs.Add(blockMsg);
+                    return Tuple.Create("", true);
+                }
+                if (page.statusCode != (int)HttpStatusCode.OK || string.IsNullOrEmpty(page.sourceCode)) {
+                    logs.Add($"搜索页失败: status={page.statusCode}");
+                    continue;
+                }
+                List<string> candidates = FindIdolLinksOnPage(page.sourceCode, baseUrl);
+                if (candidates.Count == 0) {
+                    logs.Add($"搜索结果({name})中无 idol 链接");
+                    continue;
+                }
+                foreach (string candidate in candidates) {
+                    await Task.Delay(500);
+                    logs.Add("search-disambiguate: " + candidate);
+                    var idol = await GetHtmlAsync(header, candidate);
+                    string idolBlock = DetectSiteBlock(idol.statusCode, idol.sourceCode);
+                    if (idolBlock != null) {
+                        logs.Add(idolBlock);
+                        return Tuple.Create("", true);
+                    }
+                    if (idol.statusCode != (int)HttpStatusCode.OK || string.IsNullOrEmpty(idol.sourceCode))
+                        continue;
+                    var names = ParseActressNames(idol.sourceCode);
+                    if (NameMatches(actorName, actorNameEN, names.Item1, names.Item2)) {
+                        logs.Add($"搜索兜底命中: roman={names.Item1} jp={names.Item2}");
+                        return Tuple.Create(candidate, false);
+                    }
+                }
+            }
+            return Tuple.Create("", searchBlocked);
         }
 
         /// <summary>p.mb-1 区块：b 标签含 actress/idol 的，返回区块内全部演员链接（0=无区块,1=唯一,>1=多人合演）</summary>

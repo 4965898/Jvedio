@@ -1,3 +1,4 @@
+using Jvedio.Core.Media;
 using Jvedio.Core.Utils;
 using Jvedio.Entity;
 using SuperControls.Style;
@@ -192,6 +193,112 @@ namespace Jvedio.Core.UserControls
         private string FilterClause()
         {
             return string.IsNullOrEmpty(_ExtraFilter) ? string.Empty : $"and ({_ExtraFilter}) ";
+        }
+
+        /// <summary>
+        /// 演员筛选器（ActorFilter 侧栏）的 WHERE 条件：组间 AND，与统计跳转的 _ExtraFilter AND 共存。
+        /// 必须同步拼进 count_sql 与 select_sql 的两个查询臂（共 4 处），保证计数与列表一致
+        /// </summary>
+        private string ActorFilterWhereClause()
+        {
+            if (actorFilter == null)
+                return string.Empty;
+            List<string> conditions = actorFilter.BuildWhereConditions();
+
+            // 头像（有/无）：需扫描头像目录生成集合条件，由本类构建
+            int avatarSelection = actorFilter.GetAvatarSelection();
+            if (avatarSelection == 1 || avatarSelection == 2) {
+                string avatarClause = BuildAvatarFilterClause(avatarSelection == 1);
+                if (!string.IsNullOrEmpty(avatarClause))
+                    conditions.Add(avatarClause);
+            }
+
+            if (conditions.Count == 0)
+                return string.Empty;
+            return $"and ({string.Join(" and ", conditions)}) ";
+        }
+
+        /// <summary>
+        /// 头像筛选条件：扫描演员头像目录（Actresses，{ActorID}_{Name}.jpg 优先、兼容旧 {Name}.jpg）
+        /// 生成 ActorID/ActorName 集合条件。SQL 层过滤保证计数与分页一致，无需维护存在性索引；
+        /// 目录扫描仅在该筛选启用时执行（单目录万级文件约几十毫秒）。与列表页 SetImage 的
+        /// GetImagePath()（无影片上下文）同一目录，即"列表页看得到的头像"
+        /// </summary>
+        private string BuildAvatarFilterClause(bool hasAvatar)
+        {
+            try {
+                string dir = ActorInfo.GetActressDirectory();
+                HashSet<long> ids = new HashSet<long>();
+                HashSet<string> names = new HashSet<string>();
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir)) {
+                    foreach (string file in Directory.GetFiles(dir)) {
+                        string ext = System.IO.Path.GetExtension(file).ToLower();
+                        if (!Jvedio.Core.Scan.ScanTask.PICTURE_EXTENSIONS_LIST.Contains(ext))
+                            continue;
+                        string fileName = System.IO.Path.GetFileNameWithoutExtension(file);
+                        if (string.IsNullOrWhiteSpace(fileName))
+                            continue;
+                        System.Text.RegularExpressions.Match m =
+                            System.Text.RegularExpressions.Regex.Match(fileName, "^(\\d+)_(.+)$");
+                        if (m.Success && long.TryParse(m.Groups[1].Value, out long id) && id > 0)
+                            ids.Add(id);
+                        else
+                            names.Add(fileName.Replace("'", "''"));
+                    }
+                }
+
+                if (hasAvatar) {
+                    if (ids.Count == 0 && names.Count == 0)
+                        return "1=0";
+                    List<string> parts = new List<string>();
+                    if (ids.Count > 0)
+                        parts.Add($"actor_info.ActorID in ({string.Join(",", ids)})");
+                    if (names.Count > 0)
+                        parts.Add($"actor_info.ActorName in ('{string.Join("','", names)}')");
+                    return "(" + string.Join(" or ", parts) + ")";
+                }
+
+                // 无头像：两个集合都空=没有任何头像文件，全部命中
+                if (ids.Count == 0 && names.Count == 0)
+                    return string.Empty;
+                return $"(actor_info.ActorID not in ({string.Join(",", ids)}) and actor_info.ActorName not in ('{string.Join("','", names)}'))";
+            } catch (Exception ex) {
+                App.Logger.Error($"头像筛选条件生成失败：{ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        /// <summary>作品数量档位 → HAVING 子句（聚合列，拼进有影片臂 GROUP BY 之后）；无勾选返回空</summary>
+        private string WorksCountHavingClause()
+        {
+            if (actorFilter == null)
+                return string.Empty;
+            string having = actorFilter.BuildWorksCountHaving(out _);
+            return string.IsNullOrEmpty(having) ? string.Empty : $"HAVING {having} ";
+        }
+
+        /// <summary>勾选的作品数量档位不含 0 时，剔除无影片演员臂（该臂作品数恒为 0）</summary>
+        private string ZeroWorksCountExclusion()
+        {
+            if (actorFilter == null)
+                return string.Empty;
+            actorFilter.BuildWorksCountHaving(out bool includeZero);
+            return includeZero ? string.Empty : "and 1=0 ";
+        }
+
+        private void ActorFilter_ApplyRequested(object sender, EventArgs e)
+        {
+            // 应用筛选回到第一页（pagination.CurrentPage 赋值可能触发页面切换事件，Select 幂等无碍）
+            if (CurrentPage != 1) {
+                CurrentPage = 1;
+                pagination.CurrentPage = 1;
+            }
+            Select();
+        }
+
+        private void ActorFilter_CloseRequested(object sender, EventArgs e)
+        {
+            ConfigManager.VideoConfig.ActorShowFilter = false;
         }
 
         private int _PageSize = 40;
@@ -476,13 +583,13 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                          "join metadata " +
                          "on metadata_to_actor.DataID=metadata.DataID " +
                          $"WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType={0} " +
-                         $"{(search ? SearchCondition(searchText) : string.Empty)}{FilterClause()}" +
-                         "GROUP BY actor_info.ActorID " +
+                         $"{(search ? SearchCondition(searchText) : string.Empty)}{FilterClause()}{ActorFilterWhereClause()}" +
+                         $"GROUP BY actor_info.ActorID {WorksCountHavingClause()}" +
                          "UNION " +
                          "select actor_info.ActorID  " +
                          "FROM actor_info WHERE NOT EXISTS " +
                          "(SELECT 1 from metadata_to_actor where metadata_to_actor.ActorID=actor_info.ActorID ) " +
-                         $"{(search ? SearchCondition(searchText) : string.Empty)}{FilterClause()}" +
+                         $"{(search ? SearchCondition(searchText) : string.Empty)}{FilterClause()}{ActorFilterWhereClause()}{ZeroWorksCountExclusion()}" +
                          "GROUP BY actor_info.ActorID)";
 
 
@@ -495,13 +602,13 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                 $"join metadata_to_actor on metadata_to_actor.ActorID=actor_info.ActorID " +
                 $"join metadata on metadata_to_actor.DataID=metadata.DataID " +
                 $"WHERE metadata.DBId={ConfigManager.Main.CurrentDBId} and metadata.DataType={0} " +
-                $"{(search ? SearchCondition(searchText) : string.Empty)}{FilterClause()}" +
-                $"GROUP BY actor_info.ActorID " +
+                $"{(search ? SearchCondition(searchText) : string.Empty)}{FilterClause()}{ActorFilterWhereClause()}" +
+                $"GROUP BY actor_info.ActorID {WorksCountHavingClause()}" +
                 "UNION " +
                 // 显示只有演员名，没有数量的演员
                 $"{unionSelect} FROM actor_info " +
                 "WHERE NOT EXISTS(SELECT 1 from metadata_to_actor where metadata_to_actor.ActorID=actor_info.ActorID )" +
-                $"{(search ? SearchCondition(searchText) : string.Empty)}{FilterClause()} GROUP BY actor_info.ActorID " +
+                $"{(search ? SearchCondition(searchText) : string.Empty)}{FilterClause()}{ActorFilterWhereClause()}{ZeroWorksCountExclusion()} GROUP BY actor_info.ActorID " +
                 wrapper.ToOrder() + ActorToLimit();
 
             onPageChange(TotalCount);
@@ -1030,6 +1137,98 @@ nameof(ViewMode), typeof(bool), typeof(ActorList), new PropertyMetadata(false));
                 MessageNotify.Info("所选演员已在补齐队列中");
             else
                 MessageNotify.Success($"已加入演员资料补齐队列：{result} 位（串行执行，进度见右下角任务页）");
+        }
+
+        /// <summary>批量下载头像进行中标记（防重复触发并发下载）</summary>
+        private bool _DownloadingAvatars;
+
+        /// <summary>
+        /// 右键「下载头像」：从 Gfriends 头像库下载/更新演员头像，功能与详情页「下载」按钮一致——
+        /// 显式操作视为刷新、覆盖已有头像，未收录/未启用有明确提示。
+        /// 选择语义与「同步信息/删除」一致：编辑模式=勾选的全部（批量），否则=右键的这一位
+        /// </summary>
+        public void DownloadActorAvatar(object sender, RoutedEventArgs e)
+        {
+            MenuItem mnu = sender as MenuItem;
+            ContextMenu contextMenu = mnu?.Parent as ContextMenu;
+            if (contextMenu == null || !long.TryParse(contextMenu.Tag?.ToString(), out long actorID) || actorID <= 0)
+                return;
+
+            List<ActorInfo> targets = new List<ActorInfo>();
+            if (ConfigManager.VideoConfig.ActorEditMode) {
+                foreach (ActorInfo selected in SelectedActors) {
+                    if (selected != null && selected.ActorID > 0 && !targets.Any(arg => arg.ActorID == selected.ActorID))
+                        targets.Add(selected);
+                }
+            }
+            ActorInfo current = CurrentList?.Where(arg => arg != null && arg.ActorID == actorID).FirstOrDefault();
+            if (current == null)
+                current = ActorInfo.GetById(actorID);
+            if (current == null)
+                return;
+            if (!targets.Any(arg => arg.ActorID == actorID))
+                targets.Add(current);
+
+            if (!Gfriends.GfriendsAvatar.Enabled) {
+                MessageNotify.Warning("未启用 Gfriends 头像库：请在「选项 → 同步信息」中勾选");
+                return;
+            }
+
+            // 下载期间列表可能翻页替换：只拷贝所需字段，避免后台线程读 UI 实体
+            List<ActorInfo> snapshot = targets.Select(arg => new ActorInfo {
+                ActorID = arg.ActorID,
+                ActorName = arg.ActorName,
+                ActorNameEN = arg.ActorNameEN,
+            }).ToList();
+
+            _DownloadingAvatars = true;
+            MessageNotify.Info($"开始从 Gfriends 头像库下载 {snapshot.Count} 位演员头像（已有头像将覆盖）");
+            Task.Run(async () => {
+                int ok = 0, miss = 0, fail = 0;
+                try {
+                    foreach (ActorInfo actor in snapshot) {
+                        try {
+                            byte[] bytes = await Gfriends.GfriendsAvatar.TryGetAvatarBytesAsync(actor.ActorName, actor.ActorNameEN);
+                            if (bytes == null || bytes.Length == 0) {
+                                miss++;
+                                App.Logger.Info($"手动下载演员头像：Gfriends 未收录 {actor.ActorName}");
+                                continue;
+                            }
+                            // GetImagePath：已有头像返回其现有文件名（原地覆盖），没有则落到约定命名
+                            string targetPath = Path.GetFullPath(actor.GetImagePath());
+                            string dir = Path.GetDirectoryName(targetPath);
+                            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                                Directory.CreateDirectory(dir);
+                            File.WriteAllBytes(targetPath, bytes);
+                            ImageCache.Remove(targetPath);
+                            ok++;
+                            App.Logger.Info($"手动下载演员头像（Gfriends）：{actor.ActorName} → {targetPath}");
+                            // 当前页可见的卡片即时上屏
+                            await App.Current.Dispatcher.BeginInvoke(new Action(() => {
+                                ActorInfo card = CurrentList?.Where(arg => arg != null && arg.ActorID == actor.ActorID).FirstOrDefault();
+                                if (card != null)
+                                    card.SmallImage = ImageCache.Get(card.GetImagePath()) ?? MetaData.DefaultActorImage;
+                            }));
+                        } catch (Exception ex) {
+                            fail++;
+                            App.Logger.Error($"手动下载演员头像失败 {actor.ActorName}：{ex.Message}");
+                        }
+                        await Task.Delay(500); // Gfriends 请求限速
+                    }
+                } finally {
+                    _DownloadingAvatars = false;
+                }
+                string summary = $"头像下载完成：成功 {ok}、未收录 {miss}、失败 {fail}";
+                App.Logger.Info($"手动下载演员头像（批量 {snapshot.Count} 位）：{summary}");
+                App.Current.Dispatcher.BeginInvoke(new Action(() => {
+                    if (fail > 0)
+                        MessageNotify.Warning(summary);
+                    else if (ok > 0)
+                        MessageNotify.Success(summary);
+                    else
+                        MessageNotify.Info(summary);
+                }));
+            });
         }
 
         /// <summary>

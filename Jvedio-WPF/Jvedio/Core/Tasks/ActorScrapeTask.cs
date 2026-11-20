@@ -10,6 +10,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using static Jvedio.MapperManager;
 
@@ -80,7 +82,7 @@ namespace Jvedio.Core.Tasks
                     dataInfo["ActorName"] = actorInfo.ActorName;
                     dataInfo["ActorNameEN"] = actorInfo.ActorNameEN ?? "";
                     dataInfo["Vid"] = GetFirstLinkedVid(actorInfo.ActorID);
-                    dataInfo["Vids"] = GetLinkedVids(actorInfo.ActorID, 10);
+                    dataInfo["Vids"] = GetLinkedVids(actorInfo.ActorID, MaxCandidateVids);
                     dataInfo["Url"] = server.Url;
 
                     PluginInvoker invoker = new PluginInvoker(metaData.GetDllPath());
@@ -315,12 +317,15 @@ namespace Jvedio.Core.Tasks
             }
         }
 
-        /// <summary>取该演员关联的第一部影片番号（供按番号定位演员页的数据源用）</summary>
-        private static string GetFirstLinkedVid(long actorID)
-        {
-            List<string> vids = GetLinkedVids(actorID, 1);
-            return vids.Count > 0 ? vids[0] : "";
-        }
+    /// <summary>取该演员关联的第一部影片番号（供按番号定位演员页的数据源用）</summary>
+    private static string GetFirstLinkedVid(long actorID)
+    {
+        List<string> vids = GetLinkedVids(actorID, 1);
+        return vids.Count > 0 ? vids[0] : "";
+    }
+
+    /// <summary>候选番号上限：javdatabase 收录偏新片，发行日期新→旧排序后放宽到 15 个</summary>
+    private const int MaxCandidateVids = 15;
 
         /// <summary>
         /// 下载并保存演员头像到本地头像目录（GetImagePath 约定的文件名）。
@@ -386,23 +391,55 @@ namespace Jvedio.Core.Tasks
             }
         }
 
-        /// <summary>取该演员关联的全部影片番号（最多 limit 个）：404 时逐个换下一个重试</summary>
+        /// <summary>
+        /// 取该演员关联的全部影片番号（最多 limit 个）：优先发行日期新→旧（javdatabase 收录偏新片，
+        /// 旧片更易站内缺失），发行日期缺失按入库顺序新→旧兜底；清洗去重后返回，404 时逐个换下一个重试
+        /// </summary>
         private static List<string> GetLinkedVids(long actorID, int limit)
         {
             List<string> vids = new List<string>();
             try {
                 List<Dictionary<string, object>> list = metaDataMapper.Select(
                     "select v.VID from metadata_to_actor ma join metadata_video v on v.DataID = ma.DataID " +
+                    "join metadata m on m.DataID = ma.DataID " +
                     "where ma.ActorID = '" + actorID + "' and v.VID is not null and v.VID <> '' " +
-                    "order by v.MVID limit " + limit);
+                    "order by ifnull(m.ReleaseDate,'') desc, v.MVID desc limit " + limit);
                 if (list != null)
                     foreach (Dictionary<string, object> row in list)
-                        if (row.TryGetValue("VID", out object vid) && vid != null && !string.IsNullOrWhiteSpace(vid.ToString()))
-                            vids.Add(vid.ToString().Trim());
+                        if (row.TryGetValue("VID", out object vid) && vid != null && !string.IsNullOrWhiteSpace(vid.ToString())) {
+                            string clean = NormalizeVid(vid.ToString());
+                            if (clean != "" && !vids.Contains(clean))
+                                vids.Add(clean);
+                        }
             } catch (Exception ex) {
                 App.Logger.Error(ex.Message);
             }
             return vids;
+        }
+
+        /// <summary>
+        /// 番号清洗：NFKC 归一、连字符变体统一、空白/下划线转连字符、去多分片后缀（-CD1/-C2/-PART1/-DISC2）、
+        /// FC2 归一（语义与 BrowserClipperService.NormalizeCode 一致），避免变体番号占用候选名额与无效 404
+        /// </summary>
+        private static string NormalizeVid(string raw)
+        {
+            try {
+                string code = (raw ?? "").Normalize(NormalizationForm.FormKC).Trim().ToUpperInvariant();
+                if (code == "")
+                    return "";
+                code = Regex.Replace(code, "[‐‑‒–—−]", "-");
+                code = Regex.Replace(code, "[\\s_]+", "-");
+                code = Regex.Replace(code, "-{2,}", "-").Trim('-');
+                // 多分片：SSIS-699 CD2 / SSIS-699-C2 / SSIS-699PART1 / SSIS-699 DISC2 → 主番号
+                code = Regex.Replace(code, "(?i)-?(?:CD|C|PART|DISC)\\d+$", "");
+                Match fc2 = Regex.Match(code, "^FC2-?(?:PPV-?)?(\\d{5,10})$");
+                if (fc2.Success)
+                    return "FC2-PPV-" + fc2.Groups[1].Value;
+                return code;
+            } catch (Exception ex) {
+                App.Logger.Error($"番号清洗失败：{ex.Message}");
+                return (raw ?? "").Trim();
+            }
         }
 
         private static bool TryGetStr(Dictionary<string, object> dict, string key, out string value)
